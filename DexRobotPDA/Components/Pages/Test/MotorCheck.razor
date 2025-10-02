@@ -1,0 +1,133 @@
+﻿@page "/MotorCheck"
+@using MudBlazor
+
+<MudPaper Class="pa-4">
+    <!-- 外层负责当列总宽度超过容器时出现 X 轴滚动 -->
+    <div class="horiz-scroll">
+        <MudTable T="OrderRow"
+                  Items="@Rows"
+                  FixedHeader="true"
+                  Height="@TableBodyMaxHeight"
+                  Dense="true"
+                  Hover="true"
+                  Bordered="true"
+                  Striped="true"
+                  Breakpoint="Breakpoint.Xs">
+            <HeaderContent>
+                <MudTh Style="@MinColWidthStyle">Order ID</MudTh>
+                <MudTh Style="@MinColWidthStyle">Customer</MudTh>
+                <MudTh Style="@MinColWidthStyle">Email</MudTh>
+                <MudTh Style="@MinColWidthStyle">Phone</MudTh>
+                <MudTh Style="@MinColWidthStyle">Country</MudTh>
+                <MudTh Style="@MinColWidthStyle">City</MudTh>
+                <MudTh Style="@MinColWidthStyle">Address</MudTh>
+                <MudTh Style="@MinColWidthStyle">Zip</MudTh>
+                <MudTh Style="@MinColWidthStyle">Order Date</MudTh>
+                <MudTh Style="@MinColWidthStyle">Status</MudTh>
+                <MudTh Style="@MinColWidthStyle">Subtotal</MudTh>
+                <MudTh Style="@MinColWidthStyle">Tax</MudTh>
+                <MudTh Style="@MinColWidthStyle">Shipping</MudTh>
+                <MudTh Style="@MinColWidthStyle">Total</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd Style="@MinColWidthStyle">@context.OrderId</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Customer</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Email</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Phone</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Country</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.City</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Address</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Zip</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.OrderDate.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Status</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Subtotal.ToString("C")</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Tax.ToString("C")</MudTd>
+                <MudTd Style="@MinColWidthStyle">@context.Shipping.ToString("C")</MudTd>
+                <MudTd Style="@MinColWidthStyle"><b>@context.Total.ToString("C")</b></MudTd>
+            </RowTemplate>
+        </MudTable>
+    </div>
+</MudPaper>
+
+<style>
+  /* 当列总宽度超过容器宽度时，出现横向滚动条 */
+  .horiz-scroll {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  /* 可选：稍微美化滚动条（按需保留/删除） */
+  .horiz-scroll::-webkit-scrollbar,
+  :root ::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+  .horiz-scroll::-webkit-scrollbar-thumb,
+  :root ::-webkit-scrollbar-thumb {
+    border-radius: 8px;
+  }
+  /* 表头固定无需额外 CSS：MudTable 在 FixedHeader + Height 时自动处理 */
+</style>
+
+@code {
+    // 表体最大高度，超过后出现 Y 轴滚动；表头固定
+    private string TableBodyMaxHeight = "400px";
+
+    // 每列最小宽度（避免被挤压），列多时触发 X 轴滚动
+    private const int MinColWidthPx = 140;
+    private string MinColWidthStyle => $"min-width:{MinColWidthPx}px;";
+
+    // 示例数据
+    private List<OrderRow> Rows = new();
+
+    protected override void OnInitialized()
+    {
+        var rnd = new Random(42);
+        var statuses = new[] { "Pending", "Packed", "Shipped", "Delivered", "Returned" };
+        var cities = new[] { "Los Angeles", "New York", "Seattle", "Austin", "Miami", "Chicago" };
+        var countries = new[] { "US", "CA", "UK", "DE", "JP", "SG" };
+
+        for (int i = 1; i <= 60; i++)
+        {
+            var subtotal = rnd.Next(50, 500);
+            var tax = Math.Round(subtotal * 0.0825m, 2);
+            var shipping = rnd.Next(0, 30);
+            Rows.Add(new OrderRow
+            {
+                OrderId = $"ORD-{1000 + i}",
+                Customer = $"Customer {i}",
+                Email = $"customer{i}@example.com",
+                Phone = $"+1-555-01{i:00}",
+                Country = countries[rnd.Next(countries.Length)],
+                City = cities[rnd.Next(cities.Length)],
+                Address = $"{100 + i} Main St, Apt {i % 20 + 1}",
+                Zip = $"{90000 + i}",
+                OrderDate = DateTime.Today.AddDays(-rnd.Next(0, 120)),
+                Status = statuses[rnd.Next(statuses.Length)],
+                Subtotal = subtotal,
+                Tax = tax,
+                Shipping = shipping,
+                Total = subtotal + tax + shipping
+            });
+        }
+    }
+
+    public class OrderRow
+    {
+        public string OrderId { get; set; } = default!;
+        public string Customer { get; set; } = default!;
+        public string Email { get; set; } = default!;
+        public string Phone { get; set; } = default!;
+        public string Country { get; set; } = default!;
+        public string City { get; set; } = default!;
+        public string Address { get; set; } = default!;
+        public string Zip { get; set; } = default!;
+        public DateTime OrderDate { get; set; }
+        public string Status { get; set; } = default!;
+        public decimal Subtotal { get; set; }
+        public decimal Tax { get; set; }
+        public decimal Shipping { get; set; }
+        public decimal Total { get; set; }
+    }
+}

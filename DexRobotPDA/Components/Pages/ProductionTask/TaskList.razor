@@ -1,0 +1,264 @@
+﻿@page "/tasklist"
+@inject TaskService TaskService
+@implements IBrowserViewportObserver
+@using DexRobotPDA.Components.Pages.Components
+@implements IAsyncDisposable
+
+<MudPaper Elevation="3" Class="pa-4 ma-2 mx-md-8">
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudItem xs="12" md="7">
+            <MudDateRangePicker
+                @bind-DateRange="@_dateRange"
+                Clearable="true"
+                PlaceholderStart="开始"
+                PlaceholderEnd="结束"
+                Margin="Margin.Dense"
+                Class="w-100"/>
+        </MudItem>
+        <MudSpacer/>
+        <MudItem xs="12" md="5" Class="d-flex justify-end">
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Warning"
+                OnClick="@(() => OpenDialogAsync(_addTaskDialog))"
+                StartIcon="@Icons.Material.Filled.ControlPoint"
+                Class="mx-1">
+                新增任务
+            </MudButton>
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                StartIcon="@Icons.Material.Filled.Search"
+                OnClick="LoadTasks"
+                Class="mx-1">
+                获取任务
+            </MudButton>
+        </MudItem>
+
+       
+    </MudStack>
+</MudPaper>
+
+<MudPaper Elevation="3" Class="ma-2 mx-md-8">
+    <MudCard Elevation="2" Class="pa-4">
+        @if (isLoading)
+        {
+            <MudPaper Elevation="0" Class="p-6 text-center">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+                <MudText Class="mt-2">加载任务中...</MudText>
+            </MudPaper>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudPaper Elevation="0" Class="p-6 text-center">
+                <MudText Color="Color.Error">@errorMessage</MudText>
+            </MudPaper>
+        }
+        else if (tasks == null || tasks.Count == 0)
+        {
+            <MudPaper Elevation="0" Class="p-6 text-center">
+                <MudText Color="Color.Info">没有找到相关任务</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudTable Items="tasks" Hover="true" FixedHeader="true"
+                      Filter="new Func<ProductTaskDto,bool>(FilterFunc1)"
+                      SortLabel="Sort By" Elevation="3" Bordered="true" Striped="true"
+                      Dense="@_ifDense"
+                      Height="@_tableHeight">
+                <ToolBarContent>
+                    <MudChip T="string" Size="Size.Large">任务列表</MudChip>
+                    <MudSpacer/>
+                    <MudTextField T="string" @bind-Value="searchString1" Placeholder="Search"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel T="ProductTaskDto" SortBy="@(context => tasks.IndexOf(context) + 1)">序号</MudTableSortLabel>
+                    </MudTh>
+
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.task_id">任务ID</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.title">任务名称</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.description">任务描述</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.product_num">生产数量</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.priority">优先级</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.assignee_id">负责人</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.created_at">创建时间</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.updated_at">更新时间</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.status">状态</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>操作</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="序号">@(tasks.IndexOf(context) + 1)</MudTd>
+                    <MudTd DataLabel="任务ID">@context.task_id</MudTd>
+                    <MudTd DataLabel="任务名称">@context.title</MudTd>
+                    <MudTd DataLabel="任务描述">@context.description</MudTd>
+                    <MudTd DataLabel="生产数量">@context.product_num</MudTd>
+                    <MudTd DataLabel="优先级">@context.priority</MudTd>
+                    <MudTd DataLabel="负责人">@context.assignee_id</MudTd>
+                    <MudTd DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd DataLabel="更新时间">@context.updated_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd DataLabel="状态">
+                        <MudChip T="string" Color="GetStatusColor(context.status)">@GetStatusText(context.status)</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="操作">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => NavigateToDetail(context.task_id))">查看明细
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="显示数量" HideRowsPerPage="@_ifDense"
+                                   PageSizeOptions="new int[] { 10, 20, 50, 100 }"/>
+                </PagerContent>
+            </MudTable>
+        }
+    </MudCard>
+</MudPaper>
+
+@code {
+    private DateRange _dateRange { get; set; }
+    private List<ProductTaskDto> tasks;
+    private bool isLoading = true;
+    private string errorMessage;
+    private string searchString1 = "";
+    private string _tableHeight = "600px";
+    private bool _ifDense = false;
+
+    [Inject] private IBrowserViewportService ViewportService { get; set; }
+    private Breakpoint _currentBreakpoint = Breakpoint.Xs;
+
+    private readonly DialogOptions _addTaskDialog = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    private async Task OpenDialogAsync(DialogOptions options)
+    {
+        var dialog  = await DialogService.ShowAsync<AddTaskDialog>("", options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTasks();
+        }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ViewportService.SubscribeAsync(this, fireImmediately: true);
+            UpdateTableHeightByBreakpoint(_currentBreakpoint);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    Task IBrowserViewportObserver.NotifyBrowserViewportChangeAsync(BrowserViewportEventArgs args)
+    {
+        _currentBreakpoint = args.Breakpoint;
+        UpdateTableHeightByBreakpoint(_currentBreakpoint);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateTableHeightByBreakpoint(Breakpoint breakpoint)
+    {
+        _tableHeight = breakpoint <= Breakpoint.Sm ? "350px" : "600px";
+        _ifDense = breakpoint <= Breakpoint.Sm ? true : false;
+    }
+
+    public async ValueTask DisposeAsync() => await ViewportService.UnsubscribeAsync(this);
+
+    Guid IBrowserViewportObserver.Id { get; } = Guid.NewGuid();
+
+    ResizeOptions IBrowserViewportObserver.ResizeOptions { get; } = new()
+    {
+        ReportRate = 250,
+        NotifyOnBreakpointOnly = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        isLoading = true;
+        errorMessage = null;
+        tasks = null;
+        try
+        {
+            tasks = await TaskService.GetTasks();
+            if (_dateRange != null && _dateRange.Start != null && _dateRange.End != null)
+            {
+                tasks = tasks.Where(t =>
+                    t.created_at >= _dateRange.Start.Value.Date &&
+                    t.created_at <= _dateRange.End.Value.Date.AddDays(1).AddTicks(-1)
+                ).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"加载任务失败: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(byte status) => status switch
+    {
+        0 => "待处理",
+        1 => "进行中",
+        2 => "已完成",
+        3 => "已取消",
+        _ => $"未知状态({status})"
+    };
+
+    private Color GetStatusColor(byte status) => status switch
+    {
+        0 => Color.Default,
+        1 => Color.Info,
+        2 => Color.Success,
+        3 => Color.Error,
+        _ => Color.Default
+    };
+
+    private void NavigateToDetail(string task_id)
+    {
+        NavManager.NavigateTo($"/TaskDetail/{task_id}");
+    }
+
+    private bool FilterFunc1(ProductTaskDto element) => FilterFunc(element, searchString1);
+
+    private bool FilterFunc(ProductTaskDto element, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString)) return true;
+        var search = searchString.ToLower();
+        return (element.task_id?.ToLower().Contains(search) ?? false) ||
+               (element.title?.ToLower().Contains(search) ?? false) ||
+               (element.description?.ToLower().Contains(search) ?? false) ||
+               element.priority.ToString().Contains(searchString) ||
+               (element.assignee_id?.ToLower().Contains(search) ?? false) ||
+               element.created_at.ToString("yyyy-MM-dd").Contains(searchString) ||
+               element.updated_at.ToString("yyyy-MM-dd").Contains(searchString);
+    }
+
+}

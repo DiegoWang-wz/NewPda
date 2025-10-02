@@ -1,0 +1,114 @@
+﻿@using DexRobotPDA.Components.Pages
+@using DexRobotPDA.Components.Pages.Components
+@inherits LayoutComponentBase
+
+<MudThemeProvider/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center min-vh-100">
+        <MudSpinner Color="Color.Primary" Size="Size.Large"/>
+        <MudText Class="ms-4" Typo="Typo.h6">页面加载中...</MudText>
+    </div>
+}
+else
+{
+    <MudLayout>
+        <MudAppBar>
+            <MudLink Href="/">
+                <MudImage Src="/LJ_LOGO_W.png" Alt="Logo" Height="60" Width="140" Contain="true"/>
+            </MudLink>
+            <MudChip T="string" Size="Size.Large" Style="position: absolute; left: 50%; transform: translateX(-50%);" Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Info"> @CurrentPageTitle</MudChip>
+
+            <MudSpacer/>
+            @if (currentUser != null)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Inherit"/>
+                <MudText Typo="Typo.h6">@currentUser.employee_name</MudText>
+                <MudDivider Vertical="true" Class="mx-4 my-auto" Style="height: 1em; align-self: center;"/>
+                <MudIcon Icon="@Icons.Material.Filled.AccountBox" Color="Color.Inherit"/>
+                <MudText Typo="Typo.h6">@currentUser.employee_id</MudText>
+            }
+            <MudDivider Vertical="true" Class="mx-4 my-auto" Style="height: 1em; align-self: center;"/>
+            <MudMenu Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Label="菜单">
+                <MudMenuItem Label="主页" Href="/" Match="NavLinkMatch.Prefix"/>
+                <MudMenuItem Label="退出" OnClick="OpenDialogAsync"/>
+            </MudMenu>
+        </MudAppBar>
+        <MudMainContent>
+            @Body
+        </MudMainContent>
+    </MudLayout>
+}
+
+
+
+@code {
+    private UserDto? currentUser;
+    private bool isLoading = false;
+
+    private Task OpenDialogAsync()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+
+        return DialogService.ShowAsync<MyDialog>("Simple Dialog", options);
+    }
+
+    private string CurrentPageTitle
+    {
+        get
+        {
+            var uri = NavManager.ToBaseRelativePath(NavManager.Uri);
+            if (uri.Contains('/'))
+            {
+                uri = uri.Split('/')[0];
+            }
+            return uri switch
+            {
+                "TaskList" => "生产任务",
+                "TaskDetail" => "生产详情",
+                "process_1" => "粘蜗杆",
+                "process_2" => "手指组装",
+                "process_3" => "手掌组装",
+                "Detect1" => "蜗杆粘接检测",
+                "Detect2" => "分指机构蜗杆粘接检测",
+                "Detect3" => "分指机构标定检测",
+                "Detect4" => "单指标定检测",
+                "Detect5" => "整手标定检测",
+                _ => "主页"
+            };
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+}

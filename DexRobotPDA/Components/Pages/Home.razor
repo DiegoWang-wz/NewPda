@@ -1,0 +1,216 @@
+﻿@page "/"
+<br>
+<MudContainer MaxWidth="MaxWidth.Large">
+    @if (isLoading)
+    {
+        <MudPaper Class="pa-6 text-center d-flex align-center justify-center">
+            <MudCircularProgress Color="Color.Primary" Class="mr-3"/>
+            <MudText>加载中...</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4 mb-4 d-flex align-center" Elevation="1">
+            <MudAvatar Size="Size.Small" Color="Color.Success" Class="mr-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium"/>
+            </MudAvatar>
+            <div Class="mr-auto">
+                <MudText Typo="Typo.body2">操作员: @currentUser.employee_name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    部门: @currentUser.department · 工号: @currentUser.employee_id
+                </MudText>
+            </div>
+            <MudChip 
+                T="string" 
+                Color="Color.Success" 
+                Variant="Variant.Filled"
+                Icon="@Icons.Material.Filled.CheckCircle" 
+                Class="ml-2">
+                在线
+            </MudChip>
+        </MudPaper>
+        <div class="d-flex flex-row align-center my-6">
+            <MudText Typo="Typo.h6" Class="text-primary mr-4">数据统计</MudText>
+            <MudDivider DividerType="DividerType.Middle" Class="flex-grow-1 "/>
+        </div>
+        <MudGrid Spacing="3" Justify="Justify.FlexStart">
+            @foreach (var operation in operations)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="operation-card" Elevation="2">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            FullWidth="true"
+                            Size="Size.Large"
+                            Color="Color.Primary"
+                            EndIcon="@Icons.Material.Filled.ArrowForward"
+                            OnClick="@(() => NavigateToOperation(operation.Route))"
+                            Class="operation-button">
+                            <MudIcon Icon="@operation.Icon" Class="mr-2"/>
+                            @operation.Name
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-1">
+                            今日已完成: @operation.CompletedToday
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+        <div class="d-flex flex-row align-center my-6">
+            <MudText Typo="Typo.h6" Class="text-primary mr-4">配件绑定</MudText>
+            <MudDivider DividerType="DividerType.Middle" Class=" flex-grow-1 "/>
+        </div>
+        <MudGrid Spacing="3" Justify="Justify.FlexStart">
+            @foreach (var operation in operations2)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="operation-card" Elevation="2">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            FullWidth="true"
+                            Size="Size.Large"
+                            Color="Color.Primary"
+                            EndIcon="@Icons.Material.Filled.ArrowForward"
+                            OnClick="@(() => NavigateToOperation(operation.Route))"
+                            Class="operation-button">
+                            <MudIcon Icon="@operation.Icon" Class="mr-2"/>
+                            @operation.Name
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-1">
+                            今日已完成: @operation.CompletedToday
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+        <div class="d-flex flex-row align-center my-6">
+            <MudText Typo="Typo.h6" Class="text-primary mr-4">配件检测</MudText>
+            <MudDivider DividerType="DividerType.Middle" Class="flex-grow-1 "/>
+        </div>
+        <MudGrid Spacing="3" Justify="Justify.FlexStart">
+            @foreach (var operation in operations3)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="operation-card" Elevation="2">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            FullWidth="true"
+                            Size="Size.Large"
+                            Color="Color.Primary"
+                            EndIcon="@Icons.Material.Filled.ArrowForward"
+                            OnClick="@(() => NavigateToOperation(operation.Route))"
+                            Class="operation-button">
+                            <MudIcon Icon="@operation.Icon" Class="mr-2"/>
+                            @operation.Name
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-1">
+                            今日已完成: @operation.CompletedToday
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+   
+
+    
+</MudContainer>
+
+@code {
+    public class OperationItem
+    {
+        public string Name { get; set; }
+        public string Icon { get; set; }
+        public int CompletedToday { get; set; }
+        public string Route { get; set; }
+    }
+
+    public class QuickActionItem
+    {
+        public string Name { get; set; }
+        public string Icon { get; set; }
+    }
+
+    private UserDto? currentUser;
+    private bool isLoading = true;
+
+    private List<OperationItem> operations = new()
+    {
+        new() { Name = "生产任务", Icon = Icons.Material.Filled.FormatListBulleted, CompletedToday = 2, Route = "/TaskList" },
+        new() { Name = "配件检测汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/Detect1" },
+        // new() { Name = "质量检测", Icon = Icons.Material.Filled.Verified, CompletedToday = 30, Route = "/barcode-scanner" },
+        // new() { Name = "包装", Icon = Icons.Material.Filled.Inventory, CompletedToday = 22, Route = "/focus-example" },
+        // new() { Name = "入库", Icon = Icons.Material.Filled.Warehouse, CompletedToday = 15, Route = "/InputDetect" }
+    };
+    private List<OperationItem> operations2 = new()
+    {
+        new() { Name = "粘蜗杆", Icon = Icons.Material.Filled.Build, CompletedToday = 24, Route = "/process_1" },
+        new() { Name = "手指组装", Icon = Icons.Material.Filled.PanToolAlt, CompletedToday = 18, Route = "/process_2" },
+        new() { Name = "手掌组装", Icon = Icons.Material.Filled.FrontHand, CompletedToday = 12, Route = "/process_3" },
+    };
+    private List<OperationItem> operations3 = new()
+    {
+        new() { Name = "蜗杆粘接检测", Icon = Icons.Material.Filled.LooksOne, CompletedToday = 30, Route = "/Detect1" },
+        new() { Name = "分指机构蜗杆粘接检测", Icon = Icons.Material.Filled.LooksTwo, CompletedToday = 30, Route = "/Detect2" },
+        new() { Name = "分指机构标定检测", Icon = Icons.Material.Filled.Looks3, CompletedToday = 30, Route = "/Detect3" },
+        new() { Name = "单指标定检测", Icon = Icons.Material.Filled.Looks4, CompletedToday = 30, Route = "/Detect4" },
+        new() { Name = "整手标定检测", Icon = Icons.Material.Filled.Looks5, CompletedToday = 30, Route = "/Detect5" }
+    };
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+        
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void NavigateToOperation(string route) => NavManager.NavigateTo(route);
+}
+
+<style>
+    .operation-button {
+        height: 80px;
+        font-size: 1.1rem;
+        margin: 0; 
+    }
+
+    .operation-card {
+        transition: box-shadow 0.3s ease;
+        padding: 0.5rem;
+    }
+
+    .operation-card:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12) !important;
+    }
+    @@media (max-width: 600px) {
+        .mud-button-label {
+            font-size: 0.9rem;
+        }
+        .operation-button {
+            height: 70px;
+        }
+    }
+</style>

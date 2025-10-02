@@ -1,0 +1,127 @@
+﻿@page "/focus-example"
+@inject IJSRuntime JSRuntime
+@inject TaskService TaskService
+@implements IAsyncDisposable
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-5">
+    <MudCard Elevation="5">
+        <MudCardContent Class="p-6">
+            <MudTextField @bind-Value="taskId"
+                          Label="生产单号"
+                          Variant="Variant.Outlined"
+                          Class="mb-4">
+            </MudTextField>
+            
+            <MudText Typo="Typo.h4" Class="mb-6">回车键切换按钮状态示例</MudText>
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudButton
+                        @ref="toggleButton"
+                        Variant="buttonVariant"
+                        Color="buttonColor"
+                        OnClick="ToggleAndLoadTask"
+                        Disabled="isLoading"
+                        Class="fs-5 px-8 py-6"
+                        FullWidth="true">
+                        @(isLoading ? "加载中..." : buttonText)
+                    </MudButton>
+                </MudItem>
+
+                <MudItem xs="12" Class="mt-4">
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        按下回车键可以切换按钮状态，也可以直接点击按钮进行切换
+                    </MudAlert>
+                    
+                    @if (task != null)
+                    {
+                        <MudList T="string" Class="mt-4">
+                            <MudListItem Text="生产单号" Icon="@Icons.Material.Filled.Inbox">@task.task_id</MudListItem>
+                            <MudListItem Text="创建时间" Icon="@Icons.Material.Filled.Send">@task.created_at</MudListItem>
+                        </MudList>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private ProductTaskDto? task = null;
+    private MudButton? toggleButton;
+    private bool isActive = false;
+    private bool isLoading = false;  // 新增加载状态
+    private string taskId = string.Empty;
+    private DotNetObjectReference<FocusExample>? dotNetRef;
+
+    // 按钮文本根据状态动态显示
+    private string buttonText => isActive ? "已激活" : "未激活";
+    private Variant buttonVariant => isActive ? Variant.Filled : Variant.Outlined;
+    private Color buttonColor => isActive ? Color.Success : Color.Default;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnEnterKeyPressed()
+    {
+        StateHasChanged();
+        await Task.Delay(1);
+        await ToggleAndLoadTask();
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (dotNetRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
+            dotNetRef.Dispose();
+        }
+        
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task ToggleAndLoadTask()
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            Snackbar.Add("请输入生产单号", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            isLoading = true;  // 开始加载
+            isActive = !isActive;  // 切换状态
+            StateHasChanged();  // 强制更新UI
+            
+            // 加载任务详情
+            task = await TaskService.GetTaskDetail(taskId);
+            
+            if (task != null)
+            {
+                Snackbar.Add("任务加载成功", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("未找到对应的任务", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            task = null;
+            await DialogService.ShowMessageBox("错误", $"任务加载失败：{ex.Message}", "确定");
+        }
+        finally
+        {
+            isLoading = false;  // 结束加载
+            StateHasChanged();  // 强制更新UI
+        }
+    }
+}

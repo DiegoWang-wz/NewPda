@@ -1,0 +1,179 @@
+﻿@page "/barcode-scanner"
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="my-8">
+    <MudCard Elevation="5" Class="p-6">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-4">条码扫描测试</MudText>
+            
+            <MudGrid Spacing="4" Class="mb-6">
+                <MudItem xs="12" Class="d-flex justify-content-end">
+                    <MudButton
+                        Variant="Variant.Outlined"
+                        Color="@(_isAutoMode ? Color.Success : Color.Primary)"
+                        OnClick="ToggleMode">
+                        @(_isAutoMode ? "自动匹配模式" : "手动聚焦模式")
+                        <MudIcon Icon="@(_isAutoMode ? Icons.Material.Filled.AutoAwesome : Icons.Material.Filled.Man)"
+                                 Class="ml-2"/>
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+
+            @foreach (var input in _inputs)
+            {
+                <MudGrid Spacing="4" Class="mb-4">
+                    <MudItem xs="10">
+                        <MudTextField T="string" @ref="input.FieldRef"
+                                      Label="@input.Label"
+                                      Variant="Variant.Outlined"
+                                      Id="@input.Id"
+                                      Immediate="true"/>
+                    </MudItem>
+                    @if (!_isAutoMode)
+                    {
+                        <MudItem xs="2">
+                            <MudButton OnClick="() => SetManualFocus(input.Index)" 
+                                      Variant="Variant.Outlined" FullWidth>聚焦
+                            </MudButton>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+
+            <!-- 调试信息 -->
+            <MudPaper Class="pa-3 mt-4" Elevation="1">
+                <MudText Typo="Typo.body2">最后扫描: @_lastScannedBarcode</MudText>
+            </MudPaper>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+<input
+    @ref="_barcodeInput"
+    style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px;"
+    @onfocusin="() => _isActive = true"
+    @onfocusout="HandleInputBlur"
+/>
+
+@code {
+    private ElementReference _barcodeInput;
+    private DotNetObjectReference<BarcodeScanner1>? _dotNetRef;
+    private bool _isActive, _isAutoMode = true;
+    private int _manualFocusIndex = 1;
+    private string _lastScannedBarcode = "";
+    
+    private List<InputField> _inputs = new()
+    {
+        new InputField { Index = 1, Label = "输入框 1", Id = "input-1" },
+        new InputField { Index = 2, Label = "输入框 2", Id = "input-2" },
+        new InputField { Index = 3, Label = "输入框 3", Id = "input-3" }
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("BarcodeScanner.setup", _dotNetRef, _barcodeInput);
+                Snackbar.Add("扫描器初始化成功", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"初始化失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task ReceiveBarcode(string barcodeData)
+    {
+        if (string.IsNullOrWhiteSpace(barcodeData)) return;
+
+        _lastScannedBarcode = barcodeData;
+        Snackbar.Add($"扫描到条码: {barcodeData}", Severity.Success);
+        StateHasChanged();
+
+        if (_isAutoMode)
+        {
+            var targetInput = _inputs.FirstOrDefault(i => barcodeData.Contains((char)('a' + i.Index - 1)) || 
+                                                         barcodeData.Contains((char)('A' + i.Index - 1)));
+            if (targetInput?.FieldRef != null)
+            {
+                targetInput.FieldRef.Text = barcodeData;
+                await targetInput.FieldRef.FocusAsync();
+            }
+        }
+        else
+        {
+            var currentInput = _inputs.FirstOrDefault(i => i.Index == _manualFocusIndex);
+            if (currentInput?.FieldRef != null) 
+            {
+                currentInput.FieldRef.Text = barcodeData;
+                StateHasChanged();
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void LogFromJS(string message)
+    {
+        Console.WriteLine($"JS日志: {message}");
+    }
+
+    private async Task ToggleMode()
+    {
+        _isAutoMode = !_isAutoMode;
+        if (_isAutoMode)
+        {
+            await JSRuntime.InvokeVoidAsync("BarcodeScanner.ensureAutoFocus");
+            Snackbar.Add("已切换到自动匹配模式", Severity.Info);
+        }
+        else
+        {
+            await ApplyManualFocus(_manualFocusIndex);
+            Snackbar.Add("已切换到手动聚焦模式", Severity.Info);
+        }
+    }
+
+    private async Task SetManualFocus(int index)
+    {
+        if (_isAutoMode) return;
+        _manualFocusIndex = index;
+        await ApplyManualFocus(index);
+    }
+
+    private async Task ApplyManualFocus(int index)
+    {
+        var input = _inputs.FirstOrDefault(i => i.Index == index);
+        if (input?.FieldRef != null) await input.FieldRef.FocusAsync();
+    }
+
+    private async Task HandleInputBlur(FocusEventArgs e)
+    {
+        _isActive = false;
+        if (_isAutoMode)
+        {
+            await Task.Delay(100);
+            await JSRuntime.InvokeVoidAsync("BarcodeScanner.ensureAutoFocus");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        try { await JSRuntime.InvokeVoidAsync("BarcodeScanner.cleanup"); } catch { }
+        GC.SuppressFinalize(this);
+    }
+
+    private class InputField
+    {
+        public int Index { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+        public MudTextField<string>? FieldRef { get; set; }
+    }
+}

@@ -1,0 +1,299 @@
+﻿@inject BarcodeScannerService ScannerService
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+
+<MudGrid Spacing="1">
+    @foreach (var input in Inputs)
+    {
+        @if (input.Visible)
+        {
+            <MudItem xs="12">
+                <MudTextField T="string" 
+                              @ref="input.FieldRef"
+                              @bind-Value="input.Value"
+                              Label="@input.Label"
+                              Variant="Variant.Outlined"
+                              Id="@input.Id"
+                              FullWidth="true"
+                              Clearable="true"
+                              Disabled="@input.Disable"
+                              Error="@input.Error"
+                              ErrorText="@input.ErrorText"
+                              @onfocus="() => HandleInputFocus(input)"
+                              @onblur="(e) => HandleInputBlur(input, e)"
+                              @onkeyup="(e) => HandleInputKeyUp(input, e)"
+                              Class="w-100"/>
+            </MudItem>
+        }
+    }
+</MudGrid>
+
+<input
+    @ref="_barcodeInput"
+    style="position:absolute; left:-9999px; top:-9999px; opacity:0; pointer-events:none; outline:none;"
+    @onfocusin="(e) => ScannerService.HandleInputFocus()"
+    @onfocusout="(e) => ScannerService.HandleInputBlurAsync()"
+/>
+
+@code {
+    [Parameter] public List<InputField> Inputs { get; set; } = new();
+    [Parameter] public Func<string, InputField?>? DetermineTargetInput { get; set; }
+    [Parameter] public EventCallback<InputField> OnInputValueChanged { get; set; }
+    [Parameter] public EventCallback<string> OnInputBlur { get; set; }
+    // 新增：需要进行重复校验的输入框ID列表
+    [Parameter] public List<string> DuplicateCheckInputIds { get; set; } = new();
+    // 新增：重复校验的错误提示文本
+    [Parameter] public string DuplicateErrorMessage { get; set; } = "输入内容重复";
+    
+    private ElementReference _barcodeInput;
+    private bool _isProcessing = false; // 防止并发处理
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ScannerService.InitializeAsync(_barcodeInput);
+            ScannerService.OnBarcodeScanned += HandleBarcodeScanned;
+        }
+    }
+    
+    private void HandleInputFocus(InputField input)
+    {
+        ScannerService.SetCurrentFocusedInputId(input.Id);
+        
+        // 特殊输入框获得焦点时退出自动聚焦
+        if (input.IsSpecialInput)
+        {
+            _ = ScannerService.ExitAutoFocusModeAsync();
+        }
+        // 其他输入框在自动模式下保持自动聚焦
+        else if (ScannerService.IsAutoMode)
+        {
+            _ = ScannerService.EnterAutoFocusModeAsync();
+        }
+    }
+    
+    private async Task HandleInputBlur(InputField input, FocusEventArgs e)
+    {
+        // 执行原有失焦逻辑
+        if (input.IsSpecialInput && ScannerService.IsAutoMode)
+        {
+            await ScannerService.EnterAutoFocusModeAsync();
+        }
+        await ScannerService.HandleInputBlurAsync();
+
+        // 触发外部失焦回调，传递输入框ID
+        await OnInputBlur.InvokeAsync(input.Id);
+    }
+    
+    private async Task ApplyManualFocus(int index)
+    {
+        var input = Inputs.FirstOrDefault(i => i.Index == index);
+        if (input?.FieldRef != null)
+        {
+            await input.FieldRef.FocusAsync();
+        }
+    }
+    
+    // 处理条码扫描（添加防抖动和并发控制）
+    private async void HandleBarcodeScanned(string barcodeData)
+    {
+        if (_isProcessing || string.IsNullOrWhiteSpace(barcodeData))
+        {
+            return;
+        }
+
+        try
+        {
+            _isProcessing = true;
+            
+            // 自动模式处理
+            if (ScannerService.IsAutoMode && DetermineTargetInput != null)
+            {
+                var targetInput = DetermineTargetInput(barcodeData);
+                if (targetInput != null)
+                {
+                    // 仅在值发生变化时更新并触发重渲染
+                    if (targetInput.Value != barcodeData)
+                    {
+                        await InvokeAsync(() =>
+                        {
+                            targetInput.Value = barcodeData;
+                            StateHasChanged();
+                        });
+                        // 触发外部值变化回调
+                        await OnInputValueChanged.InvokeAsync(targetInput);
+                        
+                        // 检查是否需要进行重复校验
+                        await CheckDuplicateValues(targetInput);
+                    }
+
+                    // 聚焦下一个输入框（优化：增加延迟减少闪烁）
+                    if (targetInput.FieldRef != null)
+                    {
+                        await Task.Delay(80); // 增加延迟以减少视觉闪烁
+                        await targetInput.FieldRef.FocusAsync();
+                    }
+                
+                    await ScannerService.EnsureAutoFocusAsync();
+                }
+            }
+            // 手动模式处理
+            else
+            {
+                var currentInput = Inputs.FirstOrDefault(i => 
+                    i.Index == ScannerService.GetManualFocusIndex() && i.Visible);
+            
+                if (currentInput != null)
+                {
+                    // 仅在值发生变化时更新
+                    if (currentInput.Value != barcodeData)
+                    {
+                        await InvokeAsync(() =>
+                        {
+                            currentInput.Value = barcodeData;
+                            StateHasChanged();
+                        });
+                        await OnInputValueChanged.InvokeAsync(currentInput);
+                        
+                        // 检查是否需要进行重复校验
+                        await CheckDuplicateValues(currentInput);
+                    }
+
+                    // 手动模式保持当前输入框聚焦
+                    if (currentInput.FieldRef != null)
+                    {
+                        await Task.Delay(80);
+                        await currentInput.FieldRef.FocusAsync();
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    
+    private async Task HandleInputKeyUp(InputField input, KeyboardEventArgs e)
+    {
+        await OnInputValueChanged.InvokeAsync(input);
+        
+        // 检查是否需要进行重复校验
+        await CheckDuplicateValues(input);
+    
+        // 支持按Enter键移动到下一个输入框
+        if (e.Key == "Enter" && !input.IsSpecialInput)
+        {
+            var nextIndex = input.Index + 1;
+            // 查找下一个可见输入框
+            var nextInput = Inputs.FirstOrDefault(i => 
+                i.Index == nextIndex && i.Visible && !i.IsSpecialInput);
+            if (nextInput?.FieldRef != null)
+            {
+                await Task.Delay(50);
+                await nextInput.FieldRef.FocusAsync();
+                
+                // 手动模式下更新当前聚焦索引
+                if (!ScannerService.IsAutoMode)
+                {
+                    ScannerService.SetManualFocusIndex(nextIndex);
+                }
+            }
+        }
+    }
+    
+    // 新增：检查输入值是否重复
+    private async Task CheckDuplicateValues(InputField currentInput)
+    {
+        // 如果当前输入框不在需要校验的列表中，直接返回
+        if (!DuplicateCheckInputIds.Contains(currentInput.Id))
+        {
+            return;
+        }
+        
+        // 清除当前输入框的重复错误状态（其他错误状态保留）
+        bool wasDuplicateError = currentInput.Error && currentInput.ErrorText == DuplicateErrorMessage;
+        if (wasDuplicateError)
+        {
+            currentInput.Error = false;
+            currentInput.ErrorText = "";
+        }
+        
+        // 获取当前输入值（去除空白）
+        string currentValue = currentInput.Value?.Trim() ?? "";
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            // 空值不校验重复，但需要检查其他相关输入框是否有因它而产生的错误
+            await ClearRelatedDuplicateErrors(currentInput);
+            return;
+        }
+        
+        // 查找其他需要校验的输入框中是否有相同值
+        var duplicateInput = Inputs.FirstOrDefault(i => 
+            DuplicateCheckInputIds.Contains(i.Id) &&  // 只检查指定的输入框
+            i.Id != currentInput.Id &&                // 排除当前输入框
+            i.Visible &&                               // 只检查可见的
+            currentValue.Equals(i.Value?.Trim(), StringComparison.OrdinalIgnoreCase) // 值相同（不区分大小写）
+        );
+        
+        if (duplicateInput != null)
+        {
+            // 发现重复值，设置错误状态
+            currentInput.Error = true;
+            currentInput.ErrorText = $"{DuplicateErrorMessage}（与{duplicateInput.Label}相同）";
+        }
+        else
+        {
+            // 没有重复值，检查其他相关输入框是否有因它而产生的错误
+            await ClearRelatedDuplicateErrors(currentInput);
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    // 新增：清除其他输入框中因当前输入框而产生的重复错误
+    private async Task ClearRelatedDuplicateErrors(InputField currentInput)
+    {
+        string currentValue = currentInput.Value?.Trim() ?? "";
+        
+        // 检查所有需要校验的输入框
+        foreach (var input in Inputs.Where(i => 
+            DuplicateCheckInputIds.Contains(i.Id) && 
+            i.Id != currentInput.Id && 
+            i.Visible))
+        {
+            // 如果其他输入框的错误是因为与当前输入框重复
+            if (input.Error && 
+                input.ErrorText.Contains(DuplicateErrorMessage) &&
+                currentValue.Equals(input.Value?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                // 重新检查这个输入框的值是否还有其他重复
+                await CheckDuplicateValues(input);
+            }
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        ScannerService.OnBarcodeScanned -= HandleBarcodeScanned;
+        await ScannerService.DisposeAsync();
+    }
+    
+    // 输入框信息模型
+    public class InputField
+    {
+        public int Index { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public bool IsSpecialInput { get; set; } = false;
+        public MudTextField<string>? FieldRef { get; set; }
+        public bool Visible { get; set; } = true;
+        public bool Disable { get; set; } = false;
+        public bool Error { get; set; } = false;
+        public string ErrorText { get; set; } = string.Empty;
+    }
+}
+    
