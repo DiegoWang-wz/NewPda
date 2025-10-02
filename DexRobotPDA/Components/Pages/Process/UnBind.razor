@@ -1,0 +1,474 @@
+﻿@page "/UnBind"
+@using DexRobotPDA.Components.Pages.Components
+@inject ProcessOneService ProcessOneService
+@inject ProcessTwoService ProcessTwoService
+@inject ProcessThreeService ProcessThreeService
+
+<MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true"/>
+    }
+    else if (_motor?.id > 0)
+    {
+        <MudCard Class="pa-4">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">电机详情</MudText>
+
+                    <MudChip T="string"
+                             Color="@(_motor.is_qualified ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled"
+                             Size="Size.Small"
+                             Class="ml-2">
+                        @(_motor.is_qualified ? "合格" : "不合格")
+                    </MudChip>
+
+                    <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
+                        @_motor.motor_id
+                    </MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2"/>
+
+                <!-- MudList / MudListItem 也要加 T -->
+                <MudList T="string" Dense="true" Class="kv-list">
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">任务编号</MudText>
+                        <MudText Class="kv-value">@_motor.task_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">操作人编号</MudText>
+                        <MudText Class="kv-value">@_motor.operator_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">蜗杆胶料</MudText>
+                        <MudText Class="kv-value">@_motor.worm_material_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">粘合剂料号</MudText>
+                        <MudText Class="kv-value">@_motor.adhesive_material_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">创建日期</MudText>
+                        <MudText Class="kv-value">@_motor.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">更新日期</MudText>
+                        <MudText
+                            Class="kv-value">@(_motor.update_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">绑定的手指</MudText>
+                        <MudText Class="kv-value">@(_motor.finger_id ?? "-")</MudText>
+                    </MudListItem>
+                </MudList>
+
+                @if (!string.IsNullOrWhiteSpace(_motor.remarks))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                        备注：@_motor.remarks
+                    </MudAlert>
+                }
+            </MudStack>
+        </MudCard>
+    }
+    else if (_finger?.id > 0)
+    {
+        <MudCard Class="pa-4">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">手指详情</MudText>
+
+                    <MudChip T="string"
+                             Color="@(_finger.is_qualified ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled"
+                             Size="Size.Small"
+                             Class="ml-2">
+                        @(_finger.is_qualified ? "合格" : "不合格")
+                    </MudChip>
+
+                    <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
+                        @_finger.finger_id
+                    </MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2"/>
+
+                <MudList T="string" Dense="true" Class="kv-list">
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">任务编号</MudText>
+                        <MudText Class="kv-value">@_finger.task_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">操作人</MudText>
+                        <MudText Class="kv-value">@_finger.operator_id</MudText>
+                    </MudListItem>
+
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">创建日期</MudText>
+                        <MudText Class="kv-value">@_finger.created_at.ToString("yyyy-MM-dd HH:mm:ss")
+                        </MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">更新日期</MudText>
+                        <MudText Class="kv-value">@_finger.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"
+                        </MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">绑定的手掌外壳</MudText>
+                        <MudText Class="kv-value">@(_finger.palm_id ?? "-")</MudText>
+                    </MudListItem>
+                </MudList>
+
+                @if (!string.IsNullOrWhiteSpace(_finger?.remarks))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                        备注：@_finger.remarks
+                    </MudAlert>
+                }
+
+                <div class="d-flex mt-2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Class="ml-auto mt-2"
+                               OnClick="HandleUnBind"
+                               Disabled="_isSubmitting">
+                        @(_isSubmitting ? "解绑中..." : "部件解绑")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudCard>
+    }
+    else if (_split?.id > 0)
+    {
+        <MudCard Class="pa-4">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">Split 详情</MudText>
+
+                    <MudChip T="string"
+                             Color="@(_split.is_qualified ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled"
+                             Size="Size.Small"
+                             Class="ml-2">
+                        @(_split.is_qualified ? "合格" : "不合格")
+                    </MudChip>
+
+                    <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
+                        @_split.split_id
+                    </MudText>
+                </MudStack>
+
+                <MudDivider Class="my-2"/>
+
+                <MudList T="string" Dense="true" Class="kv-list">
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">任务编号</MudText>
+                        <MudText Class="kv-value">@_split.task_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">操作人</MudText>
+                        <MudText Class="kv-value">@_split.operator_id</MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">创建日期</MudText>
+                        <MudText Class="kv-value">@_split.created_at.ToString("yyyy-MM-dd HH:mm:ss")
+                        </MudText>
+                    </MudListItem>
+
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">更新日期</MudText>
+                        <MudText Class="kv-value">@_split.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"
+                        </MudText>
+                    </MudListItem>
+                    
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">绑定的手掌外壳</MudText>
+                        <MudText Class="kv-value">@(_split.palm_id ?? "-")</MudText>
+                    </MudListItem>
+                </MudList>
+
+                @if (!string.IsNullOrWhiteSpace(_split?.remarks))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                        备注：@_split.remarks
+                    </MudAlert>
+                }
+
+                <div class="d-flex mt-2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Class="ml-auto mt-2"
+                               OnClick="HandleUnBind"
+                               Disabled="_isSubmitting">
+                        @(_isSubmitting ? "解绑中..." : "部件解绑")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudCard>
+    }
+    else if (_palm?.id > 0)
+    {
+        <MudCard Class="pa-4">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">Palm 详情</MudText>
+                    <MudChip T="string"
+                             Color="Color.Success"
+                             Variant="Variant.Filled"
+                             Size="Size.Small"
+                             Class="ml-2">
+                        合格
+                    </MudChip>
+                    <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
+                        @_palm.palm_id
+                    </MudText>
+                </MudStack>
+                <MudDivider Class="my-2"/>
+                <MudList T="string" Dense="true" Class="kv-list">
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">任务编号</MudText>
+                        <MudText Class="kv-value">@_palm.task_id</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">操作人编号</MudText>
+                        <MudText Class="kv-value">@_palm.operator_id</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">创建日期</MudText>
+                        <MudText Class="kv-value">@_palm.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">更新日期</MudText>
+                        <MudText Class="kv-value">@(_palm.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</MudText>
+                    </MudListItem>
+                </MudList>
+                @if (!string.IsNullOrWhiteSpace(_palm?.remarks))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                        备注：@_palm.remarks</MudAlert>
+                }
+                <div class="d-flex mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto mt-2"
+                               OnClick="HandleUnBind" Disabled="_isSubmitting">
+                        @(_isSubmitting ? "解绑中..." : "部件解绑")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudCard>
+    }
+    else if (_hasSearched)
+    {
+        <MudText Align="Align.Center" Color="Color.Warning">
+            未查询到相关数据
+        </MudText>
+    }
+
+    <MudDivider Class="my-4"/>
+
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudTextField
+            @bind-Value="_partId"
+            Label="解绑部件编号"
+            Variant="Variant.Outlined"
+            Required="true"
+            Clearable="true"
+            AutoFocus="true"
+            Id="taskId"
+            Class="flex-1"/>
+
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Error"
+            StartIcon="@Icons.Material.Filled.DeleteForever"
+            OnClick="ClearData"
+            Size="Size.Large"
+            Class="w-full md:w-auto">
+            清除
+        </MudButton>
+
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Search"
+            Size="Size.Large"
+            Disabled="_isLoading"
+            OnClick="GetPart"
+            Class="w-full md:w-auto">
+            @(_isLoading ? "查询中..." : "查询")
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string _partId = string.Empty;
+    private bool _isLoading = false;
+    private bool _isSubmitting = false;
+    private bool _hasSearched = false;
+    private UserDto? _currentUser;
+
+    private MotorDto? _motor = new();
+    private FingerDto? _finger = new();
+    private SplitDto? _split = new();
+    private PalmDto? _palm = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isLoading = true;
+            StateHasChanged();
+            try
+            {
+                _currentUser = await AuthService.GetCurrentUserAsync();
+                if (_currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                _isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void ClearData()
+    {
+        _partId = string.Empty;
+        _hasSearched = false;
+
+        // 清空所有模型，避免旧值影响分支显示
+        _motor = new();
+        _finger = new();
+        _split = new();
+        _palm = new();
+
+        StateHasChanged(); // 事件上下文，无需 InvokeAsync
+    }
+
+    private async Task GetPart()
+    {
+        if (string.IsNullOrWhiteSpace(_partId))
+        {
+            SnackbarHelper.Show(Snackbar, "请输入部件编号", Severity.Error);
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged(); // 立即显示 loading
+
+        try
+        {
+            // 查询前先清空其他模型，避免旧值干扰
+            _motor = new();
+            _finger = new();
+            _split = new();
+            _palm = new();
+
+            if (_partId.StartsWith("MOT", StringComparison.OrdinalIgnoreCase))
+            {
+                _motor = await DetectService.GetMotor(_partId);
+            }
+            else if (_partId.StartsWith("FG", StringComparison.OrdinalIgnoreCase))
+            {
+                _finger = await DetectService.GetFinger(_partId);
+            }
+            else if (_partId.StartsWith("SP", StringComparison.OrdinalIgnoreCase))
+            {
+                _split = await DetectService.GetSplit(_partId);
+            }
+            else if (_partId.StartsWith("PM", StringComparison.OrdinalIgnoreCase))
+            {
+                _palm = await DetectService.GetPalm(_partId);
+            }
+            else
+            {
+                SnackbarHelper.Show(Snackbar, "未知部件编号类型", Severity.Warning);
+                return;
+            }
+
+            _hasSearched = true;
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged(); // 关闭 loading
+        }
+    }
+
+    private async Task HandleUnBind()
+    {
+        if (_isSubmitting) return;
+        return;
+        try
+        {
+            _isSubmitting = true;
+            StateHasChanged();
+
+            // 根据当前显示的模型决定解绑哪个（仅示例）
+            if (_motor?.id > 0)
+            {
+                var res = await ProcessOneService.UnBindMotor(_motor.motor_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "电机解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_finger?.id > 0)
+            {
+                var res = await ProcessTwoService.UnBindFinger(_finger.finger_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "指部件解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_split?.id > 0)
+            {
+                var res = await ProcessThreeService.UnBindSplit(_split.split_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "Split 解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_palm?.id > 0)
+            {
+                var res = await ProcessThreeService.UnBindPalm(_palm.palm_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "Palm 解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+
+            // 解绑后清空
+            ClearData();
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"解绑异常：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+}
+
+<style>
+    .kv-list .kv-value {
+        margin-left: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+</style>

@@ -189,4 +189,22 @@ public class ProcessTwoService : BaseService
 
         return apiResponse;
     }
+    
+    public async Task<ApiResponse> UpdateFinger(FingerDto dto)
+    {
+        var request = new RestRequest("api/Finger/UpdateFinger", Method.Put); // 修改端点
+        request.AddJsonBody(dto);
+        _logger.LogInformation("尝试更新手指外壳 - 手指外壳ID: {MotorId}", dto.finger_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手指外壳更新成功 - 手指外壳ID: {MotorId}", dto.finger_id);
+        }
+        else
+        {
+            _logger.LogWarning("手指外壳更新失败 - 手指外壳ID: {MotorId}, 错误信息: {Msg}", dto.finger_id, apiResponse.Msg);
+        }
+        return apiResponse;
+    }
 }

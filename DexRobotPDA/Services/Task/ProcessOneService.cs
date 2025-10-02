@@ -102,6 +102,22 @@ public class ProcessOneService : BaseService
 
         return apiResponse;
     }
-
+     
+    public async Task<ApiResponse> UpdateMotor(MotorDto dto)
+    {
+        var request = new RestRequest("api/Motor/UpdateMotor", Method.Put); // 修改端点
+        request.AddJsonBody(dto);
+        _logger.LogInformation("尝试更新电机 - 电机ID: {MotorId}", dto.motor_id);
+        var apiResponse = await ExecuteCommand(request);
     
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("电机更新成功 - 电机ID: {MotorId}", dto.motor_id);
+        }
+        else
+        {
+            _logger.LogWarning("电机更新失败 - 电机ID: {MotorId}, 错误信息: {Msg}", dto.motor_id, apiResponse.Msg);
+        }
+        return apiResponse;
+    }
 }

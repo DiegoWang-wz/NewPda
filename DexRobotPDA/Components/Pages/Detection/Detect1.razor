@@ -166,7 +166,6 @@
             try
             {
                 currentUser = await AuthService.GetCurrentUserAsync();
-                StateHasChanged();
                 if (currentUser == null)
                 {
                     NavManager.NavigateTo("/login", true);
@@ -204,9 +203,7 @@
     [JSInvokable]
     public async Task OnEnterKeyPressed()
     {
-        StateHasChanged();
-        await Task.Delay(1);
-        await GetMotorWormDetect();
+        await InvokeAsync(GetMotorWormDetect);
     }
 
     private async Task GetMotorWormDetect()
@@ -261,7 +258,6 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
-
         GC.SuppressFinalize(this);
     }
 
@@ -274,7 +270,6 @@
 
     private bool CheckRequiredFields()
     {
-        // 只检查数值字段是否填写，不检查单选按钮
         return _detectDto.distance_before.HasValue &&
                _detectDto.force.HasValue &&
                _detectDto.distance_after.HasValue &&
@@ -303,7 +298,7 @@
 
             if (timeDiff.TotalHours >= 0)
             {
-                _timeDiffHours = Math.Round(timeDiff.TotalHours, 1); // 保留1位小数，更易读
+                _timeDiffHours = Math.Round(timeDiff.TotalHours, 1);
             }
             else
             {
@@ -323,24 +318,12 @@
     {
         CalculateDistanceResult();
 
-        // 先输出表单验证状态
-        Console.WriteLine($"表单验证状态: {form.IsValid}");
-        Console.WriteLine($"错误数量: {errors.Length}");
-
-        if (errors.Length > 0)
-        {
-            Console.WriteLine("表单错误详情:");
-            foreach (var error in errors)
-            {
-                Console.WriteLine($"- {error}");
-            }
-        }
-
         if (form.IsValid)
         {
             try
             {
                 isSubmitting = true;
+                StateHasChanged(); 
 
                 if (string.IsNullOrEmpty(_detectDto.inspector_id))
                 {
@@ -349,8 +332,6 @@
                 }
 
                 var response = await DetectService.AddDetect1(_detectDto);
-
-                Console.WriteLine($"API 响应结果: ResultCode = {response?.ResultCode}, Msg = {response?.Msg}");
 
                 if (response?.ResultCode == 1)
                 {
@@ -408,15 +389,11 @@
             finally
             {
                 isSubmitting = false;
+                StateHasChanged();
             }
         }
         else
         {
-            Console.WriteLine("表单验证失败，存在以下错误:");
-            foreach (var error in errors)
-            {
-                Console.WriteLine($"- {error}");
-            }
             SnackbarHelper.Show(Snackbar, "表单存在错误，请检查后提交", Severity.Warning);
         }
     }

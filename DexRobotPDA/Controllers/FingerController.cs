@@ -418,7 +418,7 @@ public class FingerController : ControllerBase
             if (finger == null)
             {
                 res.ResultCode = -1;
-                res.Msg = "电机不存在";
+                res.Msg = "手指不存在";
                 return NotFound(res);
             }
 
@@ -429,7 +429,7 @@ public class FingerController : ControllerBase
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
-            res.Msg = "电机重绑成功";
+            res.Msg = "手指更新成功";
             res.ResultData = finger;
 
             return Ok(res);
@@ -437,7 +437,46 @@ public class FingerController : ControllerBase
         catch (Exception ex)
         {
             res.ResultCode = -1;
-            res.Msg = $"电机重绑失败: {ex.Message}";
+            res.Msg = $"手指解绑失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
+    
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdateFinger(FingerDto dto)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            var finger = await db.Fingers
+                .FirstOrDefaultAsync(t => t.finger_id == dto.finger_id);
+
+            if (finger == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "手指不存在";
+                return NotFound(res);
+            }
+            
+            finger.task_id = dto.task_id;
+            finger.operator_id = dto.operator_id;
+            finger.is_qualified = dto.is_qualified;
+            finger.remarks = dto.remarks;
+            finger.palm_id = dto.palm_id;
+            finger.updated_at = DateTime.Now;
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "手指更新成功";
+            res.ResultData = finger;
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"手指更新失败: {ex.Message}";
             return BadRequest(res);
         }
     }

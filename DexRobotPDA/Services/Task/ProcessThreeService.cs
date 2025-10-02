@@ -102,6 +102,25 @@ public class ProcessThreeService : BaseService
         return apiResponse;
     }
     
+    public async Task<ApiResponse> UnBindPalm(string palm_id)
+    {
+
+        var request = new RestRequest($"api/Palm/UnBindPalm?palm_id={palm_id}", Method.Put);
+
+        _logger.LogInformation("尝试解绑手掌外壳 - 手掌外壳ID: {PalmId}", palm_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手掌外壳解绑成功 - 手掌外壳ID: {PalmId}", palm_id);
+        }
+        else
+        {
+            _logger.LogWarning("手掌外壳解绑失败 - 手掌外壳ID: {PalmId}, 错误信息: {Msg}", palm_id, apiResponse.Msg);
+        }
+
+        return apiResponse;
+    }
     
     public async Task<ApiResponse> UnBindSplit(string split_id)
     {
@@ -146,6 +165,43 @@ public class ProcessThreeService : BaseService
             _logger.LogWarning("分指机构外壳重绑失败 - 分指机构外壳ID: {SplitId}, 错误信息: {Msg}", split_id, apiResponse.Msg);
         }
 
+        return apiResponse;
+    }
+    
+    
+    public async Task<ApiResponse> UpdateSplit(SplitDto dto)
+    {
+        var request = new RestRequest("api/Split/UpdateSplit", Method.Put); // 修改端点
+        request.AddJsonBody(dto);
+        _logger.LogInformation("尝试更新分指机构 - 分指机构ID: {MotorId}", dto.split_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("分指机构更新成功 - 分指机构ID: {MotorId}", dto.split_id);
+        }
+        else
+        {
+            _logger.LogWarning("分指机构更新失败 - 分指机构ID: {MotorId}, 错误信息: {Msg}", dto.split_id, apiResponse.Msg);
+        }
+        return apiResponse;
+    }
+    
+    public async Task<ApiResponse> UpdatePalm(PalmDto dto)
+    {
+        var request = new RestRequest("api/Palm/UpdatePalm", Method.Put); // 修改端点
+        request.AddJsonBody(dto);
+        _logger.LogInformation("尝试更新手掌外壳 - 手掌外壳ID: {MotorId}", dto.palm_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手掌外壳更新成功 - 手掌外壳ID: {MotorId}", dto.palm_id);
+        }
+        else
+        {
+            _logger.LogWarning("手掌外壳更新失败 - 手掌外壳ID: {MotorId}, 错误信息: {Msg}", dto.palm_id, apiResponse.Msg);
+        }
         return apiResponse;
     }
 }

@@ -386,7 +386,7 @@ public class PalmController : ControllerBase
             if (palm == null)
             {
                 res.ResultCode = -1;
-                res.Msg = "电机不存在";
+                res.Msg = "手掌不存在";
                 return NotFound(res);
             }
 
@@ -396,7 +396,7 @@ public class PalmController : ControllerBase
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
-            res.Msg = "电机重绑成功";
+            res.Msg = "手掌更新成功";
             res.ResultData = palm;
 
             return Ok(res);
@@ -404,7 +404,46 @@ public class PalmController : ControllerBase
         catch (Exception ex)
         {
             res.ResultCode = -1;
-            res.Msg = $"电机重绑失败: {ex.Message}";
+            res.Msg = $"手掌更新失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
+    
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdatePalm(PalmDto dto)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            var palm = await db.Fingers
+                .FirstOrDefaultAsync(t => t.palm_id == dto.palm_id);
+
+            if (palm == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "手掌不存在";
+                return NotFound(res);
+            }
+
+            palm.task_id = dto.task_id;
+            palm.operator_id = dto.operator_id;
+            palm.remarks = dto.remarks;
+            palm.is_qualified = dto.is_qualified;
+            palm.updated_at = DateTime.Now;
+
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "手掌更新成功";
+            res.ResultData = palm;
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"手掌更新失败: {ex.Message}";
             return BadRequest(res);
         }
     }

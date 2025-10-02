@@ -351,4 +351,46 @@ public class MotorController : ControllerBase
             return BadRequest(res);
         }
     }
+    
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdateMotor(MotorDto dto)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            var motor = await db.Motors
+                .FirstOrDefaultAsync(t => t.motor_id == dto.motor_id);
+
+            if (motor == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "电机不存在";
+                return NotFound(res);
+            }
+
+            motor.task_id = dto.task_id;
+            motor.worm_material_id = dto.worm_material_id;
+            motor.adhesive_material_id = dto.adhesive_material_id;
+            motor.operator_id = dto.operator_id;
+            motor.remarks = dto.remarks;
+            motor.is_qualified = dto.is_qualified;
+            motor.finger_id = dto.finger_id;
+            motor.update_at = DateTime.Now;
+
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "电机更新成功";
+            res.ResultData = motor;
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"电机更新失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
 }

@@ -344,7 +344,7 @@ public class SplitController : ControllerBase
             if (split == null)
             {
                 res.ResultCode = -1;
-                res.Msg = "电机不存在";
+                res.Msg = "分指机构不存在";
                 return NotFound(res);
             }
 
@@ -355,7 +355,7 @@ public class SplitController : ControllerBase
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
-            res.Msg = "电机重绑成功";
+            res.Msg = "分指机构更新成功";
             res.ResultData = split;
 
             return Ok(res);
@@ -363,7 +363,47 @@ public class SplitController : ControllerBase
         catch (Exception ex)
         {
             res.ResultCode = -1;
-            res.Msg = $"电机重绑失败: {ex.Message}";
+            res.Msg = $"分指机构更新失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
+    
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdateSplit(SplitDto dto)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            var split = await db.Splits
+                .FirstOrDefaultAsync(t => t.split_id == dto.split_id);
+
+            if (split == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "分指机构不存在";
+                return NotFound(res);
+            }
+
+            split.task_id = dto.task_id;
+            split.operator_id = dto.operator_id;
+            split.remarks = dto.remarks;
+            split.is_qualified = dto.is_qualified;
+            split.palm_id = dto.palm_id;
+            split.updated_at = DateTime.Now;
+
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "分指机构更新成功";
+            res.ResultData = split;
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"分指机构更新失败: {ex.Message}";
             return BadRequest(res);
         }
     }
