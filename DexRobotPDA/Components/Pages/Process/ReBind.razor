@@ -1,0 +1,158 @@
+﻿@page "/ReBind"
+@inject ProcessOneService ProcessOneService
+@inject ProcessTwoService ProcessTwoService
+@inject ProcessThreeService ProcessThreeService
+
+
+<MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true"/>
+    }
+    else
+    {
+        <MudTextField Label="部件编号"
+                      Class="my-2"
+                      Required="true"
+                      Variant="Variant.Outlined"
+                      @bind-Value="_reBindDto.part_id"
+                      RequiredError="请输入部件编号"/>
+        <MudTextField Label="任务单号"
+                      Class="my-2"
+                      Required="true"
+                      Variant="Variant.Outlined"
+                      @bind-Value="_reBindDto.task_id"
+                      RequiredError="请输入任务单号"/>
+        <MudTextField Label="需要绑定的部件"
+                      Class="my-2"
+                      Variant="Variant.Outlined"
+                      @bind-Value="_reBindDto.on_part_id"
+                      RequiredError="请输入需要绑定的部件"/>
+        
+        <MudDivider Class="my-4"/>
+        
+        <MudButton OnClick="HandleBinding" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
+                   FullWidth="true" Disabled="@_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+                <MudText Class="ml-2">绑定中...</MudText>
+            }
+            else
+            {
+                <MudText>绑定</MudText>
+            }
+        </MudButton>
+    }
+   
+</MudPaper>
+
+@code {
+    private bool _isSubmitting = false;
+    private ReBindDto? _reBindDto = new ReBindDto();
+    private UserDto? _currentUser;
+    private bool _isLoading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isLoading = true;
+            StateHasChanged();
+            try
+            {
+                _currentUser = await AuthService.GetCurrentUserAsync();
+                if (_currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                _isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void ClearData()
+    {
+        _reBindDto = new();
+        StateHasChanged(); 
+    }
+    
+     private async Task HandleBinding()
+    {
+        if (_isSubmitting) return;
+        
+        // 验证输入数据
+        if (string.IsNullOrWhiteSpace(_reBindDto.part_id))
+        {
+            SnackbarHelper.Show(Snackbar, "请输入部件编号", Severity.Error);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(_reBindDto.task_id))
+        {
+            SnackbarHelper.Show(Snackbar, "请输入任务单号", Severity.Error);
+            return;
+        }
+        
+        
+        // 验证部件类型
+        if (!_reBindDto.part_id.Contains("MOT") && 
+            !_reBindDto.part_id.Contains("FG") && 
+            !_reBindDto.part_id.Contains("SP") && 
+            !_reBindDto.part_id.Contains("PM"))
+        {
+            SnackbarHelper.Show(Snackbar, "不支持的部件类型", Severity.Warning);
+            return;
+        }
+        
+        try
+        {
+            _isSubmitting = true;
+            StateHasChanged();
+
+            // 根据当前显示的模型决定解绑哪个（仅示例）
+            if (_reBindDto.part_id.Contains("MOT"))
+            {
+                var res = await ProcessOneService.ReBindMotor(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "电机绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_reBindDto.part_id.Contains("FG"))
+            {
+                var res = await ProcessTwoService.ReBindFinger(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手指外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_reBindDto.part_id.Contains("SP"))
+            {
+                var res = await ProcessThreeService.ReBindSplit(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "分指机构绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (_reBindDto.part_id.Contains("PM"))
+            {
+                var res = await ProcessThreeService.ReBindPalm(_reBindDto.part_id, _reBindDto.task_id);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+
+            // 解绑后清空
+            ClearData();
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+}

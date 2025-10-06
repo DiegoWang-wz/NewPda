@@ -1,5 +1,6 @@
 ﻿@page "/UnBind"
 @using DexRobotPDA.Components.Pages.Components
+@using Microsoft.IdentityModel.Tokens
 @inject ProcessOneService ProcessOneService
 @inject ProcessTwoService ProcessTwoService
 @inject ProcessThreeService ProcessThreeService
@@ -35,7 +36,7 @@
                 <MudList T="string" Dense="true" Class="kv-list">
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">任务编号</MudText>
-                        <MudText Class="kv-value">@_motor.task_id</MudText>
+                        <MudText Class="kv-value">@(_motor.task_id.IsNullOrEmpty() ? "-"  : _motor.task_id )</MudText>
                     </MudListItem>
 
                     <MudListItem T="string">
@@ -66,7 +67,7 @@
 
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">绑定的手指</MudText>
-                        <MudText Class="kv-value">@(_motor.finger_id ?? "-")</MudText>
+                        <MudText Class="kv-value">@(_motor.finger_id.IsNullOrEmpty() ? "-"  : _motor.finger_id )</MudText>
                     </MudListItem>
                 </MudList>
 
@@ -76,6 +77,15 @@
                         备注：@_motor.remarks
                     </MudAlert>
                 }
+                <div class="d-flex mt-2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Class="ml-auto mt-2"
+                               OnClick="HandleUnBind"
+                               Disabled="_isSubmitting">
+                        @(_isSubmitting ? "解绑中..." : "部件解绑")
+                    </MudButton>
+                </div>
             </MudStack>
         </MudCard>
     }
@@ -104,7 +114,7 @@
                 <MudList T="string" Dense="true" Class="kv-list">
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">任务编号</MudText>
-                        <MudText Class="kv-value">@_finger.task_id</MudText>
+                        <MudText Class="kv-value">@(_finger.task_id.IsNullOrEmpty() ? "-"  : _finger.task_id )</MudText>
                     </MudListItem>
 
                     <MudListItem T="string">
@@ -121,12 +131,13 @@
 
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">更新日期</MudText>
-                        <MudText Class="kv-value">@_finger.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"
+                        <MudText
+                            Class="kv-value">@((_finger.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")) ?? "-")
                         </MudText>
                     </MudListItem>
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">绑定的手掌外壳</MudText>
-                        <MudText Class="kv-value">@(_finger.palm_id ?? "-")</MudText>
+                        <MudText Class="kv-value">@(_finger.palm_id.IsNullOrEmpty() ? "-"  : _finger.palm_id )</MudText>
                     </MudListItem>
                 </MudList>
 
@@ -174,7 +185,7 @@
                 <MudList T="string" Dense="true" Class="kv-list">
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">任务编号</MudText>
-                        <MudText Class="kv-value">@_split.task_id</MudText>
+                        <MudText Class="kv-value">@(_split.task_id.IsNullOrEmpty() ? "-"  : _split.task_id )</MudText>
                     </MudListItem>
 
                     <MudListItem T="string">
@@ -190,13 +201,13 @@
 
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">更新日期</MudText>
-                        <MudText Class="kv-value">@_split.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"
+                        <MudText Class="kv-value">@(_split.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")
                         </MudText>
                     </MudListItem>
-                    
+
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">绑定的手掌外壳</MudText>
-                        <MudText Class="kv-value">@(_split.palm_id ?? "-")</MudText>
+                        <MudText Class="kv-value">@(_split.palm_id.IsNullOrEmpty() ? "-"  : _split.palm_id )</MudText>
                     </MudListItem>
                 </MudList>
 
@@ -226,12 +237,13 @@
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                     <MudText Typo="Typo.h6">Palm 详情</MudText>
                     <MudChip T="string"
-                             Color="Color.Success"
+                             Color="@(_palm.is_qualified ? Color.Success : Color.Error)"
                              Variant="Variant.Filled"
                              Size="Size.Small"
                              Class="ml-2">
-                        合格
+                        @(_palm.is_qualified ? "合格" : "不合格")
                     </MudChip>
+
                     <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
                         @_palm.palm_id
                     </MudText>
@@ -240,7 +252,7 @@
                 <MudList T="string" Dense="true" Class="kv-list">
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">任务编号</MudText>
-                        <MudText Class="kv-value">@_palm.task_id</MudText>
+                        <MudText Class="kv-value">@(_palm.task_id.IsNullOrEmpty() ? "-"  : _palm.task_id )</MudText>
                     </MudListItem>
                     <MudListItem T="string">
                         <MudText Color="Color.Secondary">操作人编号</MudText>
@@ -422,7 +434,6 @@
     private async Task HandleUnBind()
     {
         if (_isSubmitting) return;
-        return;
         try
         {
             _isSubmitting = true;
@@ -437,17 +448,17 @@
             else if (_finger?.id > 0)
             {
                 var res = await ProcessTwoService.UnBindFinger(_finger.finger_id);
-                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "指部件解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手指外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_split?.id > 0)
             {
                 var res = await ProcessThreeService.UnBindSplit(_split.split_id);
-                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "Split 解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "分指机构解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_palm?.id > 0)
             {
                 var res = await ProcessThreeService.UnBindPalm(_palm.palm_id);
-                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "Palm 解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
 
             // 解绑后清空

@@ -71,14 +71,14 @@ public class MotorController : ControllerBase
             int productNum = (await db.ProductTasks
                 .Where(p => p.task_id == addMotorDto.task_id)
                 .Select(p => p.product_num)
-                .FirstOrDefaultAsync())*11;
+                .FirstOrDefaultAsync()) * 11;
 
             if (sameTaskCount >= productNum)
             {
                 response.ResultCode = -1;
                 response.Msg = $"生产单号 '{addMotorDto.task_id}' 的电机数量已达到上限，无法继续添加";
                 _logger.LogWarning("新增电机失败：任务电机数量已达上限 - TaskId: {TaskId}, 当前数量: {Count}, 任务数量: {Count2}",
-                    addMotorDto.task_id, sameTaskCount,productNum);
+                    addMotorDto.task_id, sameTaskCount, productNum);
                 return BadRequest(response);
             }
 
@@ -244,14 +244,14 @@ public class MotorController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpGet]
     public IActionResult GetMotorQualify(string motor_id)
     {
         ApiResponse response = new ApiResponse();
         try
         {
-            var motor =  db.Motors.FirstOrDefault(m => m.motor_id == motor_id);
+            var motor = db.Motors.FirstOrDefault(m => m.motor_id == motor_id);
 
 
             if (motor == null)
@@ -263,7 +263,8 @@ public class MotorController : ControllerBase
 
             response.ResultCode = 1;
             response.Msg = "Success";
-            response.ResultData = new QualifyDto(){
+            response.ResultData = new QualifyDto()
+            {
                 qualify = motor.is_qualified,
                 message = motor.motor_id,
             };
@@ -277,7 +278,7 @@ public class MotorController : ControllerBase
 
         return Ok(response);
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UnBindMotor(string motor_id)
     {
@@ -285,6 +286,9 @@ public class MotorController : ControllerBase
 
         try
         {
+            // 开始事务
+            using var transaction = await db.Database.BeginTransactionAsync();
+
             var motor = await db.Motors
                 .FirstOrDefaultAsync(t => t.motor_id == motor_id);
 
@@ -295,11 +299,35 @@ public class MotorController : ControllerBase
                 return NotFound(res);
             }
 
+            // 获取关联的手指
+            var finger = await db.Fingers
+                .FirstOrDefaultAsync(t => t.finger_id == motor.finger_id);
+
+            // 更新手指状态（如果存在）
+            if (finger != null)
+            {
+                finger.is_qualified = false;
+
+                // 获取关联的手掌并更新状态
+                var palm = await db.Palms
+                    .FirstOrDefaultAsync(t => t.palm_id == finger.palm_id);
+
+                if (palm != null)
+                {
+                    palm.is_qualified = false;
+                }
+            }
+
+            // 更新电机信息
             motor.task_id = "";
             motor.finger_id = "";
             motor.update_at = DateTime.Now;
 
+            // 保存所有更改
             await db.SaveChangesAsync();
+
+            // 提交事务
+            await transaction.CommitAsync();
 
             res.ResultCode = 1;
             res.Msg = "电机解绑成功";
@@ -309,12 +337,14 @@ public class MotorController : ControllerBase
         }
         catch (Exception ex)
         {
+            // 回滚事务
+            _logger.LogError(ex, "电机解绑失败，电机ID: {MotorId}", motor_id);
             res.ResultCode = -1;
             res.Msg = $"电机解绑失败: {ex.Message}";
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> ReBindMotor(ReBindDto dto)
     {
@@ -351,7 +381,7 @@ public class MotorController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UpdateMotor(MotorDto dto)
     {

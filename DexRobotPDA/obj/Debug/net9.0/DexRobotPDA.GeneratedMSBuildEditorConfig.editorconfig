@@ -107,8 +107,16 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFByb2Nlc3NUd28ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/ReBind.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFJlQmluZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/Stepper.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFN0ZXBwZXIucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/UnBind.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFVuQmluZC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/ProductionTask/TaskDetail.razor]

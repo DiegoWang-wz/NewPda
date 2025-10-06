@@ -43,14 +43,14 @@ else
                 {
                     if (context.Completed)
                     {
-                        <MudBadge Dot="true" Color="Color.Error" Class="mx-2">
+                        <MudBadge Dot="true" Color="Color.Error" Class="mx-8">
                             <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle"
                                      Color="Color.Success">@(context.Title)</MudChip>
                         </MudBadge>
                     }
                     else
                     {
-                        <MudBadge Dot="true" Color="Color.Error" Class="mx-2">
+                        <MudBadge Dot="true" Color="Color.Error" Class="mx-8">
                             <MudChip T="string">@(context.Title)</MudChip>
                         </MudBadge>
                     }
@@ -1170,29 +1170,40 @@ else
         {
             case 0:
                 await GetFinishedMotors();
+                await CheckProcess1();
                 break;
             case 1:
                 await GetMotorWormDetectList();
+                await DetectService.UpdateDetect1StatusAsync(taskId);
                 break;
             case 2:
                 await GetSplitWormDetectList();
+                await DetectService.UpdateDetect2StatusAsync(taskId);
                 break;
             case 3:
                 await GetSplitCalibrateDetectList();
+                await DetectService.UpdateDetect3StatusAsync(taskId);
                 break;
             case 4:
                 await GetFinishedFingers();
+                await CheckProcess2();
                 break;
             case 5:
                 await GetFingerCalibrateDetectList();
+                await DetectService.UpdateDetect4StatusAsync(taskId);
                 break;
             case 6:
                 await GetFinishedPalms();
+                await CheckProcess3();
                 break;
             case 7:
                 await GetPalmCalibrateDetectList();
+                await DetectService.UpdateDetect5StatusAsync(taskId);
                 break;
         }
+
+        await LoadTaskDetail();
+        StateHasChanged();
     }
 
     private async Task OnPreviewInteraction(StepperInteractionEventArgs arg)
@@ -1562,6 +1573,42 @@ else
         detect.if_qualified.HasValue ? (detect.if_qualified.Value ? "是" : "否") : "",
         detect.remarks ?? ""
     };
+
+    private async Task CheckProcess1()
+    {
+        if (finishedMotors.Count == task.product_num*11)
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process1", 1);
+        }
+        else
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process1", 0);
+        }
+    }
+
+    private async Task CheckProcess2()
+    {
+        if (finishedFingers.Count == task.product_num*5)
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process5", 1);
+        }
+        else
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process5", 0);
+        }
+    }
+
+    private async Task CheckProcess3()
+    {
+        if (finishedPalms.Count == task.product_num)
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process7", 1);
+        }
+        else
+        {
+            await TaskService.UpdateTaskProcessStatus(taskId, "process7", 0);
+        }
+    }
 
 }
 

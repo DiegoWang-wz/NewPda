@@ -216,6 +216,7 @@
                 Index = 1,
                 Label = "手指编号",
                 Id = "fingerId",
+                Disable = true,
                 IsSpecialInput = false
             },
             // 电机1编号 - 普通输入框，保持自动聚焦
@@ -768,7 +769,6 @@
             SnackbarHelper.Show(Snackbar, $"{motorName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
         }
     }
-
 
 
     public async ValueTask DisposeAsync()

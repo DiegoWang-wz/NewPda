@@ -10,26 +10,26 @@
     }
     else
     {
-        <MudPaper Class="pa-4 mb-4 d-flex align-center" Elevation="1">
-            <MudAvatar Size="Size.Small" Color="Color.Success" Class="mr-3">
-                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium"/>
-            </MudAvatar>
-            <div Class="mr-auto">
-                <MudText Typo="Typo.body2">操作员: @currentUser.employee_name</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    部门: @currentUser.department · 工号: @currentUser.employee_id
-                </MudText>
-            </div>
-            <MudChip 
-                T="string" 
-                Color="Color.Success" 
-                Variant="Variant.Filled"
-                Icon="@Icons.Material.Filled.CheckCircle" 
-                Class="ml-2">
-                在线
-            </MudChip>
-        </MudPaper>
-        <div class="d-flex flex-row align-center my-6">
+        @* <MudPaper Class="pa-4 mb-4 d-flex align-center" Elevation="1"> *@
+        @*     <MudAvatar Size="Size.Small" Color="Color.Success" Class="mr-3"> *@
+        @*         <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium"/> *@
+        @*     </MudAvatar> *@
+        @*     <div Class="mr-auto"> *@
+        @*         <MudText Typo="Typo.body2">操作员: @currentUser.employee_name</MudText> *@
+        @*         <MudText Typo="Typo.caption" Color="Color.Secondary"> *@
+        @*             部门: @currentUser.department · 工号: @currentUser.employee_id *@
+        @*         </MudText> *@
+        @*     </div> *@
+        @*     <MudChip  *@
+        @*         T="string"  *@
+        @*         Color="Color.Success"  *@
+        @*         Variant="Variant.Filled" *@
+        @*         Icon="@Icons.Material.Filled.CheckCircle"  *@
+        @*         Class="ml-2"> *@
+        @*         在线 *@
+        @*     </MudChip> *@
+        @* </MudPaper> *@
+        <div class="d-flex flex-row align-center mb-6">
             <MudText Typo="Typo.h6" Class="text-primary mr-4">数据统计</MudText>
             <MudDivider DividerType="DividerType.Middle" Class="flex-grow-1 "/>
         </div>
@@ -138,8 +138,7 @@
     {
         new() { Name = "生产任务", Icon = Icons.Material.Filled.FormatListBulleted, CompletedToday = 2, Route = "/TaskList" },
         new() { Name = "配件检测汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/Detect1" },
-        new() { Name = "部件解绑", Icon = Icons.Material.Filled.Verified, CompletedToday = 30, Route = "/UnBind" },
-        // new() { Name = "包装", Icon = Icons.Material.Filled.Inventory, CompletedToday = 22, Route = "/focus-example" },
+       
         // new() { Name = "入库", Icon = Icons.Material.Filled.Warehouse, CompletedToday = 15, Route = "/InputDetect" }
     };
     private List<OperationItem> operations2 = new()
@@ -147,6 +146,8 @@
         new() { Name = "粘蜗杆", Icon = Icons.Material.Filled.Build, CompletedToday = 24, Route = "/process_1" },
         new() { Name = "手指组装", Icon = Icons.Material.Filled.PanToolAlt, CompletedToday = 18, Route = "/process_2" },
         new() { Name = "手掌组装", Icon = Icons.Material.Filled.FrontHand, CompletedToday = 12, Route = "/process_3" },
+        new() { Name = "部件解绑", Icon = Icons.Material.Filled.Verified, CompletedToday = 30, Route = "/UnBind" },
+        new() { Name = "部件重绑", Icon = Icons.Material.Filled.Inventory, CompletedToday = 22, Route = "/ReBind" }
     };
     private List<OperationItem> operations3 = new()
     {

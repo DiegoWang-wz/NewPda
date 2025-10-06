@@ -116,7 +116,7 @@ public class FingerController : ControllerBase
             int productNum = (await db.ProductTasks
                 .Where(p => p.task_id == addFingerDto.task_id)
                 .Select(p => p.product_num)
-                .FirstOrDefaultAsync())*11;
+                .FirstOrDefaultAsync())*5;
             
             // 假设每个任务最多允许添加5个手指，可根据实际业务修改此数值
             if (sameTaskCount >= productNum)
@@ -384,6 +384,15 @@ public class FingerController : ControllerBase
                 res.Msg = "手指外壳不存在";
                 return NotFound(res);
             }
+            
+            var palm = await db.Palms
+                .FirstOrDefaultAsync(t => t.palm_id == finger.palm_id);
+
+            if (palm != null)
+            {
+                palm.is_qualified = false;
+            }
+
 
             finger.task_id = "";
             finger.palm_id = "";
@@ -459,6 +468,7 @@ public class FingerController : ControllerBase
                 return NotFound(res);
             }
             
+
             finger.task_id = dto.task_id;
             finger.operator_id = dto.operator_id;
             finger.is_qualified = dto.is_qualified;

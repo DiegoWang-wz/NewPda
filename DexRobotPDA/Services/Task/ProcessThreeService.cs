@@ -168,6 +168,31 @@ public class ProcessThreeService : BaseService
         return apiResponse;
     }
     
+    public async Task<ApiResponse> ReBindPalm(string palm_id, string task_id)
+    {
+        var request = new RestRequest("api/Palm/ReBindPalm", Method.Put);
+        var dto = new ReBindDto()
+        {
+            part_id = palm_id,
+            task_id = task_id,
+        };
+        request.AddJsonBody(dto);
+
+        _logger.LogInformation("尝试重绑手掌外壳 - 手掌外壳ID: {SplitId}", palm_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手掌外壳重绑成功 - 手掌外壳ID: {SplitId}", palm_id);
+        }
+        else
+        {
+            _logger.LogWarning("手掌外壳重绑失败 - 手掌外壳ID: {SplitId}, 错误信息: {Msg}", palm_id, apiResponse.Msg);
+        }
+
+        return apiResponse;
+    }
+    
     
     public async Task<ApiResponse> UpdateSplit(SplitDto dto)
     {
