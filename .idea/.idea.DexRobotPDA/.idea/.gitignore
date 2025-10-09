@@ -8,9 +8,6 @@
 /projectSettingsUpdater.xml
 /contentModel.xml
 
-# Rider 项目配置目录
-/.idea/
-
 # 基于编辑器的 HTTP 客户端请求
 /httpRequests/
 
@@ -21,31 +18,3 @@
 # 忽略日志文件
 /DexRobotPDA/logs/
 /DexRobotPDA/logs/*.txt
-
-# === .NET / C# 常见忽略规则 ===
-# 构建产物
-bin/
-obj/
-
-# 编译生成的程序集和调试文件
-*.dll
-*.exe
-*.pdb
-*.cache
-*.log
-
-# 用户文件
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# VS Code / Rider 缓存
-.vscode/
-.idea/
-
-# 其他临时文件
-*.tmp
-*.db
-*.db-shm
-*.db-wal
