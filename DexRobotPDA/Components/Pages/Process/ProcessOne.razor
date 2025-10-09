@@ -13,7 +13,6 @@
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
 
-    
     <div class="min-vh-40 d-flex flex-column justify-center">
         @if (!hasSearched)
         {
@@ -72,7 +71,6 @@
                     </MudButton>
                 </MudStack>
 
-                <!-- 集成条码扫描组件 -->
                 <BarcodeScanner
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
@@ -94,6 +92,7 @@
             }
         }
     </div>
+
     <MudDivider Class="my-4"/>
     <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
         <MudTextField
@@ -131,10 +130,11 @@
         </MudButton>
     </MudStack>
 
-    
 </MudPaper>
 
 @code {
+    private const string StorageKey = "process1_taskId";
+
     private string taskId = string.Empty;
     private ProductTaskDto? task = null;
     private bool isLoading = false;
@@ -147,35 +147,21 @@
     private AddMotorDto _motorDto = new AddMotorDto();
     private DotNetObjectReference<ProcessOne>? dotNetRef;
     private List<BarcodeScanner.InputField> scannerInputs = new();
+    private bool isBinding = false;
 
     protected override async Task OnInitializedAsync()
     {
-        // 初始化扫描器输入框
         scannerInputs = new List<BarcodeScanner.InputField>
         {
-            // 电机编号 - 普通输入框
-            new BarcodeScanner.InputField
-            {
-                Index = 1,
-                Label = "电机编号",
-                Id = "motorId",
-                IsSpecialInput = false
-            },
-            // 备注 - 特殊输入框，点击会退出自动聚焦
-            new BarcodeScanner.InputField
-            {
-                Index = 2,
-                Label = "备注",
-                Id = "remarks",
-                IsSpecialInput = true
-            }
+            new BarcodeScanner.InputField { Index = 1, Label = "电机编号", Id = "motorId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 2, Label = "备注", Id = "remarks", IsSpecialInput = true }
         };
     }
 
     private async Task ToggleScanModeAsync()
     {
         await ScannerService.ToggleModeAsync();
-        StateHasChanged(); // 刷新按钮显示状态
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -186,21 +172,27 @@
             StateHasChanged();
             dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+
             try
             {
                 currentUser = await AuthService.GetCurrentUserAsync();
                 if (currentUser == null)
                 {
                     NavManager.NavigateTo("/login", true);
+                    return;
                 }
-                else
+                _motorDto.operator_id = currentUser.employee_id;
+
+                var saved = await JSRuntime.InvokeAsync<string>("localStorage.getItem", StorageKey);
+                if (!string.IsNullOrWhiteSpace(saved))
                 {
-                    _motorDto.operator_id = currentUser.employee_id;
+                    taskId = saved;
+                    hasSearched = true;
+                    await LoadTaskDetail();
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"加载用户信息失败: {ex.Message}");
                 NavManager.NavigateTo("/login", true);
             }
             finally
@@ -211,25 +203,22 @@
         }
     }
 
-    // 处理特殊输入框（任务单号）的聚焦事件
     private void HandleSpecialInputFocus()
     {
         ScannerService.SetCurrentFocusedInputId("taskId");
         _ = ScannerService.ExitAutoFocusModeAsync();
     }
 
-    // 处理特殊输入框（任务单号）的失焦事件
     private async Task HandleSpecialInputBlur()
     {
         if (ScannerService.IsAutoMode)
         {
             await ScannerService.EnterAutoFocusModeAsync();
         }
-
         await ScannerService.HandleInputBlurAsync();
     }
 
-    private void ClearTaskId()
+    private async Task ClearTaskId()
     {
         taskId = string.Empty;
         task = null;
@@ -237,28 +226,11 @@
         hasInputError = false;
         finishedMotors.Clear();
         _motorDto = new AddMotorDto();
-
-        // 清空扫描器输入框
-        foreach (var input in scannerInputs)
-        {
-            input.Value = string.Empty;
-        }
-
-        if (currentUser != null)
-        {
-            _motorDto.operator_id = currentUser.employee_id;
-        }
-
+        foreach (var input in scannerInputs) input.Value = string.Empty;
+        if (currentUser != null) _motorDto.operator_id = currentUser.employee_id;
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
     }
-
-    // [JSInvokable]
-    // public async Task OnEnterKeyPressed()
-    // {
-    //     StateHasChanged();
-    //     await Task.Delay(1);
-    //     await LoadTaskDetail();
-    // }
 
     private async Task LoadTaskDetail()
     {
@@ -279,6 +251,7 @@
             StateHasChanged();
             task = await TaskService.GetTaskDetail(taskId);
             _motorDto.task_id = taskId;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
             await GetFinishedList();
         }
         catch (Exception ex)
@@ -299,34 +272,31 @@
         {
             var result = await ProcessOneService.GetFinishedList(taskId);
             finishedMotors = result;
-            if (finishedMotors.Count >= (task.product_num*11))
+            if (task != null)
             {
-                await TaskService.UpdateTaskProcessStatus(taskId, "process1", 1);
-            }else
-            {
-                await TaskService.UpdateTaskProcessStatus(taskId, "process1", 0);
+                if (finishedMotors.Count >= (task.product_num * 11))
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process1", 1);
+                else
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process1", 0);
             }
         }
-        catch (Exception ex)
+        catch
         {
             finishedMotors = new List<MotorDto>();
             SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
         }
     }
-    
-    private void NavigateToDetail()
+
+    private async Task NavigateToDetail()
     {
+        if (!string.IsNullOrWhiteSpace(taskId))
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
         NavManager.NavigateTo($"/TaskDetail/{taskId}/{0}");
     }
 
-    private bool isBinding = false;
-    
     private async Task HandleBinding()
     {
-        // 从扫描器输入框获取值
         var motorIdInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId");
-
-        // 基本验证
         if (motorIdInput == null || string.IsNullOrWhiteSpace(motorIdInput.Value))
         {
             SnackbarHelper.Show(Snackbar, "请输入电机编号", Severity.Warning);
@@ -337,21 +307,16 @@
 
         try
         {
-            // 更新绑定数据
             _motorDto.motor_id = motorIdInput.Value;
             _motorDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
-
             var response = await ProcessOneService.AddMotor(_motorDto);
-
-            // 根据响应结果处理登录逻辑
             if (response != null && response.ResultCode == 1)
             {
                 SnackbarHelper.Show(Snackbar, "绑定成功！", Severity.Success);
-
-                // 清空输入框
                 motorIdInput.Value = "";
-                scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
-
+                var remark = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+                if (remark != null) remark.Value = "";
+                await TaskService.UpdateSingleTaskStatus(taskId);
                 await LoadTaskDetail();
             }
             else
@@ -360,9 +325,8 @@
                 SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"绑定失败: {ex.Message}");
             SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
         }
         finally
@@ -393,14 +357,13 @@
                 SnackbarHelper.Show(Snackbar, errorMsg, Severity.Error);
             }
         }
-        catch (Exception ex)
+        catch
         {
             SnackbarHelper.Show(Snackbar, "系统异常，提交失败", Severity.Error);
         }
     }
 
-    // 处理输入框值变化
-    private async Task HandleInputValueChanged(BarcodeScanner.InputField input)
+    private Task HandleInputValueChanged(BarcodeScanner.InputField input)
     {
         switch (input.Id)
         {
@@ -408,15 +371,13 @@
                 _motorDto.motor_id = input.Value;
                 break;
         }
+        return Task.CompletedTask;
     }
 
-    // 确定条码数据应填入哪个输入框
     private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
     {
         var motorInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId" && string.IsNullOrEmpty(i.Value));
         if (motorInput != null) return motorInput;
-
-        // 电机编号已填写则返回备注输入框
         return scannerInputs.FirstOrDefault(i => i.Id == "motorId");
     }
 
@@ -427,8 +388,6 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
-
         GC.SuppressFinalize(this);
     }
-
 }

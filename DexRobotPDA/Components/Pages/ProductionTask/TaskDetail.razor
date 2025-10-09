@@ -1203,6 +1203,7 @@ else
         }
 
         await LoadTaskDetail();
+        await TaskService.UpdateSingleTaskStatus(taskId);
         StateHasChanged();
     }
 

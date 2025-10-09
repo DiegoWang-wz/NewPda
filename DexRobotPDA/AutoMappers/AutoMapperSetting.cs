@@ -28,6 +28,7 @@ public class AutoMapperSetting : Profile
         CreateMap<SplitCalibrateDetectModel, SplitCalibrateDetectDto>().ReverseMap();
         CreateMap<FingerCalibrateDetectModel, FingerCalibrateDetectDto>().ReverseMap();
         CreateMap<PalmCalibrateDetectModel, PalmCalibrateDetectDto>().ReverseMap();
+        CreateMap<EventLogModel, EventLogDto>().ReverseMap();
         CreateMap<AddTaskDto, ProductTaskModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore()) // 忽略自增主键
             .ForMember(dest => dest.status, opt => opt.Ignore())
@@ -88,6 +89,9 @@ public class AutoMapperSetting : Profile
             .ForMember(dest => dest.id, opt => opt.Ignore());
         
         CreateMap<PalmCalibrateDetectCreateDto,PalmCalibrateDetectModel>()
+            .ForMember(dest => dest.id, opt => opt.Ignore());
+                
+        CreateMap<AddEventLogDto,EventLogModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore());
     }
 }

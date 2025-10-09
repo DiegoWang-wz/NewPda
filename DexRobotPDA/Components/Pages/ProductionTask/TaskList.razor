@@ -202,6 +202,7 @@
         isLoading = true;
         errorMessage = null;
         tasks = null;
+        await TaskService.UpdateAllTaskStatus();
         try
         {
             tasks = await TaskService.GetTasks();

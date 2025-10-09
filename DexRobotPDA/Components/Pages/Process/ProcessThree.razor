@@ -140,20 +140,19 @@
         <MudButton
             Variant="Variant.Filled"
             Color="Color.Primary"
-
             StartIcon="@Icons.Material.Filled.Search"
-            OnClick="LoadTaskDetail "
+            OnClick="LoadTaskDetail"
             Size="Size.Large"
             Disabled="@(isLoading || !string.IsNullOrEmpty(palm_id))"
             Class="w-full md:w-auto">
             @(isLoading ? "查询中..." : "查询")
         </MudButton>
     </MudStack>
-
-
 </MudPaper>
 
 @code {
+    private const string StorageKey = "process3_taskId";
+
     [Parameter] public string task_id { get; set; }
     [Parameter] public string palm_id { get; set; }
     private string taskId = string.Empty;
@@ -167,8 +166,6 @@
     private bool validation = true;
 
     private AddPalmDto _PalmDto = new AddPalmDto();
-
-    // 新增：分指机构字段
     private string _split = string.Empty;
     private string _finger1 = string.Empty;
     private string _finger2 = string.Empty;
@@ -177,6 +174,7 @@
     private string _finger5 = string.Empty;
     private DotNetObjectReference<ProcessThree>? dotNetRef;
     private List<BarcodeScanner.InputField> scannerInputs = new();
+    private bool isBinding = false;
 
     private async Task ToggleScanModeAsync()
     {
@@ -191,14 +189,12 @@
             await ScannerService.ToggleModeAsync2(false);
             StateHasChanged();
             taskId = task_id;
-            LoadTaskDetail();
+            await LoadTaskDetail();
 
             var list = await ProcessThreeService.GetPalmDetail(palm_id);
-
-            // 定义ID与列表索引的映射关系
             var inputMappings = new Dictionary<string, int>
             {
-                { "palmId", -1 }, // 特殊处理
+                { "palmId", -1 },
                 { "splitId", 0 },
                 { "finger1", 1 },
                 { "finger2", 2 },
@@ -208,89 +204,26 @@
                 { "remarks", 6 }
             };
 
-            // 批量设置输入框值
             foreach (var mapping in inputMappings)
             {
                 var input = scannerInputs.FirstOrDefault(i => i.Id == mapping.Key);
-                if (input != null)
-                {
-                    input.Value = mapping.Key == "palmId" ? palm_id : list[mapping.Value];
-                }
+                if (input != null) input.Value = mapping.Key == "palmId" ? palm_id : list[mapping.Value];
             }
         }
     }
 
-
     protected override async Task OnInitializedAsync()
     {
-        // 初始化扫描器输入框（按业务流程排序）
         scannerInputs = new List<BarcodeScanner.InputField>
         {
-            // 手掌外壳编号
-            new BarcodeScanner.InputField
-            {
-                Index = 1,
-                Label = "手掌外壳编号",
-                Id = "palmId",
-                Disable = true,
-                IsSpecialInput = false
-            },
-            // 新增：分指机构输入框
-            new BarcodeScanner.InputField
-            {
-                Index = 2,
-                Label = "分指机构",
-                Id = "splitId",
-                IsSpecialInput = false
-            },
-            // 大拇指编号
-            new BarcodeScanner.InputField
-            {
-                Index = 3,
-                Label = "大拇指编号",
-                Id = "finger1",
-                IsSpecialInput = false
-            },
-            // 食指编号
-            new BarcodeScanner.InputField
-            {
-                Index = 4,
-                Label = "食指编号",
-                Id = "finger2",
-                IsSpecialInput = false
-            },
-            // 中指编号
-            new BarcodeScanner.InputField
-            {
-                Index = 5,
-                Label = "中指编号",
-                Id = "finger3",
-                IsSpecialInput = false
-            },
-            // 无名指编号
-            new BarcodeScanner.InputField
-            {
-                Index = 6,
-                Label = "无名指编号",
-                Id = "finger4",
-                IsSpecialInput = false
-            },
-            // 小拇指编号
-            new BarcodeScanner.InputField
-            {
-                Index = 7,
-                Label = "小拇指编号",
-                Id = "finger5",
-                IsSpecialInput = false
-            },
-            // 备注
-            new BarcodeScanner.InputField
-            {
-                Index = 8,
-                Label = "备注",
-                Id = "remarks",
-                IsSpecialInput = true
-            }
+            new BarcodeScanner.InputField { Index = 1, Label = "手掌外壳编号", Id = "palmId", Disable = true, IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 2, Label = "分指机构", Id = "splitId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 3, Label = "大拇指编号", Id = "finger1", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 4, Label = "食指编号", Id = "finger2", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 5, Label = "中指编号", Id = "finger3", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 6, Label = "无名指编号", Id = "finger4", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 7, Label = "小拇指编号", Id = "finger5", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 8, Label = "备注", Id = "remarks", IsSpecialInput = true }
         };
     }
 
@@ -308,15 +241,23 @@
                 if (currentUser == null)
                 {
                     NavManager.NavigateTo("/login", true);
+                    return;
                 }
-                else
+                _PalmDto.operator_id = currentUser.employee_id;
+
+                if (string.IsNullOrWhiteSpace(taskId))
                 {
-                    _PalmDto.operator_id = currentUser.employee_id;
+                    var saved = await JSRuntime.InvokeAsync<string>("localStorage.getItem", StorageKey);
+                    if (!string.IsNullOrWhiteSpace(saved))
+                    {
+                        taskId = saved;
+                        hasSearched = true;
+                        await LoadTaskDetail();
+                    }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"加载用户信息失败: {ex.Message}");
                 NavManager.NavigateTo("/login", true);
             }
             finally
@@ -327,25 +268,19 @@
         }
     }
 
-    // 处理特殊输入框（生产单号）的聚焦事件
     private void HandleSpecialInputFocus()
     {
         ScannerService.SetCurrentFocusedInputId("taskId");
         _ = ScannerService.ExitAutoFocusModeAsync();
     }
 
-    // 处理特殊输入框（生产单号）的失焦事件
     private async Task HandleSpecialInputBlur()
     {
-        if (ScannerService.IsAutoMode)
-        {
-            await ScannerService.EnterAutoFocusModeAsync();
-        }
-
+        if (ScannerService.IsAutoMode) await ScannerService.EnterAutoFocusModeAsync();
         await ScannerService.HandleInputBlurAsync();
     }
 
-    private void ClearTaskId()
+    private async Task ClearTaskId()
     {
         taskId = string.Empty;
         task = null;
@@ -353,27 +288,10 @@
         hasInputError = false;
         finishedPalms.Clear();
         _PalmDto = new AddPalmDto();
-
-        // 清空扫描器输入框
-        foreach (var input in scannerInputs)
-        {
-            input.Value = string.Empty;
-        }
-
-        // 新增：清空分指机构字段
-        _split = string.Empty;
-        _finger1 = string.Empty;
-        _finger2 = string.Empty;
-        _finger3 = string.Empty;
-        _finger4 = string.Empty;
-        _finger5 = string.Empty;
-
-        // 重新设置操作员ID（若用户存在）
-        if (currentUser != null)
-        {
-            _PalmDto.operator_id = currentUser.employee_id;
-        }
-
+        foreach (var input in scannerInputs) input.Value = string.Empty;
+        _split = string.Empty; _finger1 = string.Empty; _finger2 = string.Empty; _finger3 = string.Empty; _finger4 = string.Empty; _finger5 = string.Empty;
+        if (currentUser != null) _PalmDto.operator_id = currentUser.employee_id;
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
     }
 
@@ -394,12 +312,10 @@
             hasSearched = true;
             StateHasChanged();
             task = await TaskService.GetTaskDetail(taskId);
-            if (task == null)
-            {
-                SnackbarHelper.Show(Snackbar, "生产单号不存在", Severity.Warning);
-            }
+            if (task == null) SnackbarHelper.Show(Snackbar, "生产单号不存在", Severity.Warning);
 
             _PalmDto.task_id = taskId;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
             await GetFinishedList();
         }
         catch (Exception ex)
@@ -420,34 +336,31 @@
         {
             var result = await ProcessThreeService.GetPalmList(taskId);
             finishedPalms = result;
-            if (finishedPalms.Count >= (task.product_num))
+            if (task != null)
             {
-                await TaskService.UpdateTaskProcessStatus(taskId, "process7", 1);
-            }
-            else
-            {
-                await TaskService.UpdateTaskProcessStatus(taskId, "process7", 0);
+                if (finishedPalms.Count >= task.product_num)
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process7", 1);
+                else
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process7", 0);
             }
         }
-        catch (Exception ex)
+        catch
         {
             finishedPalms = new List<PalmDto>();
             SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
         }
     }
 
-    private void NavigateToDetail()
+    private async Task NavigateToDetail()
     {
+        if (!string.IsNullOrWhiteSpace(taskId))
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
         NavManager.NavigateTo($"/TaskDetail/{taskId}/{6}");
     }
 
-    private bool isBinding = false;
-
     private async Task HandleBinding()
     {
-        // 从扫描器输入框获取值并验证
         var palmInput = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
-        // 新增：获取分指机构输入框
         var splitInput = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
         var finger1Input = scannerInputs.FirstOrDefault(i => i.Id == "finger1");
         var finger2Input = scannerInputs.FirstOrDefault(i => i.Id == "finger2");
@@ -455,58 +368,20 @@
         var finger4Input = scannerInputs.FirstOrDefault(i => i.Id == "finger4");
         var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
 
-        // 基础校验
-        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
-            return;
-        }
-
-        // 新增：分指机构必填校验
-        if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "分指机构编号不能为空", Severity.Warning);
-            return;
-        }
-
-        if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning);
-            return;
-        }
-
-        if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning);
-            return;
-        }
-
-        if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning);
-            return;
-        }
-
-        if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning);
-            return;
-        }
-
-        if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning);
-            return;
-        }
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value)) { SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning); return; }
+        if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value)) { SnackbarHelper.Show(Snackbar, "分指机构编号不能为空", Severity.Warning); return; }
+        if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value)) { SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning); return; }
+        if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value)) { SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning); return; }
+        if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value)) { SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning); return; }
+        if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value)) { SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning); return; }
+        if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value)) { SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning); return; }
 
         isBinding = true;
         try
         {
-            // 更新绑定数据
             _PalmDto.palm_id = palmInput.Value;
             _PalmDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
 
-            // 绑定手掌信息
             var palmResponse = await ProcessThreeService.AddPalm(_PalmDto);
             if (palmResponse.ResultCode != 1)
             {
@@ -515,11 +390,9 @@
                 return;
             }
 
-            // 新增：绑定分指机构到手掌（使用专门的分指机构绑定方法）
             var splitResp = await HandleSplitBindPalm(splitInput.Value, _PalmDto.palm_id);
             if (splitResp?.ResultCode != 1) return;
 
-            // 绑定手指到手掌
             var finger1Resp = await HandleFingerBindPalm(finger1Input.Value, _PalmDto.palm_id);
             if (finger1Resp?.ResultCode != 1) return;
 
@@ -535,19 +408,12 @@
             var finger5Resp = await HandleFingerBindPalm(finger5Input.Value, _PalmDto.palm_id);
             if (finger5Resp?.ResultCode != 1) return;
 
-            // 绑定成功后清空所有输入框
-            palmInput.Value = "";
-            // 新增：清空分指机构输入框
-            splitInput.Value = "";
-            finger1Input.Value = "";
-            finger2Input.Value = "";
-            finger3Input.Value = "";
-            finger4Input.Value = "";
-            finger5Input.Value = "";
+            palmInput.Value = ""; splitInput.Value = "";
+            finger1Input.Value = ""; finger2Input.Value = ""; finger3Input.Value = ""; finger4Input.Value = ""; finger5Input.Value = "";
             scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
 
-            // 重新加载任务数据（刷新已完成列表）
             await LoadTaskDetail();
+            await TaskService.UpdateSingleTaskStatus(taskId);
             SnackbarHelper.Show(Snackbar, "手掌与分指机构、手指绑定成功", Severity.Success);
         }
         catch (Exception ex)
@@ -561,13 +427,11 @@
         }
     }
 
-    // 新增：分指机构绑定到手掌的专用方法
     private async Task<ApiResponse> HandleSplitBindPalm(string split_id, string palm_id)
     {
         ApiResponse response = null;
         try
         {
-            // 调用专门的分指机构绑定API，而非复用手指的绑定方法
             response = await ProcessThreeService.SplitBindPalm(split_id, palm_id);
             if (response != null && response.ResultCode == 1)
             {
@@ -583,17 +447,11 @@
         {
             var errorMessage = $"分指机构 {split_id} 绑定异常：{ex.Message}";
             SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
-            response = new ApiResponse
-            {
-                ResultCode = -1,
-                Msg = errorMessage
-            };
+            response = new ApiResponse { ResultCode = -1, Msg = errorMessage };
         }
-
         return response;
     }
 
-    // 保留原有的手指绑定方法（未修改）
     private async Task<ApiResponse> HandleFingerBindPalm(string finger_id, string palm_id)
     {
         ApiResponse response = null;
@@ -614,13 +472,8 @@
         {
             var errorMessage = $"手指 {finger_id} 绑定异常：{ex.Message}";
             SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
-            response = new ApiResponse
-            {
-                ResultCode = -1,
-                Msg = errorMessage
-            };
+            response = new ApiResponse { ResultCode = -1, Msg = errorMessage };
         }
-
         return response;
     }
 
@@ -662,50 +515,27 @@
         }
     }
 
-    // 处理输入框值变化
     private async Task HandleInputValueChanged(BarcodeScanner.InputField input)
     {
         switch (input.Id)
         {
-            case "palmId":
-                _PalmDto.palm_id = input.Value;
-                break;
-            // 新增：处理分指机构输入值变化
-            case "splitId":
-                _split = input.Value;
-                break;
-            case "finger1":
-                _finger1 = input.Value;
-                break;
-            // 移除重复的_split处理（原代码可能的错误）
-            case "finger2":
-                _finger2 = input.Value;
-                break;
-            case "finger3":
-                _finger3 = input.Value;
-                break;
-            case "finger4":
-                _finger4 = input.Value;
-                break;
-            case "finger5":
-                _finger5 = input.Value;
-                break;
-            case "remarks":
-                _PalmDto.remarks = input.Value;
-                break;
+            case "palmId": _PalmDto.palm_id = input.Value; break;
+            case "splitId": _split = input.Value; break;
+            case "finger1": _finger1 = input.Value; break;
+            case "finger2": _finger2 = input.Value; break;
+            case "finger3": _finger3 = input.Value; break;
+            case "finger4": _finger4 = input.Value; break;
+            case "finger5": _finger5 = input.Value; break;
+            case "remarks": _PalmDto.remarks = input.Value; break;
         }
-
         await Task.CompletedTask;
     }
 
-    // 确定条码数据应填入哪个输入框（按顺序填充未填写的字段）
     private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
     {
-        // 按顺序查找第一个空值的输入框
         var palmInput = scannerInputs.FirstOrDefault(i => i.Id == "palmId" && string.IsNullOrEmpty(i.Value));
         if (palmInput != null) return palmInput;
 
-        // 新增：分指机构输入框优先于手指输入框
         var splitInput = scannerInputs.FirstOrDefault(i => i.Id == "splitId" && string.IsNullOrEmpty(i.Value));
         if (splitInput != null) return splitInput;
 
@@ -724,7 +554,6 @@
         var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(i.Value));
         if (finger5Input != null) return finger5Input;
 
-        // 所有必填项都已填写，默认返回备注输入框
         return scannerInputs.FirstOrDefault(i => i.Id == "remarks");
     }
 
@@ -739,16 +568,10 @@
         var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
         var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
-        // 基本验证
-        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
-        {
-            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
-            return;
-        }
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value)) { SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning); return; }
 
         try
         {
-            // 获取原始数据用于比较
             var originalData = await ProcessThreeService.GetPalmDetail(palmInput.Value);
 
             var newSplit = splitInput?.Value ?? "";
@@ -759,7 +582,6 @@
             var newFinger5 = finger5Input?.Value ?? "";
             var newRemarks = remarksInput?.Value ?? "";
 
-            // 获取原始值（从原始数据中）
             var originalSplit = originalData.Count > 0 ? originalData[0] : "";
             var originalFinger1 = originalData.Count > 1 ? originalData[1] : "";
             var originalFinger2 = originalData.Count > 2 ? originalData[2] : "";
@@ -768,14 +590,12 @@
             var originalFinger5 = originalData.Count > 5 ? originalData[5] : "";
             var originalRemarks = originalData.Count > 6 ? originalData[6] : "";
 
-            // 检查各组件变更
             await CheckAndShowSplitChange("分指机构", originalSplit, newSplit);
             await CheckAndShowFingerChange("大拇指", originalFinger1, newFinger1);
             await CheckAndShowFingerChange("食指", originalFinger2, newFinger2);
             await CheckAndShowFingerChange("中指", originalFinger3, newFinger3);
             await CheckAndShowFingerChange("无名指", originalFinger4, newFinger4);
             await CheckAndShowFingerChange("小拇指", originalFinger5, newFinger5);
-            // CheckAndShowComponentChange("备注", originalRemarks, newRemarks);
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
         }
@@ -841,7 +661,6 @@
         }
     }
 
-
     public async ValueTask DisposeAsync()
     {
         if (dotNetRef != null)
@@ -849,9 +668,6 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
-
         GC.SuppressFinalize(this);
     }
-
 }
-    

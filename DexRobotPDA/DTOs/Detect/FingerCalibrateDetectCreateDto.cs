@@ -18,7 +18,10 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     private string _test_action = string.Empty;
     private DateTime? _begin_time;
     private DateTime? _finish_time;
+
+    // ★ 改为“毫秒”语义（仍使用 int?，0–2,147,483,647 ms）
     private int? _consume_time;
+
     private double? _remote_angle;
     private double? _near_angle;
     private double? _motor_1_max;
@@ -97,7 +100,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 测试开始时间（精确到小数点后3位）
+    /// 测试开始时间（精确到毫秒）
     /// </summary>
     public DateTime? begin_time
     {
@@ -114,7 +117,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 测试结束时间（精确到小数点后3位）
+    /// 测试结束时间（精确到毫秒）
     /// </summary>
     public DateTime? finish_time
     {
@@ -131,13 +134,19 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 消耗时间（单位：秒）
+    /// 消耗时间（单位：毫秒）
     /// </summary>
+    [Range(0, int.MaxValue, ErrorMessage = "耗时不能为负数")]
     public int? consume_time
     {
         get => _consume_time;
         set => SetProperty(ref _consume_time, value);
     }
+
+    /// <summary>
+    /// 仅用于显示的秒数（含毫秒），例如 1.234 s
+    /// </summary>
+    public double? consume_time_seconds => _consume_time.HasValue ? _consume_time.Value / 1000.0 : null;
 
     /// <summary>
     /// 远端角度（传感器读数）
@@ -176,7 +185,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 校准时间（精确到秒）
+    /// 校准时间（精确到秒或毫秒，按业务需要）
     /// </summary>
     public DateTime? calibrate_time
     {
@@ -240,13 +249,11 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
         set => SetProperty(ref _normal_force, value);
     }
 
-    // INotifyPropertyChanged implementation
+    // INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
@@ -261,22 +268,21 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     /// </summary>
     private void OnTimePropertyChanged()
     {
-        // 自动计算耗时
         CalculateConsumeTime();
     }
 
     /// <summary>
-    /// 计算耗时（动作结束时间 - 发起时间）
+    /// 计算耗时（finish_time - begin_time），结果为毫秒
     /// </summary>
     private void CalculateConsumeTime()
     {
         if (begin_time.HasValue && finish_time.HasValue)
         {
             TimeSpan timeDiff = finish_time.Value - begin_time.Value;
-            if (timeDiff.TotalMilliseconds >= 0)
+            if (timeDiff.Ticks >= 0)
             {
-                double consumeTime = Math.Round(timeDiff.TotalSeconds, 3);
-                consume_time = (int)consumeTime;
+                // ★ 关键改动：毫秒为单位，四舍五入到最近 1ms
+                consume_time = (int)Math.Round(timeDiff.TotalMilliseconds, MidpointRounding.AwayFromZero);
             }
             else
             {

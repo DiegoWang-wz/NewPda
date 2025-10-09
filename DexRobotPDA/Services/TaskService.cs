@@ -31,6 +31,7 @@ namespace DexRobotPDA.Services
             request.AddParameter("taskId", taskId);
             return await ExecuteRequest<ProductTaskDto>(request);
         }
+
         public async Task<ApiResponse> AddTask(AddTaskDto taskDto)
         {
             var request = new RestRequest("api/ProductTask/AddTask", Method.Post);
@@ -44,11 +45,11 @@ namespace DexRobotPDA.Services
 
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
             {
-                _logger.LogInformation("任务新增成功 - 任务标题: {title}",taskDto.title);
+                _logger.LogInformation("任务新增成功 - 任务标题: {title}", taskDto.title);
             }
             else
             {
-                _logger.LogWarning("任务新增失败 - 任务标题: {title}, 错误信息: {Msg}",taskDto.title, apiResponse.Msg);
+                _logger.LogWarning("任务新增失败 - 任务标题: {title}, 错误信息: {Msg}", taskDto.title, apiResponse.Msg);
             }
 
             return apiResponse;
@@ -132,6 +133,58 @@ namespace DexRobotPDA.Services
             else
             {
                 _logger.LogWarning("任务整体状态更新失败 - 任务ID: {TaskId}, 错误信息: {Msg}",
+                    taskId, apiResponse.Msg);
+            }
+
+            return apiResponse;
+        }
+
+        public async Task<ApiResponse> UpdateAllTaskStatus()
+        {
+            var request = new RestRequest("api/ProductTask/UpdateAllTaskStatus", Method.Put);
+
+            _logger.LogInformation("尝试批量更新所有任务状态");
+
+            var apiResponse = await ExecuteCommand(request);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string responseJson = JsonSerializer.Serialize(apiResponse, options);
+            Console.WriteLine("批量更新任务状态API响应内容:");
+            Console.WriteLine(responseJson);
+
+            if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
+            {
+                _logger.LogInformation("批量更新任务状态成功");
+            }
+            else
+            {
+                _logger.LogWarning("批量更新任务状态失败 - 错误信息: {Msg}", apiResponse.Msg);
+            }
+
+            return apiResponse;
+        }
+
+        public async Task<ApiResponse> UpdateSingleTaskStatus(string taskId)
+        {
+            var request = new RestRequest("api/ProductTask/UpdateSingleTaskStatus", Method.Put);
+            request.AddParameter("taskId", taskId);
+
+            _logger.LogInformation("尝试更新单个任务状态 - 任务ID: {TaskId}", taskId);
+
+            var apiResponse = await ExecuteCommand(request);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string responseJson = JsonSerializer.Serialize(apiResponse, options);
+            Console.WriteLine("更新单个任务状态API响应内容:");
+            Console.WriteLine(responseJson);
+
+            if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
+            {
+                _logger.LogInformation("单个任务状态更新成功 - 任务ID: {TaskId}", taskId);
+            }
+            else
+            {
+                _logger.LogWarning("单个任务状态更新失败 - 任务ID: {TaskId}, 错误信息: {Msg}",
                     taskId, apiResponse.Msg);
             }
 

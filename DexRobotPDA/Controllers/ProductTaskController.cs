@@ -322,6 +322,7 @@ public class ProductTaskController : ControllerBase
                 task.updated_at = DateTime.Now;
                 task.process_2 = 0;
             }
+
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
@@ -370,6 +371,7 @@ public class ProductTaskController : ControllerBase
                 task.updated_at = DateTime.Now;
                 task.process_3 = 0;
             }
+
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
@@ -509,13 +511,13 @@ public class ProductTaskController : ControllerBase
             if (qualifiedCount == task.product_num)
             {
                 task.updated_at = DateTime.Now;
-                task.process_8= 1;
+                task.process_8 = 1;
                 task.status = 2;
             }
             else
             {
                 task.updated_at = DateTime.Now;
-                task.process_8= 0;
+                task.process_8 = 0;
                 task.status = 1;
             }
 
@@ -531,6 +533,169 @@ public class ProductTaskController : ControllerBase
             res.ResultCode = -1;
             res.Msg = $"更新失败: {ex.Message}";
             return BadRequest(res);
+        }
+    }
+
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdateAllTaskStatus()
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            // 获取所有任务
+            var tasks = await db.ProductTasks.ToListAsync();
+            int updatedCount = 0;
+
+            foreach (var task in tasks)
+            {
+                // 保存更新前的状态
+                int oldStatus = task.status;
+
+                // 根据SQL逻辑计算status值
+                bool allZero = task.process_1 == 0 && task.process_2 == 0 && task.process_3 == 0 &&
+                               task.process_4 == 0 && task.process_5 == 0 && task.process_6 == 0 &&
+                               task.process_7 == 0 && task.process_8 == 0;
+
+                bool allOne = task.process_1 == 1 && task.process_2 == 1 && task.process_3 == 1 &&
+                              task.process_4 == 1 && task.process_5 == 1 && task.process_6 == 1 &&
+                              task.process_7 == 1 && task.process_8 == 1;
+
+                bool anyOne = task.process_1 == 1 || task.process_2 == 1 || task.process_3 == 1 ||
+                              task.process_4 == 1 || task.process_5 == 1 || task.process_6 == 1 ||
+                              task.process_7 == 1 || task.process_8 == 1;
+
+                if (allZero)
+                {
+                    task.status = 0;
+                }
+                else if (anyOne && !allOne)
+                {
+                    task.status = 1;
+                }
+                else if (allOne)
+                {
+                    task.status = 2;
+                }
+
+                // 如果状态发生了变化，则计数器加1
+                if (oldStatus != task.status)
+                {
+                    updatedCount++;
+                }
+
+                task.updated_at = DateTime.Now;
+            }
+
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "状态更新成功";
+            res.ResultData = new
+            {
+                TotalCount = tasks.Count,
+                UpdatedCount = updatedCount,
+                UnchangedCount = tasks.Count - updatedCount
+            };
+
+            // 记录日志
+            _logger.LogInformation("批量更新任务状态完成，总共处理{TotalCount}条记录，更新了{UpdatedCount}条记录，{UnchangedCount}条记录未变更",
+                tasks.Count, updatedCount, tasks.Count - updatedCount);
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"更新失败: {ex.Message}";
+            _logger.LogError(ex, "批量更新任务状态时发生错误");
+            return StatusCode(500, res);
+        }
+    }
+
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> UpdateSingleTaskStatus(string taskId)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            // 获取指定任务
+            var task = await db.ProductTasks
+                .FirstOrDefaultAsync(t => t.task_id == taskId);
+
+            if (task == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "任务不存在";
+                return NotFound(res);
+            }
+
+            // 保存更新前的状态
+            int oldStatus = task.status;
+
+            // 根据SQL逻辑计算status值
+            bool allZero = task.process_1 == 0 && task.process_2 == 0 && task.process_3 == 0 &&
+                           task.process_4 == 0 && task.process_5 == 0 && task.process_6 == 0 &&
+                           task.process_7 == 0 && task.process_8 == 0;
+
+            bool allOne = task.process_1 == 1 && task.process_2 == 1 && task.process_3 == 1 &&
+                          task.process_4 == 1 && task.process_5 == 1 && task.process_6 == 1 &&
+                          task.process_7 == 1 && task.process_8 == 1;
+
+            bool anyOne = task.process_1 == 1 || task.process_2 == 1 || task.process_3 == 1 ||
+                          task.process_4 == 1 || task.process_5 == 1 || task.process_6 == 1 ||
+                          task.process_7 == 1 || task.process_8 == 1;
+
+            if (allZero)
+            {
+                task.status = 0;
+            }
+            else if (anyOne && !allOne)
+            {
+                task.status = 1;
+            }
+            else if (allOne)
+            {
+                task.status = 2;
+            }
+
+            task.updated_at = DateTime.Now;
+
+            // 保存更改
+            await db.SaveChangesAsync();
+
+            bool isUpdated = oldStatus != task.status;
+
+            res.ResultCode = 1;
+            res.Msg = "状态更新成功";
+            res.ResultData = new
+            {
+                TaskId = taskId,
+                OldStatus = oldStatus,
+                NewStatus = task.status,
+                StatusChanged = isUpdated
+            };
+
+            // 记录日志
+            if (isUpdated)
+            {
+                _logger.LogInformation("任务 {TaskId} 状态已更新，从 {OldStatus} 变更为 {NewStatus}",
+                    taskId, oldStatus, task.status);
+            }
+            else
+            {
+                _logger.LogInformation("任务 {TaskId} 状态未发生变化，仍为 {Status}", taskId, task.status);
+            }
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"更新失败: {ex.Message}";
+            _logger.LogError(ex, "更新单个任务状态时发生错误，任务ID: {TaskId}", taskId);
+            return StatusCode(500, res);
         }
     }
 }

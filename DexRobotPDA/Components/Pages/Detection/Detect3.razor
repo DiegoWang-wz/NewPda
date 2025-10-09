@@ -35,11 +35,10 @@
                                               RequiredError="请输入动作结束时间"
                                               @bind-Value="_detectDto.finish_time"/>
 
-                        <MudTextField Label="耗时（秒）"
+                        <MudTextField Label="耗时（毫秒）"
                                       Disabled="true"
                                       Class="my-2"
                                       @bind-Value="_detectDto.consume_time"
-                                      Format="0.000"
                                       RequiredError="请输入耗时"/>
                     </MudPaper>
                 </MudItem>
@@ -319,6 +318,7 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+                    await TaskService.UpdateSingleTaskStatus(_split.task_id);
                     ClearData();
                 }
                 else

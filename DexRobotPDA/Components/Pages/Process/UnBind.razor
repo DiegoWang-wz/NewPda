@@ -443,21 +443,25 @@
             if (_motor?.id > 0)
             {
                 var res = await ProcessOneService.UnBindMotor(_motor.motor_id);
+                await TaskService.UpdateSingleTaskStatus(_motor.task_id);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "电机解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_finger?.id > 0)
             {
                 var res = await ProcessTwoService.UnBindFinger(_finger.finger_id);
+                await TaskService.UpdateSingleTaskStatus(_finger.task_id);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手指外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_split?.id > 0)
             {
                 var res = await ProcessThreeService.UnBindSplit(_split.split_id);
+                await TaskService.UpdateSingleTaskStatus(_split.task_id);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "分指机构解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_palm?.id > 0)
             {
                 var res = await ProcessThreeService.UnBindPalm(_palm.palm_id);
+                await TaskService.UpdateSingleTaskStatus(_palm.task_id);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
 

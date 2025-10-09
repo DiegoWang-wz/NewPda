@@ -375,6 +375,7 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+                    await TaskService.UpdateSingleTaskStatus(_motor.task_id);
                     ClearTaskId();
                 }
                 else

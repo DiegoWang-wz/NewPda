@@ -64,7 +64,6 @@
                                       Disabled="true"
                                       Class="my-2"
                                       @bind-Value="_detectDto.consume_time"
-                                      Format="0.000"
                                       RequiredError="请输入耗时"/>
                     </MudPaper>
                 </MudItem>
@@ -354,6 +353,7 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+                    await TaskService.UpdateSingleTaskStatus(_finger.task_id);
                     ClearData();
                 }
                 else
