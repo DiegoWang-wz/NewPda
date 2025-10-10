@@ -22,7 +22,7 @@ public class FingerController : ControllerBase
         mapper = _mapper;
         _logger = logger;
     }
-    
+
     [HttpGet]
     public IActionResult GetFingers()
     {
@@ -73,6 +73,7 @@ public class FingerController : ControllerBase
 
         return Ok(response);
     }
+
     [HttpPost]
     public async Task<IActionResult> AddFinger(AddFingerDto addFingerDto)
     {
@@ -116,8 +117,8 @@ public class FingerController : ControllerBase
             int productNum = (await db.ProductTasks
                 .Where(p => p.task_id == addFingerDto.task_id)
                 .Select(p => p.product_num)
-                .FirstOrDefaultAsync())*5;
-            
+                .FirstOrDefaultAsync()) * 5;
+
             // 假设每个任务最多允许添加5个手指，可根据实际业务修改此数值
             if (sameTaskCount >= productNum)
             {
@@ -152,7 +153,7 @@ public class FingerController : ControllerBase
             var fingerModel = mapper.Map<FingerModel>(addFingerDto);
 
             // 7. 补充DTO中未包含但Model需要的字段
-            fingerModel.palm_id = null; 
+            fingerModel.palm_id = null;
             fingerModel.updated_at = null;
             // 8. 添加到数据库（异步）
             await db.Fingers.AddAsync(fingerModel);
@@ -326,7 +327,7 @@ public class FingerController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ApiResponse>> GetFingerDetail(string finger_id)
     {
@@ -365,7 +366,7 @@ public class FingerController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UnBindFinger(string finger_id)
     {
@@ -382,7 +383,7 @@ public class FingerController : ControllerBase
                 res.Msg = "手指外壳不存在";
                 return NotFound(res);
             }
-            
+
             var palm = await db.Palms
                 .FirstOrDefaultAsync(t => t.palm_id == finger.palm_id);
 
@@ -410,7 +411,7 @@ public class FingerController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> ReBindFinger(ReBindDto dto)
     {
@@ -447,7 +448,7 @@ public class FingerController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UpdateFinger(FingerDto dto)
     {
@@ -464,7 +465,7 @@ public class FingerController : ControllerBase
                 res.Msg = "手指不存在";
                 return NotFound(res);
             }
-            
+
 
             finger.task_id = dto.task_id;
             finger.operator_id = dto.operator_id;
@@ -488,4 +489,116 @@ public class FingerController : ControllerBase
         }
     }
 
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse>> AddFingerWithMotors(AddFingerWithMotorsDto dto)
+    {
+        var res = new ApiResponse();
+
+        using var transaction = await db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 1. 检查手指是否已存在
+            var existingFinger = await db.Fingers
+                .FirstOrDefaultAsync(f => f.finger_id == dto.finger_id);
+
+            if (existingFinger != null)
+            {
+                res.ResultCode = -1;
+                res.Msg = $"手指 {dto.finger_id} 已存在";
+                return BadRequest(res);
+            }
+
+            // 2. 检查是否有重复的电机ID
+            var duplicateMotors = dto.motor_ids
+                .GroupBy(x => x)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateMotors.Any())
+            {
+                res.ResultCode = -1;
+                res.Msg = $"存在重复的电机ID: {string.Join(", ", duplicateMotors)}";
+                return BadRequest(res);
+            }
+
+            // 3. 验证所有电机是否存在且未被绑定
+            foreach (var motorId in dto.motor_ids)
+            {
+                var motor = await db.Motors
+                    .FirstOrDefaultAsync(m => m.motor_id == motorId);
+
+                if (motor == null)
+                {
+                    res.ResultCode = -1;
+                    res.Msg = $"电机 {motorId} 不存在";
+                    return BadRequest(res);
+                }
+
+                if (!string.IsNullOrEmpty(motor.finger_id))
+                {
+                    res.ResultCode = -1;
+                    res.Msg = $"电机 {motorId} 已被绑定";
+                    return BadRequest(res);
+                }
+            }
+
+            // 4. 创建手指对象
+            var fingerModel = new FingerModel
+            {
+                finger_id = dto.finger_id,
+                task_id = dto.task_id,
+                operator_id = dto.operator_id,
+                remarks = dto.remarks,
+                is_thumb = dto.is_thumb,
+                is_qualified = false,
+                created_at = DateTime.Now,
+                updated_at = null
+            };
+
+            await db.Fingers.AddAsync(fingerModel);
+
+            // 5. 绑定所有电机
+            foreach (var motorId in dto.motor_ids)
+            {
+                var motor = await db.Motors
+                    .FirstOrDefaultAsync(m => m.motor_id == motorId);
+                motor.task_id = dto.task_id;
+                motor.finger_id = dto.finger_id;
+                motor.updated_at = DateTime.Now;
+            }
+
+            // 6. 保存所有更改
+            await db.SaveChangesAsync();
+
+            // 7. 提交事务
+            await transaction.CommitAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "手指创建并绑定电机成功";
+            // 修改返回数据格式，避免可能的序列化问题
+            res.ResultData = new
+            {
+                finger = mapper.Map<FingerDto>(fingerModel),
+                motorCount = dto.motor_ids.Count
+            };
+
+            _logger.LogInformation("手指创建并绑定电机成功 - 手指ID: {FingerId}, 电机数量: {MotorCount}",
+                dto.finger_id, dto.motor_ids.Count);
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            // 回滚事务
+            await transaction.RollbackAsync();
+
+            _logger.LogError(ex, "手指创建并绑定电机失败 - 手指ID: {FingerId}", dto.finger_id);
+
+            res.ResultCode = -1;
+            res.Msg = $"操作失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
 }

@@ -182,6 +182,13 @@ public class MotorController : ControllerBase
                 res.Msg = $"{dto.motor_id},电机不存在";
                 return NotFound(res);
             }
+            
+            if (!String.IsNullOrEmpty(motor.finger_id))
+            {
+                res.ResultCode = -1;
+                res.Msg = $"{dto.motor_id},该单机已经绑定过手指，请勿重复绑定";
+                return NotFound(res);
+            }
 
             // if (finger == null)
             // {

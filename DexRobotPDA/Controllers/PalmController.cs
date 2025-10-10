@@ -75,7 +75,7 @@ public class PalmController : ControllerBase
 
         return Ok(response);
     }
-    
+
     /// <summary>
     /// 新增手掌
     /// </summary>
@@ -118,12 +118,12 @@ public class PalmController : ControllerBase
             int sameTaskCount = await db.Palms
                 .Where(p => p.task_id == addPalmDto.task_id)
                 .CountAsync();
-            
+
             int productNum = await db.ProductTasks
                 .Where(p => p.task_id == addPalmDto.task_id)
                 .Select(p => p.product_num)
                 .FirstOrDefaultAsync();
-            
+
             // 假设每个任务最多允许添加2个手掌，可根据实际业务修改
             if (sameTaskCount >= productNum)
             {
@@ -293,7 +293,7 @@ public class PalmController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ApiResponse>> GetPalmDetail(string palm_id)
     {
@@ -311,11 +311,12 @@ public class PalmController : ControllerBase
                 res.Msg = "手指外壳不存在";
                 return NotFound(res);
             }
+
             var splitIds = await db.Splits
                 .Where(m => m.palm_id == palm_id)
                 .Select(m => m.split_id)
                 .ToListAsync();
-            
+
             var fingerIds = await db.Fingers
                 .Where(m => m.palm_id == palm_id)
                 .Select(m => m.finger_id)
@@ -337,6 +338,7 @@ public class PalmController : ControllerBase
             return BadRequest(res);
         }
     }
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UnBindPalm(string palm_id)
     {
@@ -372,7 +374,7 @@ public class PalmController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> ReBindPalm(ReBindDto dto)
     {
@@ -408,7 +410,7 @@ public class PalmController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UpdatePalm(PalmDto dto)
     {
@@ -444,6 +446,155 @@ public class PalmController : ControllerBase
         {
             res.ResultCode = -1;
             res.Msg = $"手掌更新失败: {ex.Message}";
+            return BadRequest(res);
+        }
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse>> AddPalmWithComponents(AddPalmWithComponentsDto dto)
+    {
+        var res = new ApiResponse();
+
+        using var transaction = await db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 1. 检查手掌是否已存在
+            var existingPalm = await db.Palms
+                .FirstOrDefaultAsync(p => p.palm_id == dto.palm_id);
+
+            if (existingPalm != null)
+            {
+                res.ResultCode = -1;
+                res.Msg = $"手掌 {dto.palm_id} 已存在";
+                return BadRequest(res);
+            }
+            
+            // 2. 检查是否有重复的电机ID
+            var duplicateMotors = dto.component_ids
+                .GroupBy(x => x)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateMotors.Any())
+            {
+                res.ResultCode = -1;
+                res.Msg = $"存在重复的组件ID: {string.Join(", ", duplicateMotors)}";
+                return BadRequest(res);
+            }
+
+            // 2. 验证所有组件是否存在且未被绑定
+            foreach (var componentId in dto.component_ids)
+            {
+                // 检查是否为分指机构
+                var split = await db.Splits
+                    .FirstOrDefaultAsync(s => s.split_id == componentId);
+
+                if (split != null)
+                {
+                    if (!string.IsNullOrEmpty(split.palm_id))
+                    {
+                        res.ResultCode = -1;
+                        res.Msg = $"分指机构 {componentId} 已被绑定";
+                        return BadRequest(res);
+                    }
+
+                    continue;
+                }
+
+                // 检查是否为手指
+                var finger = await db.Fingers
+                    .FirstOrDefaultAsync(f => f.finger_id == componentId);
+
+                if (finger != null)
+                {
+                    if (!string.IsNullOrEmpty(finger.palm_id))
+                    {
+                        res.ResultCode = -1;
+                        res.Msg = $"手指 {componentId} 已被绑定";
+                        return BadRequest(res);
+                    }
+
+                    continue;
+                }
+
+                // 组件不存在
+                res.ResultCode = -1;
+                res.Msg = $"组件 {componentId} 不存在";
+                return BadRequest(res);
+            }
+
+            // 3. 创建手掌对象
+            var palmModel = new PalmModel
+            {
+                palm_id = dto.palm_id,
+                task_id = dto.task_id,
+                operator_id = dto.operator_id,
+                remarks = dto.remarks,
+                is_qualified = false,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
+            };
+
+            await db.Palms.AddAsync(palmModel);
+
+            // 4. 绑定所有组件
+            foreach (var componentId in dto.component_ids)
+            {
+                // 绑定分指机构
+                var split = await db.Splits
+                    .FirstOrDefaultAsync(s => s.split_id == componentId);
+
+                if (split != null)
+                {
+                    split.task_id = dto.task_id;
+                    split.palm_id = dto.palm_id;
+                    split.updated_at = DateTime.Now;
+                    continue;
+                }
+
+                // 绑定手指
+                var finger = await db.Fingers
+                    .FirstOrDefaultAsync(f => f.finger_id == componentId);
+
+                if (finger != null)
+                {
+                    finger.task_id = dto.task_id;
+                    finger.palm_id = dto.palm_id;
+                    finger.updated_at = DateTime.Now;
+                }
+            }
+
+            // 5. 保存所有更改
+            await db.SaveChangesAsync();
+
+            // 6. 提交事务
+            await transaction.CommitAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "手掌创建并绑定组件成功";
+            res.ResultData = palmModel;
+            res.ResultData = new
+            {
+                palm = mapper.Map<PalmDto>(palmModel),
+                fingerCount = dto.component_ids.Count
+            };
+
+            _logger.LogInformation("手掌创建并绑定组件成功 - 手掌ID: {PalmId}, 组件数量: {ComponentCount}",
+                dto.palm_id, dto.component_ids.Count);
+
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            // 回滚事务
+            await transaction.RollbackAsync();
+
+            _logger.LogError(ex, "手掌创建并绑定组件失败 - 手掌ID: {PalmId}", dto.palm_id);
+
+            res.ResultCode = -1;
+            res.Msg = $"操作失败: {ex.Message}";
             return BadRequest(res);
         }
     }

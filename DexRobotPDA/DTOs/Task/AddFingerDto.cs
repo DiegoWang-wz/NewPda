@@ -12,4 +12,5 @@ public class AddFingerDto
 
     public DateTime created_at { get; set; } = DateTime.Now;
     public bool is_qualified { get; set; } = false;
+    public bool is_thumb { get; set; } = false;
 }

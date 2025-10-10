@@ -11,13 +11,12 @@ public class ProcessTwoService : BaseService
 {
     public ProcessTwoService(
         RestClient restClient,
-        ILogger<AuthService> logger,ILocalStorageService localStorage) 
+        ILogger<AuthService> logger, ILocalStorageService localStorage)
         : base(restClient, logger, localStorage)
     {
     }
-    
 
-    
+
     public async Task<List<FingerDto>?> GetFinishedList(string taskId)
     {
         var request = new RestRequest("api/Finger/GetFingerList");
@@ -25,13 +24,14 @@ public class ProcessTwoService : BaseService
         return await ExecuteRequest<List<FingerDto>>(request);
     }
 
-    
+
     public async Task<List<string>?> GetFingerDetail(string finger_id)
     {
         var request = new RestRequest("api/Finger/GetFingerDetail");
         request.AddParameter("finger_id", finger_id);
         return await ExecuteRequest<List<string>>(request);
     }
+
     public async Task<QualifyDto> CheckMotor(string motor_id)
     {
         var request = new RestRequest("api/Motor/GetMotorQualify");
@@ -70,7 +70,7 @@ public class ProcessTwoService : BaseService
                     );
                     return detailDto ?? qualifyDto; // 优先返回详情接口数据
                 }
-            
+
                 // 详情接口调用失败时，保留基础不合格信息
                 qualifyDto.message = detailResponse.Msg ?? "获取不合格详情失败";
                 return qualifyDto;
@@ -90,7 +90,7 @@ public class ProcessTwoService : BaseService
             };
         }
     }
-    
+
     public async Task<ApiResponse> AddFinger(AddFingerDto fingerDto)
     {
         var request = new RestRequest("api/Finger/AddFinger", Method.Post);
@@ -121,20 +121,22 @@ public class ProcessTwoService : BaseService
         }
         else
         {
-            _logger.LogWarning("手指新增失败 - 手指ID: {FingerId}, 错误信息: {Msg}", 
+            _logger.LogWarning("手指新增失败 - 手指ID: {FingerId}, 错误信息: {Msg}",
                 fingerDto.finger_id, apiResponse.Msg);
         }
 
         return apiResponse;
     }
+
     public async Task<ApiResponse> MotorBindFinger(string motor_id, string finger_id)
     {
         var request = new RestRequest("api/Motor/MotorBindFinger", Method.Post);
-        request.AddJsonBody(new { 
-            motor_id = motor_id, 
+        request.AddJsonBody(new
+        {
+            motor_id = motor_id,
             finger_id = finger_id
         });
-        
+
         var apiResponse = await ExecuteCommand(request);
 
         var options = new JsonSerializerOptions { WriteIndented = true };
@@ -143,15 +145,14 @@ public class ProcessTwoService : BaseService
         Console.WriteLine(responseJson);
         return apiResponse;
     }
-    
+
     public async Task<ApiResponse> UnBindFinger(string finger_id)
     {
-
         var request = new RestRequest($"api/Finger/UnBindFinger?finger_id={finger_id}", Method.Put);
 
         _logger.LogInformation("尝试解绑手指外壳 - 手指外壳ID: {FingerId}", finger_id);
         var apiResponse = await ExecuteCommand(request);
-    
+
         if (apiResponse.ResultCode == 1)
         {
             _logger.LogInformation("手指外壳解绑成功 - 手指外壳ID: {FingerId}", finger_id);
@@ -163,7 +164,7 @@ public class ProcessTwoService : BaseService
 
         return apiResponse;
     }
-    
+
     public async Task<ApiResponse> ReBindFinger(string finger_id, string task_id, string palm_id)
     {
         var request = new RestRequest("api/Finger/ReBindFinger", Method.Put); // 修改端点
@@ -177,7 +178,7 @@ public class ProcessTwoService : BaseService
 
         _logger.LogInformation("尝试重绑手指外壳 - 手指外壳ID: {FingerId}", finger_id);
         var apiResponse = await ExecuteCommand(request);
-    
+
         if (apiResponse.ResultCode == 1)
         {
             _logger.LogInformation("手指外壳重绑成功 - 手指外壳ID: {FingerId}", finger_id);
@@ -189,14 +190,14 @@ public class ProcessTwoService : BaseService
 
         return apiResponse;
     }
-    
+
     public async Task<ApiResponse> UpdateFinger(FingerDto dto)
     {
         var request = new RestRequest("api/Finger/UpdateFinger", Method.Put); // 修改端点
         request.AddJsonBody(dto);
         _logger.LogInformation("尝试更新手指外壳 - 手指外壳ID: {MotorId}", dto.finger_id);
         var apiResponse = await ExecuteCommand(request);
-    
+
         if (apiResponse.ResultCode == 1)
         {
             _logger.LogInformation("手指外壳更新成功 - 手指外壳ID: {MotorId}", dto.finger_id);
@@ -205,6 +206,28 @@ public class ProcessTwoService : BaseService
         {
             _logger.LogWarning("手指外壳更新失败 - 手指外壳ID: {MotorId}, 错误信息: {Msg}", dto.finger_id, apiResponse.Msg);
         }
+
+        return apiResponse;
+    }
+
+    public async Task<ApiResponse> AddFingerWithMotors(AddFingerWithMotorsDto dto)
+    {
+        var request = new RestRequest("api/Finger/AddFingerWithMotors", Method.Post);
+        request.AddJsonBody(dto);
+
+        _logger.LogInformation("尝试创建手指并绑定电机 - 手指ID: {FingerId}", dto.finger_id);
+        var apiResponse = await ExecuteCommand(request);
+
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手指创建并绑定电机成功 - 手指ID: {FingerId}", dto.finger_id);
+        }
+        else
+        {
+            _logger.LogWarning("手指创建并绑定电机失败 - 手指ID: {FingerId}, 错误信息: {Msg}",
+                dto.finger_id, apiResponse.Msg);
+        }
+
         return apiResponse;
     }
 }

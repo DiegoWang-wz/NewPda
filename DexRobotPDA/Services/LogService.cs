@@ -22,7 +22,7 @@ public class LogService : BaseService
     
     public async Task<List<EventLogDto>?> GetLogs(DateTime? startTime = null, DateTime? endTime = null)
     {
-        var request = new RestRequest("api/EventLog/GetLogs", Method.Get);
+        var request = new RestRequest("api/EventLog/GetEventLogs", Method.Get);
         if (startTime.HasValue)
             request.AddParameter("startTime", startTime.Value);
         if (endTime.HasValue)

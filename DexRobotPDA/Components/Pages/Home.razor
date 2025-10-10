@@ -111,12 +111,12 @@
             }
         </MudGrid>
     }
-   
 
-    
+
 </MudContainer>
 
 @code {
+
     public class OperationItem
     {
         public string Name { get; set; }
@@ -137,11 +137,12 @@
     private List<OperationItem> operations = new()
     {
         new() { Name = "生产任务", Icon = Icons.Material.Filled.FormatListBulleted, CompletedToday = 2, Route = "/TaskList" },
-        new() { Name = "绑定汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/BindSummary" },
-        new() { Name = "检测汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/DetectSummary" },
-       
+        new() { Name = "数据汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/DataSummary" },
+        new() { Name = "日志汇总", Icon = Icons.Material.Filled.TextSnippet, CompletedToday = 30, Route = "/LogSummary" },
+
         // new() { Name = "入库", Icon = Icons.Material.Filled.Warehouse, CompletedToday = 15, Route = "/InputDetect" }
     };
+
     private List<OperationItem> operations2 = new()
     {
         new() { Name = "粘蜗杆", Icon = Icons.Material.Filled.Build, CompletedToday = 24, Route = "/process_1" },
@@ -150,6 +151,7 @@
         new() { Name = "部件解绑", Icon = Icons.Material.Filled.Verified, CompletedToday = 30, Route = "/UnBind" },
         new() { Name = "部件重绑", Icon = Icons.Material.Filled.Inventory, CompletedToday = 22, Route = "/ReBind" }
     };
+
     private List<OperationItem> operations3 = new()
     {
         new() { Name = "蜗杆粘接检测", Icon = Icons.Material.Filled.LooksOne, CompletedToday = 30, Route = "/Detect1" },
@@ -159,15 +161,13 @@
         new() { Name = "整手标定检测", Icon = Icons.Material.Filled.Looks5, CompletedToday = 30, Route = "/Detect5" }
     };
 
-
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             isLoading = true;
             StateHasChanged();
-        
+
             try
             {
                 currentUser = await AuthService.GetCurrentUserAsync();
@@ -196,7 +196,7 @@
     .operation-button {
         height: 80px;
         font-size: 1.1rem;
-        margin: 0;  
+        margin: 0;
     }
 
     .operation-card {
@@ -207,10 +207,12 @@
     .operation-card:hover {
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12) !important;
     }
+
     @@media (max-width: 600px) {
         .mud-button-label {
             font-size: 0.9rem;
         }
+
         .operation-button {
             height: 70px;
         }

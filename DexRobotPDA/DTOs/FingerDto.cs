@@ -20,4 +20,6 @@ public class FingerDto
     
     public bool is_qualified { get; set; } = false;
     
+    public bool is_thumb { get; set; } = false;
+    
 }

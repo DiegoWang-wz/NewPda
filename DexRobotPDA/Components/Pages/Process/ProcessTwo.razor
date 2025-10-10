@@ -1,6 +1,7 @@
 ﻿@page "/process_2"
 @page "/process_2/{task_id}/{finger_id}"
 
+@using System.Text.Json
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -77,6 +78,18 @@
                             Class="ml-2"/>
                     </MudButton>
                     <MudSpacer/>
+                    <MudButton Variant=" Variant.Filled"
+                               Color="@(_fingerDto.is_thumb ? Color.Default : Color.Error)"
+                               OnClick="@(e => ToggleFingerType(false))">
+                        四指
+                    </MudButton>
+                    <MudButton Variant=" Variant.Filled"
+                               Color="@(!_fingerDto.is_thumb ? Color.Default : Color.Error)"
+                               OnClick="@(e => ToggleFingerType(true))">
+                        大拇指
+                    </MudButton>
+
+                    <MudDivider Vertical="true" Class="mx-4 my-auto" Style="height: 1em; align-self: center;"/>
                     <MudButton Variant="Variant.Filled"
                                OnClick="NavigateToDetail"
                                Color="Color.Primary">
@@ -165,7 +178,6 @@
     private string _motorId2 { get; set; } = string.Empty;
     private string _motorId3 { get; set; } = string.Empty;
     private DotNetObjectReference<ProcessTwo>? dotNetRef;
-    private bool isThumbSelected = false;
     private List<BarcodeScanner.InputField> scannerInputs = new();
     private List<string> DuplicateCheckList = new() { "motorId1", "motorId2", "motorId3" };
     private bool isBinding = false;
@@ -186,6 +198,7 @@
             _motorId1 = list.Count > 0 ? list[0] : string.Empty;
             _motorId2 = list.Count > 1 ? list[1] : string.Empty;
             _motorId3 = list.Count > 2 ? list[2] : string.Empty;
+            _fingerDto.is_thumb = list.Count > 2;
         }
 
         scannerInputs = new List<BarcodeScanner.InputField>
@@ -193,7 +206,7 @@
             new BarcodeScanner.InputField { Index = 1, Label = "手指编号", Id = "fingerId", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 2, Label = "电机1编号", Id = "motorId1", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 3, Label = "电机2编号", Id = "motorId2", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 4, Label = "电机3编号(大拇指)", Id = "motorId3", IsSpecialInput = false, Visible = false },
+            new BarcodeScanner.InputField { Index = 4, Label = "电机3编号(大拇指)", Id = "motorId3", IsSpecialInput = false, Visible = _fingerDto.is_thumb },
             new BarcodeScanner.InputField { Index = 5, Label = "备注", Id = "remarks", IsSpecialInput = true }
         };
     }
@@ -222,19 +235,22 @@
                 if (input != null) input.Value = kvp.Value;
             }
 
-            if (list.Count > 2)
+            _fingerDto.is_thumb = list.Count > 2;
+            var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
+            if (motor3Input != null)
             {
-                ToggleFingerType(true);
-                var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
-                if (motor3Input != null) motor3Input.Value = list[2];
-                _motorId3 = list[2];
+                motor3Input.Visible = _fingerDto.is_thumb;
+                if (_fingerDto.is_thumb) motor3Input.Value = list[2];
             }
+
+            _motorId3 = list.Count > 2 ? list[2] : "";
+            StateHasChanged();
         }
     }
 
     private void ToggleFingerType(bool isThumb)
     {
-        isThumbSelected = isThumb;
+        _fingerDto.is_thumb = isThumb;
         var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
         if (motor3Input != null) motor3Input.Visible = isThumb;
         StateHasChanged();
@@ -410,7 +426,7 @@
             return;
         }
 
-        if (isThumbSelected && (motor3Input == null || string.IsNullOrWhiteSpace(motor3Input.Value)))
+        if (_fingerDto.is_thumb && (motor3Input == null || string.IsNullOrWhiteSpace(motor3Input.Value)))
         {
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机3编号为空(大拇指)", false);
@@ -424,37 +440,53 @@
             _fingerDto.finger_id = fingerIdInput.Value;
             _fingerDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
 
-            var response = await ProcessTwoService.AddFinger(_fingerDto);
-            if (response.ResultCode != 1)
+            // 准备电机ID列表
+            var motorIds = new List<string> { motor1Input.Value, motor2Input.Value };
+            if (_fingerDto.is_thumb && motor3Input != null && !string.IsNullOrWhiteSpace(motor3Input.Value))
             {
-                var errorMessage = response?.Msg ?? "绑定失败";
+                motorIds.Add(motor3Input.Value);
+            }
+
+            // 创建包含手指和电机信息的DTO
+            var fingerWithMotorsDto = new AddFingerWithMotorsDto
+            {
+                finger_id = _fingerDto.finger_id,
+                task_id = _fingerDto.task_id,
+                operator_id = _fingerDto.operator_id,
+                remarks = _fingerDto.remarks,
+                is_thumb = _fingerDto.is_thumb,
+                motor_ids = motorIds
+            };
+
+            // 调用新的原子操作接口
+            var response = await ProcessTwoService.AddFingerWithMotors(fingerWithMotorsDto);
+
+            if (response.ResultCode == 1)
+            {
                 await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                    $"手指绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {errorMessage}", false);
-                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
-                return;
+                    $"手指绑定成功 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 电机绑定: 电机1({motor1Input.Value}) 电机2({motor2Input.Value})" +
+                    (_fingerDto.is_thumb && motor3Input != null ? $" 电机3({motor3Input.Value})" : ""), true);
+
+                fingerIdInput.Value = "";
+                motor1Input.Value = "";
+                motor2Input.Value = "";
+                if (motor3Input != null) motor3Input.Value = "";
+                scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+
+                SnackbarHelper.Show(Snackbar, "绑定成功", Severity.Success);
             }
-
-            ApiResponse response1 = await HandleMotorBindFinger(motor1Input.Value, _fingerDto.finger_id);
-            if (response1?.ResultCode != 1) return;
-
-            ApiResponse response2 = await HandleMotorBindFinger(motor2Input.Value, _fingerDto.finger_id);
-            if (response2?.ResultCode != 1) return;
-
-            if (isThumbSelected && motor3Input != null && !string.IsNullOrWhiteSpace(motor3Input.Value))
+            else
             {
-                ApiResponse response3 = await HandleMotorBindFinger(motor3Input.Value, _fingerDto.finger_id);
-                if (response3?.ResultCode != 1) return;
+                await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                    $"手指绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {response.Msg}", false);
+                SnackbarHelper.Show(Snackbar, response.Msg, Severity.Error);
             }
-
+        }
+        catch (JsonException jsonEx)
+        {
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定成功 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, " +
-                $"电机绑定: 电机1({motor1Input.Value}) 电机2({motor2Input.Value})" +
-                (isThumbSelected && motor3Input != null ? $" 电机3({motor3Input.Value})" : ""), true);
-            fingerIdInput.Value = "";
-            motor1Input.Value = "";
-            motor2Input.Value = "";
-            if (motor3Input != null) motor3Input.Value = "";
-            scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+                $"手指绑定JSON解析失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {jsonEx.Message}", false);
+            SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
         }
         catch (Exception ex)
         {
@@ -468,7 +500,6 @@
             await LoadTaskDetail();
         }
     }
-
 
     private async Task<ApiResponse> HandleMotorBindFinger(string motor_id, string finger_id)
     {
@@ -548,7 +579,7 @@
         var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(i.Value));
         if (motor2Input != null) return motor2Input;
 
-        if (isThumbSelected)
+        if (_fingerDto.is_thumb)
         {
             var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && string.IsNullOrEmpty(i.Value));
             if (motor3Input != null) return motor3Input;
@@ -579,16 +610,16 @@
             var newMotor3 = motor3Input?.Value ?? "";
             var newRemarks = remarksInput?.Value ?? "";
 
-            int remarksIndex = isThumbSelected ? 3 : 2;
+            int remarksIndex = _fingerDto.is_thumb ? 3 : 2;
 
             var originalMotor1 = originalData.Count > 0 ? originalData[0] : "";
             var originalMotor2 = originalData.Count > 1 ? originalData[1] : "";
-            var originalMotor3 = originalData.Count > 2 && isThumbSelected ? originalData[2] : "";
+            var originalMotor3 = originalData.Count > 2 && _fingerDto.is_thumb ? originalData[2] : "";
             var originalRemark = originalData.Count > remarksIndex ? originalData[remarksIndex] : "";
 
             await CheckAndShowMotorChange("电机1", originalMotor1, newMotor1);
             await CheckAndShowMotorChange("电机2", originalMotor2, newMotor2);
-            if (isThumbSelected) await CheckAndShowMotorChange("电机3", originalMotor3, newMotor3);
+            if (_fingerDto.is_thumb) await CheckAndShowMotorChange("电机3", originalMotor3, newMotor3);
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
         }

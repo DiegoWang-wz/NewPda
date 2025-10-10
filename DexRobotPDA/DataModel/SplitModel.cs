@@ -25,7 +25,6 @@ namespace DexRobotPDA.DataModel
         /// <summary>
         /// 关联生产单号
         /// </summary>
-        [Required]
         [MaxLength(64)]
         public string task_id { get; set; }
 

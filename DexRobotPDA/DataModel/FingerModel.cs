@@ -39,6 +39,9 @@ namespace DexRobotPDA.DataModel
 
         [Required]
         public bool is_qualified { get; set; } = false;
+        
+        [Required]
+        public bool is_thumb { get; set; } = false;
         // 导航属性
         public ProductTaskModel TaskModel { get; set; }
         public MaterialModel FingerMaterial { get; set; }

@@ -53,7 +53,7 @@ public class SplitController : ControllerBase
 
         return Ok(response);
     }
-    
+
     [HttpGet]
     public async Task<IActionResult> GetSplit(string split_id)
     {
@@ -202,7 +202,7 @@ public class SplitController : ControllerBase
             return StatusCode(500, response);
         }
     }
-    
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse>> SplitBindPalm(SplitBindPalmDto dto)
     {
@@ -213,7 +213,7 @@ public class SplitController : ControllerBase
             // 查询分指机构是否存在（原查询手指的逻辑改为查询分指机构）
             var split = await db.Splits
                 .FirstOrDefaultAsync(t => t.split_id == dto.split_id);
-        
+
             // // 查询手掌是否存在（保持手掌查询逻辑不变）
             // var palm = await db.Materials
             //     .FirstOrDefaultAsync(t => t.material_id == dto.palm_id);
@@ -225,7 +225,7 @@ public class SplitController : ControllerBase
                 res.Msg = "分指机构不存在";
                 return NotFound(res);
             }
-        
+
             // // 手掌不存在的校验（保持不变）
             // if (palm == null)
             // {
@@ -254,7 +254,7 @@ public class SplitController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UpdateQualify(UpdateQualifyDto qualifyDto)
     {
@@ -310,7 +310,7 @@ public class SplitController : ControllerBase
             }
 
             split.task_id = "";
-            split.palm_id= "";
+            split.palm_id = "";
             split.updated_at = null;
 
             await db.SaveChangesAsync();
@@ -328,7 +328,7 @@ public class SplitController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> ReBindSplit(ReBindDto dto)
     {
@@ -365,7 +365,7 @@ public class SplitController : ControllerBase
             return BadRequest(res);
         }
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> UpdateSplit(SplitDto dto)
     {

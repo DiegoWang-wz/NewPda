@@ -229,4 +229,26 @@ public class ProcessThreeService : BaseService
         }
         return apiResponse;
     }
+    
+    public async Task<ApiResponse> AddPalmWithComponents(AddPalmWithComponentsDto dto)
+    {
+        var request = new RestRequest("api/Palm/AddPalmWithComponents", Method.Post);
+        request.AddJsonBody(dto);
+    
+        _logger.LogInformation("尝试创建手掌并绑定组件 - 手掌ID: {PalmId}", dto.palm_id);
+        var apiResponse = await ExecuteCommand(request);
+    
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("手掌创建并绑定组件成功 - 手掌ID: {PalmId}", dto.palm_id);
+        }
+        else
+        {
+            _logger.LogWarning("手掌创建并绑定组件失败 - 手掌ID: {PalmId}, 错误信息: {Msg}", 
+                dto.palm_id, apiResponse.Msg);
+        }
+    
+        return apiResponse;
+    }
+
 }

@@ -1,0 +1,222 @@
+﻿@page "/LogSummary"
+@using MudBlazor
+
+@inject ISnackbar Snackbar
+@inject LogService LogService
+
+<MudPaper Class="pa-4 ma-4 mx-auto" MaxWidth="1600px" Elevation="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Style="height: 80px" Spacing="2" Class="d-flex flex-nowrap overflow-x-auto">
+        <MudDateRangePicker
+            @bind-DateRange="_dateRange"
+            MaxDate="_maxDate"
+            Dense="true"
+            DateFormat="yyyy-MM-dd"
+            Margin="Margin.Dense"
+            Variant="Variant.Outlined"
+            Label="请选择时间范围"
+            Class="filter-item"/>
+
+        <MudSelect T="string"
+                   @bind-Value="_eventType"
+                   Label="事件类型"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   Dense="true"
+                   Clearable="true"
+                   Class="filter-item">
+            @foreach (var state in _types)
+            {
+                <MudSelectItem T="string" Value="@state">@state</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField T="string"
+                      @bind-Value="_operator"
+                      Label="操作人"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Margin="Margin.Dense"
+                      Class="filter-item"/>
+
+        <MudRadioGroup T="string"
+                       @bind-SelectedOption="_qualifyFilter"
+                       Class="filter-radios"
+                       @key="_radioKey">
+            <MudRadio T="string" Option="all">全部</MudRadio>
+            <MudRadio T="string" Option="pass">成功</MudRadio>
+            <MudRadio T="string" Option="fail">失败</MudRadio>
+        </MudRadioGroup>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Medium"
+                   Style="width: 100px;"
+                   StartIcon="@Icons.Material.Filled.Search"
+                   Class="filter-button"
+                   OnClick="OnQuery">
+            查询
+        </MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Size="Size.Medium"
+                   Style="width: 100px;"
+                   StartIcon="@Icons.Material.Filled.Cached"
+                   Class="filter-button"
+                   OnClick="OnReset">
+            重置
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudPaper Class="pa-4 ma-4 mx-auto" MaxWidth="1600px" Elevation="2">
+    @if (_isLoading)
+    {
+        <MudStack AlignItems="AlignItems.Center" JustifyContent="Justify.Center" Class="py-10">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+            <MudText Class="mt-2">加载中...</MudText>
+        </MudStack>
+    }
+    else
+    {
+        <MudTable Items="_filtered" Dense="true" Hover="true" Bordered="true" Striped="true">
+            <HeaderContent>
+                <MudTh style="width:80px;">ID</MudTh>
+                <MudTh style="width:140px;">事件类型</MudTh>
+                <MudTh style="width:140px;">操作人</MudTh>
+                <MudTh>具体明细</MudTh>
+                <MudTh style="width:200px;">操作时间</MudTh>
+                <MudTh style="width:120px;">结果</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.id</MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
+                        @(!string.IsNullOrWhiteSpace(context.event_type) ? context.event_type : "-")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@(!string.IsNullOrWhiteSpace(context.operator_id) ? context.operator_id : "-")</MudTd>
+                <MudTd>
+                    @((!string.IsNullOrWhiteSpace(context.event_detail) ? context.event_detail : "-"))
+                </MudTd>
+                <MudTd>@context.operate_time.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                <MudTd>
+                    @if (context.is_qualified)
+                    {
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">成功</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">失败</MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4">暂无数据</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudPaper>
+
+<style>
+    .filter-item {
+        min-width: 230px;
+        margin: 0 8px 0 0;
+    }
+    .filter-radios {
+        display: flex;
+        align-items: center;
+        height: 40px;
+        gap: 12px;
+        margin-right: 8px;
+        white-space: nowrap;
+    }
+    .filter-button {
+        height: 40px;
+        margin-right: 8px;
+        white-space: nowrap;
+    }
+</style>
+
+@code {
+    private DateRange _dateRange { get; set; } = new DateRange(DateTime.Today.AddDays(-2), DateTime.Today);
+    private DateTime _maxDate = DateTime.Now.Date;
+
+    private string _eventType { get; set; } = "全部";
+    private string _operator { get; set; } = string.Empty;
+    private string _qualifyFilter { get; set; } = "all";
+
+    private readonly string[] _types = { "全部", "新增任务", "绑定", "解绑", "重绑", "检测" };
+    private int _radioKey = 0;
+
+    private bool _isLoading = false;
+    private List<EventLogDto> _all = new();
+    private List<EventLogDto> _filtered = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await QueryAndApplyFilters();
+    }
+
+    private async Task OnQuery()
+    {
+        await QueryAndApplyFilters();
+    }
+
+    private void OnReset()
+    {
+        _dateRange = new DateRange(DateTime.Today.AddDays(-2), DateTime.Today);
+        _eventType = "全部";
+        _operator = string.Empty;
+        _qualifyFilter = "all";
+        _radioKey++;
+        StateHasChanged();
+    }
+
+    private async Task QueryAndApplyFilters()
+    {
+        try
+        {
+            _isLoading = true;
+
+            var start = _dateRange.Start?.Date;
+            var endExclusive = (_dateRange.End ?? _dateRange.Start)?.Date.AddDays(1);
+
+            var data = await LogService.GetLogs(start, endExclusive);
+            _all = (data ?? new List<EventLogDto>())
+                .OrderByDescending(x => x.operate_time)
+                .ToList();
+
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"查询失败：{ex.Message}", Severity.Error);
+            _all = new();
+            _filtered = new();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<EventLogDto> q = _all;
+
+        if (!string.IsNullOrWhiteSpace(_eventType) && _eventType != "全部")
+            q = q.Where(x => string.Equals(x.event_type, _eventType, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(_operator))
+            q = q.Where(x => !string.IsNullOrWhiteSpace(x.operator_id) && x.operator_id.Contains(_operator, StringComparison.OrdinalIgnoreCase));
+
+        if (_qualifyFilter == "pass")
+            q = q.Where(x => x.is_qualified);
+        else if (_qualifyFilter == "fail")
+            q = q.Where(x => !x.is_qualified);
+
+        _filtered = q.ToList();
+    }
+}

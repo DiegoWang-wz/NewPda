@@ -80,6 +80,8 @@ public class EventLogController : ControllerBase
     [HttpGet]
     public IActionResult GetEventLogs([FromQuery] string startDate, [FromQuery] string endDate)
     {
+        Console.WriteLine(startDate);
+        Console.WriteLine(endDate);
         ApiResponse response = new ApiResponse();
         try
         {

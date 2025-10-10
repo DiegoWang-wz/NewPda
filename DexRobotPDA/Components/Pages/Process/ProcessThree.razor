@@ -1,5 +1,6 @@
 ﻿@page "/process_3"
 @page "/process_3/{task_id}/{palm_id}"
+@using System.Text.Json
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -205,7 +206,7 @@
     {
         scannerInputs = new List<BarcodeScanner.InputField>
         {
-            new BarcodeScanner.InputField { Index = 1, Label = "手掌外壳编号", Id = "palmId", Disable = true, IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 1, Label = "手掌外壳编号", Id = "palmId", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 2, Label = "分指机构", Id = "splitId", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 3, Label = "大拇指编号", Id = "finger1", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 4, Label = "食指编号", Id = "finger2", IsSpecialInput = false },
@@ -425,52 +426,65 @@
             _PalmDto.palm_id = palmInput.Value;
             _PalmDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
 
-            var palmResponse = await ProcessThreeService.AddPalm(_PalmDto);
-            if (palmResponse.ResultCode != 1)
+            // 准备所有需要绑定的部件ID列表
+            var componentIds = new List<string>
+            {
+                splitInput.Value,
+                finger1Input.Value,
+                finger2Input.Value,
+                finger3Input.Value,
+                finger4Input.Value,
+                finger5Input.Value
+            };
+
+            // 创建包含手掌和所有部件信息的DTO
+            var palmWithComponentsDto = new AddPalmWithComponentsDto
+            {
+                palm_id = _PalmDto.palm_id,
+                task_id = _PalmDto.task_id,
+                operator_id = _PalmDto.operator_id,
+                remarks = _PalmDto.remarks,
+                component_ids = componentIds
+            };
+
+            // 调用新的原子操作接口
+            var palmResponse = await ProcessThreeService.AddPalmWithComponents(palmWithComponentsDto);
+
+            if (palmResponse.ResultCode == 1)
+            {
+                await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                    $"手掌绑定成功 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, " +
+                    $"绑定详情: 分指机构({splitInput.Value}) " +
+                    $"大拇指({finger1Input.Value}) 食指({finger2Input.Value}) 中指({finger3Input.Value}) " +
+                    $"无名指({finger4Input.Value}) 小拇指({finger5Input.Value})", true);
+
+                palmInput.Value = "";
+                splitInput.Value = "";
+                finger1Input.Value = "";
+                finger2Input.Value = "";
+                finger3Input.Value = "";
+                finger4Input.Value = "";
+                finger5Input.Value = "";
+                scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+
+                await LoadTaskDetail();
+                await TaskService.UpdateSingleTaskStatus(taskId);
+                SnackbarHelper.Show(Snackbar, "手掌与分指机构、手指绑定成功", Severity.Success);
+            }
+            else
             {
                 var errorMsg = palmResponse?.Msg ?? "手掌绑定失败";
                 await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
                     $"手掌绑定失败 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 错误信息: {errorMsg}", false);
                 SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{errorMsg}", Severity.Error);
-                return;
             }
-
-            var splitResp = await HandleSplitBindPalm(splitInput.Value, _PalmDto.palm_id);
-            if (splitResp?.ResultCode != 1) return;
-
-            var finger1Resp = await HandleFingerBindPalm(finger1Input.Value, _PalmDto.palm_id);
-            if (finger1Resp?.ResultCode != 1) return;
-
-            var finger2Resp = await HandleFingerBindPalm(finger2Input.Value, _PalmDto.palm_id);
-            if (finger2Resp?.ResultCode != 1) return;
-
-            var finger3Resp = await HandleFingerBindPalm(finger3Input.Value, _PalmDto.palm_id);
-            if (finger3Resp?.ResultCode != 1) return;
-
-            var finger4Resp = await HandleFingerBindPalm(finger4Input.Value, _PalmDto.palm_id);
-            if (finger4Resp?.ResultCode != 1) return;
-
-            var finger5Resp = await HandleFingerBindPalm(finger5Input.Value, _PalmDto.palm_id);
-            if (finger5Resp?.ResultCode != 1) return;
-
+        }
+        catch (JsonException jsonEx)
+        {
             await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定成功 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, " +
-                $"绑定详情: 分指机构({splitInput.Value}) " +
-                $"大拇指({finger1Input.Value}) 食指({finger2Input.Value}) 中指({finger3Input.Value}) " +
-                $"无名指({finger4Input.Value}) 小拇指({finger5Input.Value})", true);
-
-            palmInput.Value = "";
-            splitInput.Value = "";
-            finger1Input.Value = "";
-            finger2Input.Value = "";
-            finger3Input.Value = "";
-            finger4Input.Value = "";
-            finger5Input.Value = "";
-            scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
-
-            await LoadTaskDetail();
-            await TaskService.UpdateSingleTaskStatus(taskId);
-            SnackbarHelper.Show(Snackbar, "手掌与分指机构、手指绑定成功", Severity.Success);
+                $"手掌绑定JSON解析失败 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 错误信息: {jsonEx.Message}", false);
+            SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
+            
         }
         catch (Exception ex)
         {
