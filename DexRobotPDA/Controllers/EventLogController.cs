@@ -24,37 +24,37 @@ public class EventLogController : ControllerBase
         _logger = logger;
     }
     
-    [HttpGet]
-    public IActionResult GetEventLogs()
-    {
-        ApiResponse response = new ApiResponse();
-        try
-        {
-            var list = db.EventLogs.ToList();
-            _logger.LogDebug("从数据库获取到{Count}条记录", list.Count);
-            
-            List<EventLogDto> Logs = mapper.Map<List<EventLogDto>>(list);
-            response.ResultCode = 1;
-            response.Msg = "Success";
-            response.ResultData = Logs;
-            
-            // 记录成功信息
-            _logger.LogInformation("成功获取，共{Count}条记录", Logs.Count);
-        }
-        catch (Exception e)
-        {
-            response.ResultCode = -1;
-            response.Msg = "Error";
-            
-            // 记录错误信息，包括异常详情
-            _logger.LogError(e, "获取列表时发生错误");
-        }
-
-        return Ok(response);
-    }
+    // [HttpGet]
+    // public IActionResult GetEventLogs()
+    // {
+    //     ApiResponse response = new ApiResponse();
+    //     try
+    //     {
+    //         var list = db.EventLogs.ToList();
+    //         _logger.LogDebug("从数据库获取到{Count}条记录", list.Count);
+    //         
+    //         List<EventLogDto> Logs = mapper.Map<List<EventLogDto>>(list);
+    //         response.ResultCode = 1;
+    //         response.Msg = "Success";
+    //         response.ResultData = Logs;
+    //         
+    //         // 记录成功信息
+    //         _logger.LogInformation("成功获取，共{Count}条记录", Logs.Count);
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         response.ResultCode = -1;
+    //         response.Msg = "Error";
+    //         
+    //         // 记录错误信息，包括异常详情
+    //         _logger.LogError(e, "获取列表时发生错误");
+    //     }
+    //
+    //     return Ok(response);
+    // }
     
     [HttpPost]
-    public async Task<IActionResult> AddEventLogs(AddEventLogDto dto)
+    public async Task<IActionResult> AddEventLog(AddEventLogDto dto)
     {
         ApiResponse response = new ApiResponse();
         try
@@ -77,48 +77,42 @@ public class EventLogController : ControllerBase
             return StatusCode(500, response);
         }
     }
-    
     [HttpGet]
-    public IActionResult GetEventLogsByDateRange([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+    public IActionResult GetEventLogs([FromQuery] string startDate, [FromQuery] string endDate)
     {
         ApiResponse response = new ApiResponse();
         try
         {
-            IQueryable<EventLogModel> query = db.EventLogs.AsQueryable();
-
-            // 如果提供了开始日期，则筛选大于等于开始日期的记录
-            if (startDate.HasValue)
+            if (!DateTime.TryParse(startDate, out var start) || !DateTime.TryParse(endDate, out var end))
             {
-                query = query.Where(e => e.operate_time >= startDate.Value);
+                response.ResultCode = -1;
+                response.Msg = "日期格式错误，应为 yyyy-MM-dd";
+                return BadRequest(response);
             }
 
-            // 如果提供了结束日期，则筛选小于等于结束日期的记录
-            if (endDate.HasValue)
-            {
-                // 通常将结束日期设为当天的最后一秒
-                var endOfDay = endDate.Value.Date.AddDays(1).AddTicks(-1);
-                query = query.Where(e => e.operate_time <= endOfDay);
-            }
+            // 确保结束日期包含当日的记录
+            end = end.AddDays(1);
 
-            // 按创建时间降序排列
-            var list = query.OrderByDescending(e => e.operate_time).ToList();
-            _logger.LogDebug("从数据库获取到{Count}条记录", list.Count);
+            // 查询在指定日期范围内的记录
+            var list = db.EventLogs
+                .Where(e => e.operate_time >= start && e.operate_time < end)
+                .OrderByDescending(e => e.operate_time)
+                .ToList();
 
-            List<EventLogDto> logs = mapper.Map<List<EventLogDto>>(list);
+            _logger.LogDebug("在 {Start} 至 {End} 获取到 {Count} 条记录", start, end, list.Count);
+
+            List<EventLogDto> Logs = mapper.Map<List<EventLogDto>>(list);
             response.ResultCode = 1;
             response.Msg = "Success";
-            response.ResultData = logs;
+            response.ResultData = Logs;
 
-            // 记录成功信息
-            _logger.LogInformation("成功获取日期范围内的日志，共{Count}条记录", logs.Count);
+            _logger.LogInformation("成功根据日期范围获取，共 {Count} 条记录", Logs.Count);
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
             response.ResultCode = -1;
             response.Msg = "Error";
-
-            // 记录错误信息，包括异常详情
-            _logger.LogError(e, "根据日期范围获取日志时发生错误");
+            _logger.LogError(ex, "根据日期范围获取记录时发生错误");
         }
 
         return Ok(response);

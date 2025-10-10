@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DexRobotPDA")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f36d2693a3e3520b1b79db8e323c8c551c3d8c57")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+57c4f63a47f09e47c175b19bc685ffa218442416")]
 [assembly: System.Reflection.AssemblyProductAttribute("DexRobotPDA")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DexRobotPDA")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

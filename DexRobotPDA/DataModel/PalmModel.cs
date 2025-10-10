@@ -54,7 +54,6 @@ namespace DexRobotPDA.DataModel
         /// <summary>
         /// 手掌更新时间（自动更新）
         /// </summary>
-        [Required]
         public DateTime? updated_at { get; set; } = DateTime.Now;
         
         [Required]

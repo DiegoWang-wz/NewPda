@@ -42,10 +42,10 @@ public class AutoMapperSetting : Profile
         CreateMap<AddMotorDto, MotorModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore())
             .ForMember(dest => dest.finger_id, opt => opt.Ignore())
-            .ForMember(dest => dest.update_at, opt => opt.Ignore())
+            .ForMember(dest => dest.updated_at, opt => opt.Ignore())
             .ForMember(dest => dest.TaskModel, opt => opt.Ignore())
-            .ForMember(dest => dest.WormMaterial, opt => opt.Ignore())
-            .ForMember(dest => dest.AdhesiveMaterial, opt => opt.Ignore())
+            // .ForMember(dest => dest.WormMaterial, opt => opt.Ignore())
+            // .ForMember(dest => dest.AdhesiveMaterial, opt => opt.Ignore())
             .ForMember(dest => dest.Operator, opt => opt.Ignore())
             .ForMember(dest => dest.Finger, opt => opt.Ignore());
 

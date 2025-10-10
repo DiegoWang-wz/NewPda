@@ -26,4 +26,6 @@ public class EventLogDto
     /// 操作时间
     /// </summary>
     public DateTime operate_time { get; set; }
+    
+    public bool is_qualified { get; set; } = false;
 }

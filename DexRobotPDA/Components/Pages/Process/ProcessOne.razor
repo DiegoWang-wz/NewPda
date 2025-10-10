@@ -1,14 +1,5 @@
 ﻿@page "/process_1"
 
-@inject TaskService TaskService
-@inject ProcessOneService ProcessOneService
-@inject IJSRuntime JSRuntime
-@inject BarcodeScannerService ScannerService
-@inject ISnackbar Snackbar
-@inject AuthService AuthService
-@inject NavigationManager NavManager
-@inject IDialogService DialogService
-@using DexRobotPDA.Components.Pages.Components
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -312,6 +303,8 @@
             var response = await ProcessOneService.AddMotor(_motorDto);
             if (response != null && response.ResultCode == 1)
             {
+                await LogService.AddLog("电机绑定", _motorDto.operator_id,
+                    $"电机绑定成功 - 电机编号: {_motorDto.motor_id}, 任务单号: {_motorDto.task_id}", true);
                 SnackbarHelper.Show(Snackbar, "绑定成功！", Severity.Success);
                 motorIdInput.Value = "";
                 var remark = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
@@ -322,11 +315,15 @@
             else
             {
                 var errorMessage = response?.Msg ?? "绑定失败";
+                await LogService.AddLog("电机绑定", _motorDto.operator_id,
+                    $"电机绑定失败 - 电机编号: {_motorDto.motor_id}, 任务单号: {_motorDto.task_id}, 错误信息: {errorMessage}", false);
                 SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            await LogService.AddLog("电机绑定", _motorDto.operator_id,
+                $"电机绑定异常 - 电机编号: {_motorDto.motor_id}, 任务单号: {_motorDto.task_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
         }
         finally
@@ -334,6 +331,7 @@
             isBinding = false;
         }
     }
+
 
     private async Task HandleSubmit()
     {

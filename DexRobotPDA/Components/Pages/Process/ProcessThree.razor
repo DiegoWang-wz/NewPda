@@ -1,16 +1,5 @@
 ﻿@page "/process_3"
 @page "/process_3/{task_id}/{palm_id}"
-@inject TaskService TaskService
-@inject ProcessThreeService ProcessThreeService
-@inject ProcessTwoService ProcessTwoService
-@inject IJSRuntime JSRuntime
-@inject BarcodeScannerService ScannerService
-@inject ISnackbar Snackbar
-@inject AuthService AuthService
-@inject NavigationManager NavManager
-@inject IDialogService DialogService
-@using DexRobotPDA.Components.Pages.Components
-@using DexRobotPDA.Components.Pages.Detection
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -243,6 +232,7 @@
                     NavManager.NavigateTo("/login", true);
                     return;
                 }
+
                 _PalmDto.operator_id = currentUser.employee_id;
 
                 if (string.IsNullOrWhiteSpace(taskId))
@@ -289,7 +279,12 @@
         finishedPalms.Clear();
         _PalmDto = new AddPalmDto();
         foreach (var input in scannerInputs) input.Value = string.Empty;
-        _split = string.Empty; _finger1 = string.Empty; _finger2 = string.Empty; _finger3 = string.Empty; _finger4 = string.Empty; _finger5 = string.Empty;
+        _split = string.Empty;
+        _finger1 = string.Empty;
+        _finger2 = string.Empty;
+        _finger3 = string.Empty;
+        _finger4 = string.Empty;
+        _finger5 = string.Empty;
         if (currentUser != null) _PalmDto.operator_id = currentUser.employee_id;
         await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
@@ -368,13 +363,61 @@
         var finger4Input = scannerInputs.FirstOrDefault(i => i.Id == "finger4");
         var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
 
-        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value)) { SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning); return; }
-        if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value)) { SnackbarHelper.Show(Snackbar, "分指机构编号不能为空", Severity.Warning); return; }
-        if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value)) { SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning); return; }
-        if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value)) { SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning); return; }
-        if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value)) { SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning); return; }
-        if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value)) { SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning); return; }
-        if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value)) { SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning); return; }
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                "手掌绑定失败 - 手掌编号为空", false);
+            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            return;
+        }
+
+        if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 分指机构编号为空", false);
+            SnackbarHelper.Show(Snackbar, "分指机构编号不能为空", Severity.Warning);
+            return;
+        }
+
+        if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 大拇指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning);
+            return;
+        }
+
+        if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 食指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning);
+            return;
+        }
+
+        if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 中指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning);
+            return;
+        }
+
+        if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 无名指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning);
+            return;
+        }
+
+        if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value))
+        {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 小拇指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning);
+            return;
+        }
 
         isBinding = true;
         try
@@ -386,6 +429,8 @@
             if (palmResponse.ResultCode != 1)
             {
                 var errorMsg = palmResponse?.Msg ?? "手掌绑定失败";
+                await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                    $"手掌绑定失败 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 错误信息: {errorMsg}", false);
                 SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{errorMsg}", Severity.Error);
                 return;
             }
@@ -408,8 +453,19 @@
             var finger5Resp = await HandleFingerBindPalm(finger5Input.Value, _PalmDto.palm_id);
             if (finger5Resp?.ResultCode != 1) return;
 
-            palmInput.Value = ""; splitInput.Value = "";
-            finger1Input.Value = ""; finger2Input.Value = ""; finger3Input.Value = ""; finger4Input.Value = ""; finger5Input.Value = "";
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定成功 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, " +
+                $"绑定详情: 分指机构({splitInput.Value}) " +
+                $"大拇指({finger1Input.Value}) 食指({finger2Input.Value}) 中指({finger3Input.Value}) " +
+                $"无名指({finger4Input.Value}) 小拇指({finger5Input.Value})", true);
+
+            palmInput.Value = "";
+            splitInput.Value = "";
+            finger1Input.Value = "";
+            finger2Input.Value = "";
+            finger3Input.Value = "";
+            finger4Input.Value = "";
+            finger5Input.Value = "";
             scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
 
             await LoadTaskDetail();
@@ -418,6 +474,8 @@
         }
         catch (Exception ex)
         {
+            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
+                $"手掌绑定异常 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
         }
         finally
@@ -426,6 +484,7 @@
             StateHasChanged();
         }
     }
+
 
     private async Task<ApiResponse> HandleSplitBindPalm(string split_id, string palm_id)
     {
@@ -449,6 +508,7 @@
             SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
             response = new ApiResponse { ResultCode = -1, Msg = errorMessage };
         }
+
         return response;
     }
 
@@ -474,6 +534,7 @@
             SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
             response = new ApiResponse { ResultCode = -1, Msg = errorMessage };
         }
+
         return response;
     }
 
@@ -528,6 +589,7 @@
             case "finger5": _finger5 = input.Value; break;
             case "remarks": _PalmDto.remarks = input.Value; break;
         }
+
         await Task.CompletedTask;
     }
 
@@ -568,7 +630,11 @@
         var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
         var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
-        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value)) { SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning); return; }
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            return;
+        }
 
         try
         {
@@ -668,6 +734,8 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
+
         GC.SuppressFinalize(this);
     }
+
 }

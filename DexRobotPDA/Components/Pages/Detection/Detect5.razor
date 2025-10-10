@@ -222,14 +222,21 @@
 
                 if (string.IsNullOrEmpty(_detectDto.inspector))
                 {
+                    await LogService.AddLog("手掌标定检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 手掌编号: {_detectDto.palm_id}, 原因: 检测员信息缺失", false);
+
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
                 }
 
+                _detectDto.calibrate_time = DateTime.Now;
                 var response = await DetectService.AddDetect5(_detectDto);
 
                 if (response?.ResultCode == 1)
                 {
+                    await LogService.AddLog("手掌标定检测", currentUser.employee_id,
+                        $"检测完成 - 手掌编号: {_detectDto.palm_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
                     try
                     {
@@ -270,16 +277,23 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+
                     await TaskService.UpdateSingleTaskStatus(_palm.task_id);
                     ClearData();
                 }
                 else
                 {
+                    await LogService.AddLog("手掌标定检测", currentUser.employee_id,
+                        $"检测失败 - 手掌编号: {_detectDto.palm_id}, 原因: {response?.Msg}", false);
+
                     SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
+                await LogService.AddLog("手掌标定检测", currentUser.employee_id,
+                    $"检测异常 - 手掌编号: {_detectDto.palm_id}, 异常: {ex.Message}", false);
+
                 SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
             }
             finally
@@ -290,8 +304,10 @@
         }
         else
         {
+            await LogService.AddLog("手掌标定检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 手掌编号: {_detectDto.palm_id}", false);
+
             SnackbarHelper.Show(Snackbar, "表单存在错误（如未选择时间/耗时未计算），请检查后提交", Severity.Warning);
         }
     }
-
 }

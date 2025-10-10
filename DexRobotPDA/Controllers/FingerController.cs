@@ -152,9 +152,8 @@ public class FingerController : ControllerBase
             var fingerModel = mapper.Map<FingerModel>(addFingerDto);
 
             // 7. 补充DTO中未包含但Model需要的字段
-            fingerModel.palm_id = null; // 新增时未绑定手掌
-            fingerModel.updated_at = DateTime.Now; // 设置更新时间
-
+            fingerModel.palm_id = null; 
+            fingerModel.updated_at = null;
             // 8. 添加到数据库（异步）
             await db.Fingers.AddAsync(fingerModel);
             await db.SaveChangesAsync();
@@ -311,7 +310,6 @@ public class FingerController : ControllerBase
 
 
             finger.is_qualified = qualifyDto.qualified;
-            finger.updated_at = DateTime.Now;
 
             await db.SaveChangesAsync();
 
@@ -396,8 +394,7 @@ public class FingerController : ControllerBase
 
             finger.task_id = "";
             finger.palm_id = "";
-            finger.updated_at = DateTime.Now;
-
+            finger.updated_at = null;
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
@@ -474,7 +471,7 @@ public class FingerController : ControllerBase
             finger.is_qualified = dto.is_qualified;
             finger.remarks = dto.remarks;
             finger.palm_id = dto.palm_id;
-            finger.updated_at = DateTime.Now;
+            finger.updated_at = dto.updated_at;
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;

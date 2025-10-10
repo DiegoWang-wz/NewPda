@@ -305,6 +305,9 @@
 
                 if (string.IsNullOrEmpty(_detectDto.inspector))
                 {
+                    await LogService.AddLog("手指标定检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 手指编号: {_detectDto.finger_id}, 原因: 检测员信息缺失", false);
+
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
                 }
@@ -313,6 +316,9 @@
 
                 if (response?.ResultCode == 1)
                 {
+                    await LogService.AddLog("手指标定检测", currentUser.employee_id,
+                        $"检测完成 - 手指编号: {_detectDto.finger_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
                     try
                     {
@@ -336,7 +342,7 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
-                    
+
                     try
                     {
                         var response2 = await DetectService.UpdateDetect4StatusAsync(_finger.task_id);
@@ -353,16 +359,23 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+
                     await TaskService.UpdateSingleTaskStatus(_finger.task_id);
                     ClearData();
                 }
                 else
                 {
+                    await LogService.AddLog("手指标定检测", currentUser.employee_id,
+                        $"检测失败 - 手指编号: {_detectDto.finger_id}, 原因: {response?.Msg}", false);
+
                     SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
+                await LogService.AddLog("手指标定检测", currentUser.employee_id,
+                    $"检测异常 - 手指编号: {_detectDto.finger_id}, 异常: {ex.Message}", false);
+
                 SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
             }
             finally
@@ -373,7 +386,11 @@
         }
         else
         {
+            await LogService.AddLog("手指标定检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 手指编号: {_detectDto.finger_id}", false);
+
             SnackbarHelper.Show(Snackbar, "表单存在错误（如未选择时间/耗时未计算），请检查后提交", Severity.Warning);
         }
     }
+
 }

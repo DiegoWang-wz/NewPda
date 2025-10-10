@@ -29,22 +29,7 @@ namespace DexRobotPDA.DataModel
         /// </summary>
         [Required]
         [MaxLength(64)]
-        public string task_id { get; set; }
-
-        /// <summary>
-        /// 蜗杆物料ID（关联物料表）
-        /// </summary>
-        [Required]
-        [MaxLength(32)]
-        public string worm_material_id { get; set; }
-
-        /// <summary>
-        /// 粘合剂物料ID（关联物料表）
-        /// </summary>
-        [Required]
-        [MaxLength(32)]
-        public string adhesive_material_id { get; set; }
-
+        public string? task_id { get; set; }
         /// <summary>
         /// 操作员ID（关联员工表，确保操作可追溯）
         /// </summary>
@@ -75,13 +60,12 @@ namespace DexRobotPDA.DataModel
         [MaxLength(64)]
         public string? finger_id { get; set; }
         
-        public DateTime? update_at { get; set; } = DateTime.Now;
+        public DateTime? updated_at { get; set; }
 
         // 导航属性
         public ProductTaskModel TaskModel { get; set; }
         public MaterialModel MotorMaterial { get; set; }
-        public MaterialModel WormMaterial { get; set; }
-        public MaterialModel AdhesiveMaterial { get; set; }
+
         public EmployeeModel Operator { get; set; }
         public FingerModel Finger { get; set; }
         

@@ -130,7 +130,7 @@ else
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(MotorDto x) => x.update_at">更新时间
+                                            <MudTableSortLabel SortBy="(MotorDto x) => x.updated_at">更新时间
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
@@ -157,7 +157,7 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="更新时间">@context.update_at?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm")</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
                                             <MudChip T="string"
                                                      Color="@(context.is_qualified ? Color.Success : Color.Error)">@(context.is_qualified ? "是" : "否")</MudChip>
@@ -1469,7 +1469,7 @@ else
         motor.task_id ?? "",
         motor.operator_id ?? "",
         motor.created_at.ToString("yyyy-MM-dd"),
-        motor.update_at?.ToString("yyyy-MM-dd") ?? "",
+        motor.updated_at?.ToString("yyyy-MM-dd") ?? "",
         motor.is_qualified ? "是" : "否",
         motor.remarks ?? "",
         motor.finger_id ?? ""

@@ -149,11 +149,10 @@ public class SplitController : ControllerBase
 
             // 6. 使用 AutoMapper 将 DTO 转换为 Model
             var splitModel = mapper.Map<SplitModel>(addSplitDto);
-
+            splitModel.updated_at = null;
             // 7. 补充DTO中未包含但Model需要的字段
             splitModel.palm_id = null; // 新增时未绑定手掌
             splitModel.created_at = DateTime.Now; // 设置创建时间
-            splitModel.updated_at = DateTime.Now; // 设置更新时间
 
             // 8. 添加到数据库
             await db.Splits.AddAsync(splitModel);
@@ -275,7 +274,6 @@ public class SplitController : ControllerBase
 
 
             split.is_qualified = qualifyDto.qualified;
-            split.updated_at = DateTime.Now;
 
             await db.SaveChangesAsync();
 
@@ -313,7 +311,7 @@ public class SplitController : ControllerBase
 
             split.task_id = "";
             split.palm_id= "";
-            split.updated_at = DateTime.Now;
+            split.updated_at = null;
 
             await db.SaveChangesAsync();
 
@@ -390,7 +388,7 @@ public class SplitController : ControllerBase
             split.remarks = dto.remarks;
             split.is_qualified = dto.is_qualified;
             split.palm_id = dto.palm_id;
-            split.updated_at = DateTime.Now;
+            split.updated_at = dto.updated_at;
 
             await db.SaveChangesAsync();
 

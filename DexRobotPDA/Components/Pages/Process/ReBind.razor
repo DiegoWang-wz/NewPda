@@ -1,8 +1,4 @@
 ﻿@page "/ReBind"
-@inject ProcessOneService ProcessOneService
-@inject ProcessTwoService ProcessTwoService
-@inject ProcessThreeService ProcessThreeService
-
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
     @if (_isLoading)
@@ -28,9 +24,9 @@
                       Variant="Variant.Outlined"
                       @bind-Value="_reBindDto.on_part_id"
                       RequiredError="请输入需要绑定的部件"/>
-        
+
         <MudDivider Class="my-4"/>
-        
+
         <MudButton OnClick="HandleBinding" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
                    FullWidth="true" Disabled="@_isSubmitting">
             @if (_isSubmitting)
@@ -44,7 +40,7 @@
             }
         </MudButton>
     }
-   
+
 </MudPaper>
 
 @code {
@@ -83,37 +79,37 @@
     private void ClearData()
     {
         _reBindDto = new();
-        StateHasChanged(); 
+        StateHasChanged();
     }
-    
-     private async Task HandleBinding()
+
+    private async Task HandleBinding()
     {
         if (_isSubmitting) return;
-        
+
         // 验证输入数据
         if (string.IsNullOrWhiteSpace(_reBindDto.part_id))
         {
             SnackbarHelper.Show(Snackbar, "请输入部件编号", Severity.Error);
             return;
         }
-        
+
         if (string.IsNullOrWhiteSpace(_reBindDto.task_id))
         {
             SnackbarHelper.Show(Snackbar, "请输入任务单号", Severity.Error);
             return;
         }
-        
-        
+
+
         // 验证部件类型
-        if (!_reBindDto.part_id.Contains("MOT") && 
-            !_reBindDto.part_id.Contains("FG") && 
-            !_reBindDto.part_id.Contains("SP") && 
+        if (!_reBindDto.part_id.Contains("MOT") &&
+            !_reBindDto.part_id.Contains("FG") &&
+            !_reBindDto.part_id.Contains("SP") &&
             !_reBindDto.part_id.Contains("PM"))
         {
             SnackbarHelper.Show(Snackbar, "不支持的部件类型", Severity.Warning);
             return;
         }
-        
+
         try
         {
             _isSubmitting = true;
@@ -122,22 +118,34 @@
             // 根据当前显示的模型决定解绑哪个（仅示例）
             if (_reBindDto.part_id.Contains("MOT"))
             {
-                var res = await ProcessOneService.ReBindMotor(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                var res = await ProcessOneService.ReBindMotor(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
+                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
+                    $"电机重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                    res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "电机绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("FG"))
             {
-                var res = await ProcessTwoService.ReBindFinger(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                var res = await ProcessTwoService.ReBindFinger(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
+                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
+                    $"手指外壳重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                    res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手指外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("SP"))
             {
-                var res = await ProcessThreeService.ReBindSplit(_reBindDto.part_id, _reBindDto.task_id,_reBindDto.on_part_id);
+                var res = await ProcessThreeService.ReBindSplit(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
+                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
+                    $"分指机构重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                    res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "分指机构绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("PM"))
             {
                 var res = await ProcessThreeService.ReBindPalm(_reBindDto.part_id, _reBindDto.task_id);
+                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
+                    $"手掌外壳重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                    res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
 
@@ -146,6 +154,8 @@
         }
         catch (Exception ex)
         {
+            await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
+                $"重绑定异常 - 部件编号: {_reBindDto.part_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
         }
         finally
@@ -154,5 +164,6 @@
             StateHasChanged();
         }
     }
+
 
 }

@@ -92,9 +92,9 @@ namespace DexRobotPDA.DataModel
         [Required]
         public DateTime updated_at { get; set; } = DateTime.Now;
 
-        // 导航属性
-        public ICollection<MotorModel> MotorsAsWormMaterial { get; set; } = new List<MotorModel>();
-        public ICollection<MotorModel> MotorsAsAdhesiveMaterial { get; set; } = new List<MotorModel>();
+        // // 导航属性
+        // public ICollection<MotorModel> MotorsAsWormMaterial { get; set; } = new List<MotorModel>();
+        // public ICollection<MotorModel> MotorsAsAdhesiveMaterial { get; set; } = new List<MotorModel>();
         
         public MotorModel MotorMaterial { get; set; }
         public FingerModel FingerShellMaterial { get; set; }

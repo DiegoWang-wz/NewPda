@@ -1,15 +1,6 @@
 ﻿@page "/process_2"
 @page "/process_2/{task_id}/{finger_id}"
-@inject TaskService TaskService
-@inject ProcessTwoService ProcessTwoService
-@inject ProcessOneService ProcessOneService
-@inject IJSRuntime JSRuntime
-@inject BarcodeScannerService ScannerService
-@inject ISnackbar Snackbar
-@inject AuthService AuthService
-@inject NavigationManager NavManager
-@inject IDialogService DialogService
-@using DexRobotPDA.Components.Pages.Components
+
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -265,6 +256,7 @@
                     NavManager.NavigateTo("/login", true);
                     return;
                 }
+
                 _fingerDto.operator_id = currentUser.employee_id;
 
                 if (string.IsNullOrWhiteSpace(taskId))
@@ -311,7 +303,9 @@
         finishedFingers.Clear();
         _fingerDto = new AddFingerDto();
         foreach (var input in scannerInputs) input.Value = string.Empty;
-        _motorId1 = string.Empty; _motorId2 = string.Empty; _motorId3 = string.Empty;
+        _motorId1 = string.Empty;
+        _motorId2 = string.Empty;
+        _motorId3 = string.Empty;
         if (currentUser != null) _fingerDto.operator_id = currentUser.employee_id;
         await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
@@ -392,10 +386,37 @@
         var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2");
         var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
 
-        if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value)) { SnackbarHelper.Show(Snackbar, "请输入手指外壳编号", Severity.Warning); return; }
-        if (motor1Input == null || string.IsNullOrWhiteSpace(motor1Input.Value)) { SnackbarHelper.Show(Snackbar, "请输入电机1编号", Severity.Warning); return; }
-        if (motor2Input == null || string.IsNullOrWhiteSpace(motor2Input.Value)) { SnackbarHelper.Show(Snackbar, "请输入电机2编号", Severity.Warning); return; }
-        if (isThumbSelected && (motor3Input == null || string.IsNullOrWhiteSpace(motor3Input.Value))) { SnackbarHelper.Show(Snackbar, "请输入电机3编号", Severity.Warning); return; }
+        if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
+        {
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                "手指绑定失败 - 手指编号为空", false);
+            SnackbarHelper.Show(Snackbar, "请输入手指外壳编号", Severity.Warning);
+            return;
+        }
+
+        if (motor1Input == null || string.IsNullOrWhiteSpace(motor1Input.Value))
+        {
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机1编号为空", false);
+            SnackbarHelper.Show(Snackbar, "请输入电机1编号", Severity.Warning);
+            return;
+        }
+
+        if (motor2Input == null || string.IsNullOrWhiteSpace(motor2Input.Value))
+        {
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机2编号为空", false);
+            SnackbarHelper.Show(Snackbar, "请输入电机2编号", Severity.Warning);
+            return;
+        }
+
+        if (isThumbSelected && (motor3Input == null || string.IsNullOrWhiteSpace(motor3Input.Value)))
+        {
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机3编号为空(大拇指)", false);
+            SnackbarHelper.Show(Snackbar, "请输入电机3编号", Severity.Warning);
+            return;
+        }
 
         isBinding = true;
         try
@@ -407,6 +428,8 @@
             if (response.ResultCode != 1)
             {
                 var errorMessage = response?.Msg ?? "绑定失败";
+                await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                    $"手指绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {errorMessage}", false);
                 SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
                 return;
             }
@@ -423,12 +446,20 @@
                 if (response3?.ResultCode != 1) return;
             }
 
-            fingerIdInput.Value = ""; motor1Input.Value = ""; motor2Input.Value = "";
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                $"手指绑定成功 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, " +
+                $"电机绑定: 电机1({motor1Input.Value}) 电机2({motor2Input.Value})" +
+                (isThumbSelected && motor3Input != null ? $" 电机3({motor3Input.Value})" : ""), true);
+            fingerIdInput.Value = "";
+            motor1Input.Value = "";
+            motor2Input.Value = "";
             if (motor3Input != null) motor3Input.Value = "";
             scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
         }
-        catch
+        catch (Exception ex)
         {
+            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
+                $"手指绑定异常 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
         }
         finally
@@ -437,6 +468,7 @@
             await LoadTaskDetail();
         }
     }
+
 
     private async Task<ApiResponse> HandleMotorBindFinger(string motor_id, string finger_id)
     {
@@ -459,12 +491,17 @@
         {
             SnackbarHelper.Show(Snackbar, $"电机{motor_id},绑定失败", Severity.Error);
         }
+
         return response;
     }
 
     private async Task HandleSubmit()
     {
-        if (string.IsNullOrWhiteSpace(taskId) || task == null) { SnackbarHelper.Show(Snackbar, "请先查询并加载有效的任务数据", Severity.Warning); return; }
+        if (string.IsNullOrWhiteSpace(taskId) || task == null)
+        {
+            SnackbarHelper.Show(Snackbar, "请先查询并加载有效的任务数据", Severity.Warning);
+            return;
+        }
 
         try
         {
@@ -496,6 +533,7 @@
             case "motorId3": _motorId3 = input.Value; break;
             case "remarks": _fingerDto.remarks = input.Value; break;
         }
+
         await Task.CompletedTask;
     }
 
@@ -595,6 +633,8 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
+
         GC.SuppressFinalize(this);
     }
+
 }

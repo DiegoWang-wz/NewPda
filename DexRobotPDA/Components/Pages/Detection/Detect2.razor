@@ -22,7 +22,7 @@
                                       Required="true"
                                       RequiredError="请选择粘接时间"
                                       @bind-Value="_detectDto.combine_time"/>
-                
+
                 <CustomDateTimePicker Label="使用时间"
                                       Required="true"
                                       RequiredError="请选择使用时间"
@@ -222,8 +222,9 @@
     {
         return true;
     }
-    
+
     private double? _timeDiffHours;
+
     private void CalculateTimeDiff()
     {
         if (_detectDto.combine_time.HasValue && _detectDto.using_time.HasValue)
@@ -236,13 +237,13 @@
             }
             else
             {
-                _timeDiffHours = null; 
+                _timeDiffHours = null;
                 Snackbar.Add("使用时间不能早于粘结时间", Severity.Warning);
             }
         }
         else
         {
-            _timeDiffHours = null; 
+            _timeDiffHours = null;
         }
     }
 
@@ -259,6 +260,9 @@
 
                 if (string.IsNullOrEmpty(_detectDto.inspector))
                 {
+                    await LogService.AddLog("分指机构蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 分指机构编号: {_detectDto.split_id}, 原因: 检测员信息缺失", false);
+
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
                 }
@@ -267,8 +271,11 @@
 
                 if (response?.ResultCode == 1)
                 {
+                    await LogService.AddLog("分指机构蜗杆粘接检测", currentUser.employee_id,
+                        $"检测完成 - 分指机构编号: {_detectDto.split_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
-                    
+
                     try
                     {
                         var response2 = await DetectService.UpdateDetect2StatusAsync(_split.task_id);
@@ -285,16 +292,23 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+
                     await TaskService.UpdateSingleTaskStatus(_split.task_id);
                     ClearData();
                 }
                 else
                 {
+                    await LogService.AddLog("分指机构蜗杆粘接检测", currentUser.employee_id,
+                        $"检测失败 - 分指机构编号: {_detectDto.split_id}, 原因: {response?.Msg}", false);
+
                     SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
+                await LogService.AddLog("分指机构蜗杆粘接检测", currentUser.employee_id,
+                    $"检测异常 - 分指机构编号: {_detectDto.split_id}, 异常: {ex.Message}", false);
+
                 SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
             }
             finally
@@ -305,8 +319,12 @@
         }
         else
         {
+            await LogService.AddLog("分指机构蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 分指机构编号: {_detectDto.split_id}", false);
+
             SnackbarHelper.Show(Snackbar, "表单存在错误（如未选择时间/耗时未计算），请检查后提交", Severity.Warning);
         }
     }
+
 
 }

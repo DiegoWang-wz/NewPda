@@ -81,10 +81,10 @@ public class MotorController : ControllerBase
                     addMotorDto.task_id, sameTaskCount, productNum);
                 return BadRequest(response);
             }
-
+            
             // 3. 使用 AutoMapper 将 DTO 转换为 Model
             var motorModel = mapper.Map<MotorModel>(addMotorDto);
-
+            motorModel.updated_at = null;
             // 4. 添加到数据库（异步）
             await db.Motors.AddAsync(motorModel);
             await db.SaveChangesAsync();
@@ -191,7 +191,7 @@ public class MotorController : ControllerBase
             // }
 
             motor.finger_id = dto.finger_id;
-            motor.update_at = DateTime.Now;
+            motor.updated_at = DateTime.Now;
 
             await db.SaveChangesAsync();
 
@@ -227,8 +227,6 @@ public class MotorController : ControllerBase
             }
 
             motor.is_qualified = qualifyDto.qualified;
-            motor.update_at = DateTime.Now;
-
             await db.SaveChangesAsync();
 
             res.ResultCode = 1;
@@ -321,11 +319,9 @@ public class MotorController : ControllerBase
             // 更新电机信息
             motor.task_id = "";
             motor.finger_id = "";
-            motor.update_at = DateTime.Now;
-
+            motor.updated_at = null;
             // 保存所有更改
             await db.SaveChangesAsync();
-
             // 提交事务
             await transaction.CommitAsync();
 
@@ -364,7 +360,7 @@ public class MotorController : ControllerBase
 
             motor.task_id = dto.task_id;
             motor.finger_id = dto.on_part_id;
-            motor.update_at = DateTime.Now;
+            motor.updated_at = DateTime.Now;
 
             await db.SaveChangesAsync();
 
@@ -400,13 +396,11 @@ public class MotorController : ControllerBase
             }
 
             motor.task_id = dto.task_id;
-            motor.worm_material_id = dto.worm_material_id;
-            motor.adhesive_material_id = dto.adhesive_material_id;
             motor.operator_id = dto.operator_id;
             motor.remarks = dto.remarks;
             motor.is_qualified = dto.is_qualified;
             motor.finger_id = dto.finger_id;
-            motor.update_at = DateTime.Now;
+            motor.updated_at = dto.updated_at;
 
             await db.SaveChangesAsync();
 

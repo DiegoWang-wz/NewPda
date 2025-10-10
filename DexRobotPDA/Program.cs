@@ -104,6 +104,7 @@ builder.Services.AddScoped<ProcessTwoService>();
 builder.Services.AddScoped<ProcessThreeService>();
 builder.Services.AddScoped<BarcodeScannerService>();
 builder.Services.AddScoped<DetectService>();
+builder.Services.AddScoped<LogService>();
 
 // 添加session
 // builder.Services.AddBlazoredSessionStorage();

@@ -16,7 +16,7 @@ public class SplitDto
 
     public DateTime created_at { get; set; } = DateTime.Now;
 
-    public DateTime? updated_at { get; set; } = DateTime.Now;
+    public DateTime? updated_at { get; set; }
     
     public bool is_qualified { get; set; } = false;
     

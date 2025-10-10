@@ -79,21 +79,6 @@ namespace DexRobotPDA.DataModel
             {
                 entity.HasKey(t => t.id);
                 entity.HasIndex(t => t.motor_id).IsUnique(); 
-                
-                entity.HasOne(m => m.WormMaterial)
-                    .WithMany(mat => mat.MotorsAsWormMaterial) 
-                    .HasForeignKey(m => m.worm_material_id)
-                    .HasPrincipalKey(t => t.material_id) 
-                    .IsRequired(false)
-                    .OnDelete(DeleteBehavior.SetNull);
-                
-                entity.HasOne(m => m.AdhesiveMaterial)
-                    .WithMany(mat => mat.MotorsAsAdhesiveMaterial) 
-                    .HasForeignKey(m => m.adhesive_material_id)
-                    .HasPrincipalKey(t => t.material_id) 
-                    .IsRequired(false)
-                    .OnDelete(DeleteBehavior.SetNull);
-
                 entity.HasOne(m => m.TaskModel)
                     .WithMany(b => b.Motors)
                     .HasForeignKey(m => m.task_id)

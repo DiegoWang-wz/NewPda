@@ -7,11 +7,7 @@ public class MotorDto
 
     public string motor_id { get; set; }
 
-    public string task_id { get; set; }
-
-    public string worm_material_id { get; set; }
-
-    public string adhesive_material_id { get; set; }
+    public string? task_id { get; set; }
 
     public string operator_id { get; set; }
 
@@ -23,6 +19,6 @@ public class MotorDto
 
     public string? finger_id { get; set; }
     
-    public DateTime? update_at { get; set; } = DateTime.Now;
+    public DateTime? updated_at { get; set; } = DateTime.Now;
     
 }

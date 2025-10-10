@@ -12,7 +12,8 @@
 @using DexRobotPDA.Utilities
 @using DexRobotPDA.ApiResponses
 @using DexRobotPDA.DTOs
-
+@using DexRobotPDA.Components.Pages.Components
+@using DexRobotPDA.Components.Pages.Detection
 @using MudBlazor
 @using MudBlazor.Components
 @using MudBlazor.Services
@@ -23,3 +24,9 @@
 @inject DetectService DetectService
 @inject IJSRuntime JSRuntime
 @inject TaskService TaskService
+@inject LogService LogService
+@inject ProcessThreeService ProcessThreeService
+@inject ProcessTwoService ProcessTwoService
+@inject ProcessOneService ProcessOneService
+@inject BarcodeScannerService ScannerService
+

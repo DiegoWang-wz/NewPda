@@ -31,7 +31,7 @@
                                          Class="my-2"
                                          OnBlur="CalculateDistanceResult"
                                          @bind-Value="_detectDto.distance_before"/>
-                        
+
                         <MudNumericField T="double?" Label="测试前的距离"
                                          Required="true"
                                          RequiredError="请输入测试前的距离"
@@ -39,7 +39,7 @@
                                          Class="my-2"
                                          OnBlur="CalculateDistanceResult"
                                          @bind-Value="_detectDto.distance_after"/>
-                        
+
                         <MudTextField T="double?" Label="距离差"
                                       @bind-Value="_detectDto.distance_result"
                                       Disabled="true"
@@ -258,6 +258,7 @@
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
             dotNetRef.Dispose();
         }
+
         GC.SuppressFinalize(this);
     }
 
@@ -302,13 +303,13 @@
             }
             else
             {
-                _timeDiffHours = null; 
+                _timeDiffHours = null;
                 Snackbar.Add("使用时间不能早于粘结时间", Severity.Warning);
             }
         }
         else
         {
-            _timeDiffHours = null; 
+            _timeDiffHours = null;
         }
     }
 
@@ -323,10 +324,13 @@
             try
             {
                 isSubmitting = true;
-                StateHasChanged(); 
+                StateHasChanged();
 
                 if (string.IsNullOrEmpty(_detectDto.inspector_id))
                 {
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 电机编号: {_detectDto.motor_id}, 原因: 检测员信息缺失", false);
+
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
                 }
@@ -335,6 +339,10 @@
 
                 if (response?.ResultCode == 1)
                 {
+                    // 记录检测操作日志
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                        $"检测完成 - 电机编号: {_detectDto.motor_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
                     try
                     {
@@ -358,7 +366,7 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
-                    
+
                     try
                     {
                         var response2 = await DetectService.UpdateDetect1StatusAsync(_motor.task_id);
@@ -375,16 +383,23 @@
                     {
                         SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
                     }
+
                     await TaskService.UpdateSingleTaskStatus(_motor.task_id);
                     ClearTaskId();
                 }
                 else
                 {
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                        $"检测失败 - 电机编号: {_detectDto.motor_id}, 原因: {response?.Msg}", false);
+
                     SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
+                await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                    $"检测异常 - 电机编号: {_detectDto.motor_id}, 异常: {ex.Message}", false);
+
                 SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
             }
             finally
@@ -395,7 +410,11 @@
         }
         else
         {
+            await LogService.AddLog("电机蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 电机编号: {_detectDto.motor_id}", false);
+
             SnackbarHelper.Show(Snackbar, "表单存在错误，请检查后提交", Severity.Warning);
         }
     }
+
 }

@@ -62,4 +62,6 @@ public class PalmCalibrateDetectDto
     /// 整体是否合格（0=不合格，1=合格）
     /// </summary>
     public bool? if_qualified { get; set; }
+    
+    public DateTime? calibrate_time { get; set; }
 }

@@ -42,7 +42,7 @@
                                      Required="true"
                                      InvertMouseWheel="true"
                                      Variant="Variant.Outlined"
-                                     Min="1" 
+                                     Min="1"
                                      Adornment="@Adornment.Start"
                                      AdornmentIcon="@Icons.Material.Filled.PriorityHigh">
                     </MudNumericField>
@@ -107,6 +107,34 @@
     AddTaskDto _addTaskDto = new();
     MudForm form;
     private bool isLoading = false;
+    private UserDto? currentUser;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
 
     private async Task Submit()
     {
@@ -128,18 +156,24 @@
             if (response != null && response.ResultCode == 1)
             {
                 SnackbarHelper.Show(Snackbar, "新增成功！", Severity.Success);
+                await LogService.AddLog("新增任务", currentUser.employee_id,
+                    $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", true);
                 MudDialog.Close(DialogResult.Ok(true));
             }
             else
             {
                 var errorMessage = response?.Msg ?? "新增失败";
                 SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
+                await LogService.AddLog("新增任务", currentUser.employee_id,
+                    $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", false);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"新增失败: {ex.Message}");
             SnackbarHelper.Show(Snackbar, "新增失败", Severity.Error);
+            await LogService.AddLog("新增任务", currentUser.employee_id,
+                $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", false);
         }
         finally
         {

@@ -11,7 +11,7 @@ public class AddSplitDto
     public string? remarks { get; set; }
 
     public DateTime created_at { get; set; } = DateTime.Now;
-    public DateTime updated_at { get; set; } = DateTime.Now;
+    public DateTime? updated_at { get; set; }
 
     public bool is_qualified { get; set; } = false;
 }
