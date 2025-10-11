@@ -44,8 +44,6 @@ public class ProcessThreeService : BaseService
         // 序列化并打印响应
         var options = new JsonSerializerOptions { WriteIndented = true };
         string responseJson = JsonSerializer.Serialize(apiResponse, options);
-        Console.WriteLine("API响应内容:");
-        Console.WriteLine(responseJson);
 
         // 新增成功时处理返回数据
         if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
@@ -80,8 +78,6 @@ public class ProcessThreeService : BaseService
 
         var options = new JsonSerializerOptions { WriteIndented = true };
         string responseJson = JsonSerializer.Serialize(apiResponse, options);
-        Console.WriteLine("更新任务流程状态API响应内容:");
-        Console.WriteLine(responseJson);
         return apiResponse;
     }
     
@@ -97,8 +93,6 @@ public class ProcessThreeService : BaseService
 
         var options = new JsonSerializerOptions { WriteIndented = true };
         string responseJson = JsonSerializer.Serialize(apiResponse, options);
-        Console.WriteLine("更新任务流程状态API响应内容:");
-        Console.WriteLine(responseJson);
         return apiResponse;
     }
     

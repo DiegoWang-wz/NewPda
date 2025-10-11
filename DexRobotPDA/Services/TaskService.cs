@@ -40,8 +40,6 @@ namespace DexRobotPDA.Services
             var apiResponse = await ExecuteCommand(request);
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("API响应内容:");
-            Console.WriteLine(responseJson);
 
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
             {
@@ -59,11 +57,6 @@ namespace DexRobotPDA.Services
         public async Task<ApiResponse> UpdateTaskProcessStatus(string taskId, string process, byte status)
         {
             // 控制台输出传入的参数
-            Console.WriteLine("===== 传入的更新参数 =====");
-            Console.WriteLine($"任务ID (taskId): {taskId}");
-            Console.WriteLine($"流程名称 (process): {process}");
-            Console.WriteLine($"状态值 (status): {status}");
-            Console.WriteLine("==========================\n");
 
             var request = new RestRequest("api/ProductTask/UpdateTaskProcessStatus", Method.Post);
             // 传递JSON体参数，与后端DTO匹配
@@ -81,8 +74,6 @@ namespace DexRobotPDA.Services
 
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("更新任务流程状态API响应内容:");
-            Console.WriteLine(responseJson);
 
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
             {
@@ -118,8 +109,6 @@ namespace DexRobotPDA.Services
             // 3. 序列化并打印响应
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("更新任务整体状态API响应内容:");
-            Console.WriteLine(responseJson);
 
             // 4. 处理响应结果
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
@@ -149,8 +138,6 @@ namespace DexRobotPDA.Services
 
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("批量更新任务状态API响应内容:");
-            Console.WriteLine(responseJson);
 
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
             {
@@ -175,8 +162,6 @@ namespace DexRobotPDA.Services
 
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("更新单个任务状态API响应内容:");
-            Console.WriteLine(responseJson);
 
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
             {

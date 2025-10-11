@@ -36,8 +36,6 @@ namespace DexRobotPDA.Services
             // 序列化并打印响应
             var options = new JsonSerializerOptions { WriteIndented = true };
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("API响应内容:");
-            Console.WriteLine(responseJson);
 
             // 登录成功时存储用户信息到LocalStorage
             if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)

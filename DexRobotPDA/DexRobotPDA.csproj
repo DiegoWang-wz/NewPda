@@ -10,6 +10,7 @@
       <PackageReference Include="AutoMapper" Version="14.0.0" />
       <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
       <PackageReference Include="Blazored.SessionStorage" Version="2.4.0" />
+      <PackageReference Include="ClosedXML" Version="0.105.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.8">
         <PrivateAssets>all</PrivateAssets>
@@ -34,6 +35,10 @@
 
     <ItemGroup>
       <Content Remove="Components\Pages\Memo.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <TypeScriptCompile Include="wwwroot\xlsx\types\index.d.ts" />
     </ItemGroup>
 
 </Project>

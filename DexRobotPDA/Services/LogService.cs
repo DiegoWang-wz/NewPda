@@ -19,19 +19,20 @@ public class LogService : BaseService
     {
         _logger = logger;
     }
-    
+
     public async Task<List<EventLogDto>?> GetLogs(DateTime? startTime = null, DateTime? endTime = null)
     {
         var request = new RestRequest("api/EventLog/GetEventLogs", Method.Get);
         if (startTime.HasValue)
-            request.AddParameter("startTime", startTime.Value);
+            request.AddParameter("startDate", startTime.Value.ToString("yyyy-MM-dd"));
         if (endTime.HasValue)
-            request.AddParameter("endTime", endTime.Value);
-        
+            request.AddParameter("endDate", endTime.Value.ToString("yyyy-MM-dd"));
+
         return await ExecuteRequest<List<EventLogDto>>(request);
     }
 
-    public async Task<ApiResponse> AddLog(string event_type,string operator_id,string event_detail,bool is_qualified )
+
+    public async Task<ApiResponse> AddLog(string event_type, string operator_id, string event_detail, bool is_qualified)
     {
         var request = new RestRequest("api/EventLog/AddEventLog", Method.Post);
         AddEventLogDto logDto = new AddEventLogDto()

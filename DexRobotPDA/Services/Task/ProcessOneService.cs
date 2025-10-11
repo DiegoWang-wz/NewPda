@@ -36,9 +36,7 @@ public class ProcessOneService : BaseService
         // 序列化并打印响应
         var options = new JsonSerializerOptions { WriteIndented = true };
         string responseJson = JsonSerializer.Serialize(apiResponse, options);
-        Console.WriteLine("API响应内容:");
-        Console.WriteLine(responseJson);
-
+        
         // 新增成功时处理返回数据并创建detect1记录
         if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
         {

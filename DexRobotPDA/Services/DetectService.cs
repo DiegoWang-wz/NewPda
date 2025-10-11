@@ -139,10 +139,7 @@ public class DetectService : BaseService
             // 输出请求内容
             var options = new JsonSerializerOptions { WriteIndented = true };
             string requestJson = JsonSerializer.Serialize(detect1Dto, options);
-            Console.WriteLine("=== PalmCalibrateDetectCreateDto 请求内容 ===");
-            Console.WriteLine(requestJson);
-            Console.WriteLine("========================================");
-
+            
             // 发送创建检测记录的请求
             var detectRequest = new RestRequest("api/Detect5/AddDetect5", Method.Post);
             detectRequest.AddJsonBody(detect1Dto);
@@ -161,9 +158,7 @@ public class DetectService : BaseService
         
             // 输出响应内容
             string responseJson = JsonSerializer.Serialize(detectResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
+
 
             return detectResponse;
         }
@@ -210,9 +205,7 @@ public class DetectService : BaseService
         // 先输出请求内容
         var options = new JsonSerializerOptions { WriteIndented = true };
         string requestJson = JsonSerializer.Serialize(detect1Dto, options);
-        Console.WriteLine("=== 请求内容 ===");
-        Console.WriteLine(requestJson);
-        Console.WriteLine("==============");
+
 
         // 使用JSON格式发送检测数据
         request.AddJsonBody(detect1Dto);
@@ -225,9 +218,7 @@ public class DetectService : BaseService
 
             // 序列化并打印响应
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
+
 
             if (apiResponse.ResultCode == 1)
             {
@@ -243,8 +234,6 @@ public class DetectService : BaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"请求异常: {ex.Message}");
-            Console.WriteLine($"异常堆栈: {ex.StackTrace}");
             throw;
         }
     }
@@ -296,18 +285,12 @@ public class DetectService : BaseService
         var request = new RestRequest("api/Motor/UpdateQualify", Method.Put);
         var options = new JsonSerializerOptions { WriteIndented = true };
         string requestJson = JsonSerializer.Serialize(qualifyDto, options);
-        Console.WriteLine("=== 请求内容 ===");
-        Console.WriteLine(requestJson);
-        Console.WriteLine("==============");
         request.AddJsonBody(qualifyDto);
         _logger.LogInformation("尝试更新检测记录 - 配件ID: {ID}", qualifyDto.id);
         try
         {
             var apiResponse = await ExecuteCommand(request);
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
 
             if (apiResponse.ResultCode == 1)
             {
@@ -322,8 +305,6 @@ public class DetectService : BaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"请求异常: {ex.Message}");
-            Console.WriteLine($"异常堆栈: {ex.StackTrace}");
             _logger.LogError(ex, "更新配件状态时发生异常 - 配件ID: {ID}", qualifyDto.id);
             throw;
         }
@@ -333,18 +314,12 @@ public class DetectService : BaseService
         var request = new RestRequest("api/Finger/UpdateQualify", Method.Put);
         var options = new JsonSerializerOptions { WriteIndented = true };
         string requestJson = JsonSerializer.Serialize(qualifyDto, options);
-        Console.WriteLine("=== 请求内容 ===");
-        Console.WriteLine(requestJson);
-        Console.WriteLine("==============");
         request.AddJsonBody(qualifyDto);
         _logger.LogInformation("尝试更新检测记录 - 配件ID: {ID}", qualifyDto.id);
         try
         {
             var apiResponse = await ExecuteCommand(request);
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
 
             if (apiResponse.ResultCode == 1)
             {
@@ -359,8 +334,6 @@ public class DetectService : BaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"请求异常: {ex.Message}");
-            Console.WriteLine($"异常堆栈: {ex.StackTrace}");
             _logger.LogError(ex, "更新配件状态时发生异常 - 配件ID: {ID}", qualifyDto.id);
             throw;
         }
@@ -370,18 +343,12 @@ public class DetectService : BaseService
         var request = new RestRequest("api/Palm/UpdateQualify", Method.Put);
         var options = new JsonSerializerOptions { WriteIndented = true };
         string requestJson = JsonSerializer.Serialize(qualifyDto, options);
-        Console.WriteLine("=== 请求内容 ===");
-        Console.WriteLine(requestJson);
-        Console.WriteLine("==============");
         request.AddJsonBody(qualifyDto);
         _logger.LogInformation("尝试更新检测记录 - 配件ID: {ID}", qualifyDto.id);
         try
         {
             var apiResponse = await ExecuteCommand(request);
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
 
             if (apiResponse.ResultCode == 1)
             {
@@ -396,8 +363,6 @@ public class DetectService : BaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"请求异常: {ex.Message}");
-            Console.WriteLine($"异常堆栈: {ex.StackTrace}");
             _logger.LogError(ex, "更新配件状态时发生异常 - 配件ID: {ID}", qualifyDto.id);
             throw;
         }
@@ -407,18 +372,12 @@ public class DetectService : BaseService
         var request = new RestRequest("api/Split/UpdateQualify", Method.Put);
         var options = new JsonSerializerOptions { WriteIndented = true };
         string requestJson = JsonSerializer.Serialize(qualifyDto, options);
-        Console.WriteLine("=== 请求内容 ===");
-        Console.WriteLine(requestJson);
-        Console.WriteLine("==============");
         request.AddJsonBody(qualifyDto);
         _logger.LogInformation("尝试更新检测记录 - 配件ID: {ID}", qualifyDto.id);
         try
         {
             var apiResponse = await ExecuteCommand(request);
             string responseJson = JsonSerializer.Serialize(apiResponse, options);
-            Console.WriteLine("=== API响应内容 ===");
-            Console.WriteLine(responseJson);
-            Console.WriteLine("=================");
 
             if (apiResponse.ResultCode == 1)
             {
@@ -433,8 +392,6 @@ public class DetectService : BaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"请求异常: {ex.Message}");
-            Console.WriteLine($"异常堆栈: {ex.StackTrace}");
             _logger.LogError(ex, "更新配件状态时发生异常 - 配件ID: {ID}", qualifyDto.id);
             throw;
         }

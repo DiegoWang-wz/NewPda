@@ -24,35 +24,6 @@ public class EventLogController : ControllerBase
         _logger = logger;
     }
     
-    // [HttpGet]
-    // public IActionResult GetEventLogs()
-    // {
-    //     ApiResponse response = new ApiResponse();
-    //     try
-    //     {
-    //         var list = db.EventLogs.ToList();
-    //         _logger.LogDebug("从数据库获取到{Count}条记录", list.Count);
-    //         
-    //         List<EventLogDto> Logs = mapper.Map<List<EventLogDto>>(list);
-    //         response.ResultCode = 1;
-    //         response.Msg = "Success";
-    //         response.ResultData = Logs;
-    //         
-    //         // 记录成功信息
-    //         _logger.LogInformation("成功获取，共{Count}条记录", Logs.Count);
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         response.ResultCode = -1;
-    //         response.Msg = "Error";
-    //         
-    //         // 记录错误信息，包括异常详情
-    //         _logger.LogError(e, "获取列表时发生错误");
-    //     }
-    //
-    //     return Ok(response);
-    // }
-    
     [HttpPost]
     public async Task<IActionResult> AddEventLog(AddEventLogDto dto)
     {
@@ -80,8 +51,6 @@ public class EventLogController : ControllerBase
     [HttpGet]
     public IActionResult GetEventLogs([FromQuery] string startDate, [FromQuery] string endDate)
     {
-        Console.WriteLine(startDate);
-        Console.WriteLine(endDate);
         ApiResponse response = new ApiResponse();
         try
         {

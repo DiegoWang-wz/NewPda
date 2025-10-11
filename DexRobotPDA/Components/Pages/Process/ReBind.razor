@@ -119,32 +119,32 @@
             if (_reBindDto.part_id.Contains("MOT"))
             {
                 var res = await ProcessOneService.ReBindMotor(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
-                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
-                    $"电机重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                    $"电机重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "电机绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("FG"))
             {
                 var res = await ProcessTwoService.ReBindFinger(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
-                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
-                    $"手指外壳重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                    $"手指外壳重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手指外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("SP"))
             {
                 var res = await ProcessThreeService.ReBindSplit(_reBindDto.part_id, _reBindDto.task_id, _reBindDto.on_part_id);
-                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
-                    $"分指机构重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                    $"分指机构重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 绑定到: {_reBindDto.on_part_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "分指机构绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
             else if (_reBindDto.part_id.Contains("PM"))
             {
                 var res = await ProcessThreeService.ReBindPalm(_reBindDto.part_id, _reBindDto.task_id);
-                await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
-                    $"手掌外壳重绑定 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                    $"手掌外壳重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
@@ -154,8 +154,8 @@
         }
         catch (Exception ex)
         {
-            await LogService.AddLog("部件重绑定", _currentUser?.employee_id ?? "未知用户",
-                $"重绑定异常 - 部件编号: {_reBindDto.part_id}, 异常信息: {ex.Message}", false);
+            await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                $"重绑异常 - 部件编号: {_reBindDto.part_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
         }
         finally
