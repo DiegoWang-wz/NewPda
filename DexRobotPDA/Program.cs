@@ -141,6 +141,18 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent);
         diagnosticContext.Set("RemoteIpAddress", httpContext.Connection.RemoteIpAddress);
     };
+    
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        var path = httpContext.Request.Path.Value ?? "";
+        if (path.StartsWith("/_blazor") || path.StartsWith("/_framework") ||
+            path.EndsWith(".js") || path.EndsWith(".css") || path.EndsWith(".png") ||
+            path.EndsWith(".jpg") || path.EndsWith(".ico"))
+        {
+            return Serilog.Events.LogEventLevel.Verbose; // 或直接 LogEventLevel.Debug 以便被过滤
+        }
+        return Serilog.Events.LogEventLevel.Information;
+    };
 });
 
 app.MapStaticAssets();
