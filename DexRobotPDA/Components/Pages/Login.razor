@@ -1,0 +1,112 @@
+﻿@page "/Login"
+@layout EmptyLayout
+@using DexRobotPDA.Components.Layout
+@implements IDisposable
+
+<MudCard Class="mx-auto" Style="max-width: 350px; margin-top: 200px;">
+    <MudCardContent>
+        <MudText Typo="Typo.h5" GutterBottom="true" Align="Align.Center">登录</MudText>
+        <MudFocusTrap DefaultFocus="DefaultFocus.FirstChild">
+            <MudTextField 
+                @bind-Value="EmployeeId" 
+                Label="用户名" 
+                Variant="Variant.Outlined" 
+                Required="true" 
+                AutoFocus="true"/> 
+        
+            <MudTextField 
+                @bind-Value="Password" 
+                Label="密码" 
+                InputType="InputType.Password"
+                Variant="Variant.Outlined" 
+                Required="true" 
+                Class="mt-4" /> 
+        </MudFocusTrap>
+        <MudButton 
+            OnClick="HandleLogin" 
+            Color="Color.Primary" 
+            FullWidth="true" 
+            Class="mt-6" 
+            Disabled="@isLoggingIn"> 
+            @if (isLoggingIn)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">登录中...</MudText>
+            }
+            else
+            {
+                <MudText>登录</MudText>
+            }
+        </MudButton>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    public string EmployeeId { get; set; }
+    public string Password { get; set; }
+    private bool isLoggingIn = false; // 只需要一个状态变量控制登录状态
+    private DotNetObjectReference<Login>? dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+        }
+    }
+    
+    [JSInvokable]
+    public async Task OnEnterKeyPressed()
+    {
+        StateHasChanged();
+        await Task.Delay(1);
+        await HandleLogin();
+    }
+
+    private async Task HandleLogin()
+    {
+        if (isLoggingIn) return;
+        isLoggingIn = true;
+        StateHasChanged();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(EmployeeId) || string.IsNullOrWhiteSpace(Password))
+            {
+                SnackbarHelper.Show(Snackbar, "请输入用户名和密码", Severity.Warning);
+                return;
+            }
+            // 使用直接注入的 AuthService，而不是 Services.AuthService
+            var response = await AuthService.Login(EmployeeId, Password);
+            if (response != null && response.ResultCode == 1)
+            {
+                SnackbarHelper.Show(Snackbar, "登录成功", Severity.Success);
+                NavManager.NavigateTo("/");
+            }
+            else
+            {
+                var errorMessage = response?.Msg ?? "登录失败";
+                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+            SnackbarHelper.Show(Snackbar, "登录过程中发生错误，请稍后重试", Severity.Error);
+        }
+        finally
+        {
+            isLoggingIn = false; 
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (dotNetRef != null)
+        {
+            _ = JSRuntime.InvokeVoidAsync("unregisterGlobalKeyPress");
+            dotNetRef.Dispose();
+        }
+    }
+}

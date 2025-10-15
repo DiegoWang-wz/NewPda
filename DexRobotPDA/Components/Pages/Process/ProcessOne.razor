@@ -1,0 +1,469 @@
+﻿@page "/process_1"
+
+@using System.Text.Json
+@implements IAsyncDisposable
+
+<MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
+
+    <div class="min-vh-40 d-flex flex-column justify-center">
+        @if (!hasSearched)
+        {
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="text-center">
+                请输入生产单号并点击查询，加载任务详情
+            </MudText>
+        }
+        else if (isLoading)
+        {
+            <div class="d-flex justify-content-center align-items-center">
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7"/>
+            </div>
+        }
+        else if (task == null)
+        {
+            <div class="d-flex justify-content-center align-items-center text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Medium" Class="mr-3"/>
+                <MudText Typo="Typo.body1" Color="Color.Error">
+                    无法加载任务数据，请检查生产单号是否正确
+                </MudText>
+            </div>
+        }
+        else
+        {
+            @if (finishedMotors.Count == (task.product_num * 12))
+            {
+                <div class="d-flex flex-row align-center my-6">
+                    <MudText Typo="Typo.h6" Class="text-primary mr-4">该任务已完成</MudText>
+                    <MudSpacer/>
+                    <MudButton Variant="Variant.Filled"
+                               OnClick="NavigateToDetail"
+                               Color="Color.Primary">
+                        查看明细
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <MudDivider Class="my-4"/>
+                <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+                    <MudButton
+                        Variant="Variant.Outlined"
+                        Color="@(ScannerService.IsAutoMode ? Color.Success : Color.Primary)"
+                        OnClick="ToggleScanModeAsync"
+                        Size="Size.Medium">
+                        @(ScannerService.IsAutoMode ? "自动匹配模式" : "手动聚焦模式")
+                        <MudIcon
+                            Icon="@(ScannerService.IsAutoMode ? Icons.Material.Filled.AutoAwesome : Icons.Material.Filled.Man)"
+                            Class="ml-2"/>
+                    </MudButton>
+                    <MudSpacer/>
+                    <MudButton Variant=" Variant.Filled"
+                               Color="@(!if_motor ? Color.Default : Color.Error)"
+                               OnClick="@(e => ToggleFingerType(true))">
+                        电机
+                    </MudButton>
+                    <MudButton Variant=" Variant.Filled"
+                               Color="@(if_motor ? Color.Default : Color.Error)"
+                               OnClick="@(e => ToggleFingerType(false))">
+                        分指
+                    </MudButton>
+
+                    <MudDivider Vertical="true" Class="mx-4 my-auto" Style="height: 1em; align-self: center;"/>
+                    <MudButton Variant="Variant.Filled"
+                               OnClick="NavigateToDetail"
+                               Color="Color.Primary">
+                        已绑定数量@(finishedMotors.Count)/@(task.product_num * 12)
+                    </MudButton>
+                </MudStack>
+
+                <BarcodeScanner
+                    Inputs="scannerInputs"
+                    DetermineTargetInput="DetermineTargetInput"
+                    OnInputValueChanged="HandleInputValueChanged"/>
+
+                <MudDivider Class="my-4"/>
+                <MudButton OnClick="HandleBindingUnified" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
+                           FullWidth="true" Disabled="@isBinding">
+                    @if (isBinding)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+                        <MudText Class="ml-2">绑定中...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>绑定</MudText>
+                    }
+                </MudButton>
+            }
+        }
+    </div>
+
+    <MudDivider Class="my-4"/>
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudTextField
+            @bind-Value="taskId"
+            Label="生产单号"
+            Variant="Variant.Outlined"
+            Required="true"
+            Clearable="true"
+            Error="@hasInputError"
+            ErrorText="请输入生产单号"
+            AutoFocus="true"
+            Id="taskId"
+            @onfocus="() => HandleSpecialInputFocus()"
+            @onblur="() => HandleSpecialInputBlur()"
+            Class="flex-1"/>
+
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Error"
+            StartIcon="@Icons.Material.Filled.DeleteForever"
+            OnClick="ClearTaskId"
+            Size="Size.Large"
+            Class="w-full md:w-auto">
+            清除
+        </MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Search"
+            OnClick="LoadTaskDetail"
+            Size="Size.Large"
+            Disabled="isLoading"
+            Class="w-full md:w-auto">
+            @(isLoading ? "查询中..." : "查询")
+        </MudButton>
+    </MudStack>
+
+</MudPaper>
+
+@code {
+    private const string StorageKey = "process1_taskId";
+
+    private string taskId = string.Empty;
+    private ProductTaskDto? task = null;
+    private bool isLoading = false;
+    private bool hasSearched = false;
+    private bool hasInputError = false;
+    private UserDto? currentUser;
+    private List<MotorDto> finishedMotors = new List<MotorDto>();
+    private MudForm form;
+    private bool validation = true;
+    private AddMotorDto _motorDto = new AddMotorDto();
+    private AddFingerDto _fingerDto = new AddFingerDto();
+    private DotNetObjectReference<ProcessOne>? dotNetRef;
+    private List<BarcodeScanner.InputField> scannerInputs = new();
+    private bool isBinding = false;
+    private bool if_motor = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        scannerInputs = new List<BarcodeScanner.InputField>
+        {
+            new BarcodeScanner.InputField { Index = 1, Label = "分指编号", Id = "fingerId", IsSpecialInput = false, Visible = false },
+            new BarcodeScanner.InputField { Index = 2, Label = "电机编号", Id = "motorId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 3, Label = "备注", Id = "remarks", IsSpecialInput = true }
+        };
+    }
+
+    private async Task ToggleScanModeAsync()
+    {
+        await ScannerService.ToggleModeAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                    return;
+                }
+
+                _motorDto.operator_id = currentUser.employee_id;
+                _fingerDto.operator_id = currentUser.employee_id;
+
+                var saved = await JSRuntime.InvokeAsync<string>("localStorage.getItem", StorageKey);
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    taskId = saved;
+                    hasSearched = true;
+                    await LoadTaskDetail();
+                }
+            }
+            catch
+            {
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void HandleSpecialInputFocus()
+    {
+        ScannerService.SetCurrentFocusedInputId("taskId");
+        _ = ScannerService.ExitAutoFocusModeAsync();
+    }
+
+    private void ToggleFingerType(bool isTrue)
+    {
+        if_motor = isTrue;
+        var input = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
+        input.Visible = !isTrue;
+        StateHasChanged();
+    }
+
+    private async Task HandleSpecialInputBlur()
+    {
+        if (ScannerService.IsAutoMode)
+        {
+            await ScannerService.EnterAutoFocusModeAsync();
+        }
+
+        await ScannerService.HandleInputBlurAsync();
+    }
+
+    private async Task ClearTaskId()
+    {
+        taskId = string.Empty;
+        task = null;
+        hasSearched = false;
+        hasInputError = false;
+        finishedMotors.Clear();
+        _motorDto = new AddMotorDto();
+        _fingerDto = new AddFingerDto();
+        foreach (var input in scannerInputs) input.Value = string.Empty;
+        if (currentUser != null)
+        {
+            _motorDto.operator_id = currentUser.employee_id;
+            _fingerDto.operator_id = currentUser.employee_id;
+        }
+
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        StateHasChanged();
+    }
+
+    private async Task LoadTaskDetail()
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            hasInputError = true;
+            StateHasChanged();
+            return;
+        }
+
+        hasInputError = false;
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            hasSearched = true;
+            StateHasChanged();
+            task = await TaskService.GetTaskDetail(taskId);
+            _motorDto.task_id = taskId;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
+            await GetFinishedList();
+        }
+        catch (Exception ex)
+        {
+            task = null;
+            await DialogService.ShowMessageBox("错误", $"任务加载失败：{ex.Message}", "确定");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GetFinishedList()
+    {
+        try
+        {
+            var result = await ProcessOneService.GetFinishedList(taskId);
+            finishedMotors = result;
+            if (task != null)
+            {
+                if (finishedMotors.Count >= (task.product_num * 12))
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process1", 1);
+                else
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process1", 0);
+            }
+        }
+        catch
+        {
+            finishedMotors = new List<MotorDto>();
+            SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
+        }
+    }
+
+    private async Task NavigateToDetail()
+    {
+        if (!string.IsNullOrWhiteSpace(taskId))
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
+        NavManager.NavigateTo($"/TaskDetail/{taskId}/{0}");
+    }
+
+    private async Task HandleBindingUnified()
+    {
+        var motorIdInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId");
+        var fingerIdInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
+        var remarkInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+
+        // 基础校验
+        if (motorIdInput == null || string.IsNullOrWhiteSpace(motorIdInput.Value))
+        {
+            if (!if_motor) // 分指模式下提示更明确
+                await LogService.AddLog("分指绑定", _fingerDto.operator_id, "分指绑定失败 - 电机编号为空", false);
+            SnackbarHelper.Show(Snackbar, "请输入电机编号", Severity.Warning);
+            return;
+        }
+
+        if (!if_motor) // 只有在“分指”流程才需要手指编号
+        {
+            if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
+            {
+                await LogService.AddLog("分指绑定", _fingerDto.operator_id, "分指绑定失败 - 分指编号为空", false);
+                SnackbarHelper.Show(Snackbar, "请输入分指编号", Severity.Warning);
+                return;
+            }
+        }
+
+        isBinding = true;
+        try
+        {
+            // 统一准备备注
+            var remarks = remarkInput?.Value ?? string.Empty;
+
+            // 1) 先添加电机（两种模式都需要）
+            _motorDto.motor_id = motorIdInput.Value;
+            _motorDto.remarks = remarks;
+
+            var addMotorResp = await ProcessOneService.AddMotor(_motorDto);
+            if (addMotorResp == null || addMotorResp.ResultCode != 1)
+            {
+                var msg = addMotorResp?.Msg ?? "电机绑定失败";
+                await LogService.AddLog("电机绑定", _motorDto.operator_id,
+                    $"电机绑定失败 - 电机编号: {_motorDto.motor_id}, 任务单号: {_motorDto.task_id}, 错误信息: {msg}", false);
+                SnackbarHelper.Show(Snackbar, msg, Severity.Error);
+                return;
+            }
+
+            await LogService.AddLog("电机绑定", _motorDto.operator_id,
+                $"电机绑定成功 - 电机编号: {_motorDto.motor_id}, 任务单号: {_motorDto.task_id}", true);
+
+            // 仅电机模式：到此结束
+            if (if_motor)
+            {
+                SnackbarHelper.Show(Snackbar, "电机绑定成功！", Severity.Success);
+                motorIdInput.Value = string.Empty;
+                if (remarkInput != null) remarkInput.Value = string.Empty;
+
+                await TaskService.UpdateSingleTaskStatus(taskId);
+                await LoadTaskDetail();
+                return;
+            }
+
+            // 2) 分指模式：电机成功后，继续添加分指并绑定该电机
+            _fingerDto.finger_id = fingerIdInput!.Value;
+            _fingerDto.remarks = remarks;
+            _fingerDto.task_id = taskId;
+
+            var dto = new AddFingerWithMotorsDto
+            {
+                finger_id = _fingerDto.finger_id,
+                task_id = _fingerDto.task_id,
+                operator_id = _fingerDto.operator_id,
+                remarks = _fingerDto.remarks,
+                type = 2,
+                motor_ids = new List<string> { motorIdInput.Value }
+            };
+
+            var addFingerResp = await ProcessTwoService.AddFingerWithMotors(dto);
+            if (addFingerResp != null && addFingerResp.ResultCode == 1)
+            {
+                await LogService.AddLog("分指绑定", _fingerDto.operator_id,
+                    $"分指绑定成功 - 分指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 电机: {motorIdInput.Value}", true);
+
+                fingerIdInput.Value = string.Empty;
+                motorIdInput.Value = string.Empty;
+                if (remarkInput != null) remarkInput.Value = string.Empty;
+
+                SnackbarHelper.Show(Snackbar, "分指绑定成功！", Severity.Success);
+                await TaskService.UpdateSingleTaskStatus(taskId);
+                await LoadTaskDetail();
+            }
+            else
+            {
+                var msg = addFingerResp?.Msg ?? "分指绑定失败";
+                await LogService.AddLog("分指绑定", _fingerDto.operator_id,
+                    $"分指绑定失败 - 分指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {msg}", false);
+                SnackbarHelper.Show(Snackbar, msg, Severity.Error);
+            }
+        }
+        catch (JsonException jsonEx)
+        {
+            await LogService.AddLog(if_motor ? "电机绑定" : "分指绑定",
+                if_motor ? _motorDto.operator_id : _fingerDto.operator_id,
+                $"JSON解析失败 - 错误信息: {jsonEx.Message}", false);
+            SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            await LogService.AddLog(if_motor ? "电机绑定" : "分指绑定",
+                if_motor ? _motorDto.operator_id : _fingerDto.operator_id,
+                $"绑定异常 - 异常信息: {ex.Message}", false);
+            SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
+        }
+        finally
+        {
+            isBinding = false;
+        }
+    }
+
+
+    private Task HandleInputValueChanged(BarcodeScanner.InputField input)
+    {
+        switch (input.Id)
+        {
+            case "motorId":
+                _motorDto.motor_id = input.Value;
+                break;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
+    {
+        var motorInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId" && string.IsNullOrEmpty(i.Value));
+        if (motorInput != null) return motorInput;
+        return scannerInputs.FirstOrDefault(i => i.Id == "motorId");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dotNetRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
+            dotNetRef.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+}

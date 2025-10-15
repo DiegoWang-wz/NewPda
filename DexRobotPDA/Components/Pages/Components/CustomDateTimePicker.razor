@@ -1,0 +1,436 @@
+﻿@using MudBlazor
+@using System
+
+<MudItem Class="my-2">
+    <MudTextField T="string"
+                  Label="@Label"
+                  Required="@Required"
+                  RequiredError="@RequiredError"
+                  @bind-Value="FormattedValue"
+                  ReadOnly="true"
+                  Adornment="Adornment.End"
+                  AdornmentIcon="@Icons.Material.Filled.Event"
+                  OnAdornmentClick="TogglePicker">
+        <ExtraActions>
+            @if (!string.IsNullOrEmpty(FormattedValue))
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="ClearValue" Size="Size.Small"/>
+            }
+        </ExtraActions>
+    </MudTextField>
+
+    @if (IsOpen)
+    {
+        <MudPaper Elevation="3" Class="mt-2">
+            <div class="picker-panel">
+                <!-- 切换标签 -->
+                <div class="picker-tabs">
+                    <MudButton
+                        Variant="Variant.Text"
+                        Color="@(ActiveTab == PickerTab.Date ? Color.Primary : Color.Default)"
+                        OnClick="() => ShowTab(PickerTab.Date)">
+                        日期
+                    </MudButton>
+                    <MudButton
+                        Variant="Variant.Text"
+                        Color="@(ActiveTab == PickerTab.Time ? Color.Primary : Color.Default)"
+                        OnClick="() => ShowTab(PickerTab.Time)">
+                        时间
+                    </MudButton>
+                </div>
+
+                <!-- 日期选择面板 -->
+                @if (ActiveTab == PickerTab.Date)
+                {
+                    <div class="date-picker">
+                        <!-- 年月导航 -->
+                        <div class="date-nav">
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="PrevMonth"
+                                           Size="Size.Small"/>
+                            <MudText Typo="Typo.body1">@CurrentDisplayMonth.ToString("yyyy年MM月")</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="NextMonth"
+                                           Size="Size.Small"/>
+                        </div>
+
+                        <!-- 星期标题 -->
+                        <div class="weekdays">
+                            @foreach (var day in new[] { "日", "一", "二", "三", "四", "五", "六" })
+                            {
+                                <MudText Typo="Typo.caption" Class="weekday">@day</MudText>
+                            }
+                        </div>
+
+                        <!-- 日期网格 -->
+                        <div class="date-grid">
+                            @foreach (var day in GetCalendarDays())
+                            {
+                                <MudButton
+                                    Variant="Variant.Text"
+                                    OnClick="() => SelectDate(day.Date)"
+                                    Class="@GetDateButtonClass(day)">
+                                    @day.Date.Day
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- 时间选择面板 -->
+                @if (ActiveTab == PickerTab.Time)
+                {
+                    <div class="time-picker">
+                        <div class="time-selectors">
+                            <!-- 小时 -->
+                            <div class="time-selector">
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                               OnClick="() => ChangeHour(1)" Size="Size.Small"/>
+                                <MudText Typo="Typo.body1">@CurrentHour.ToString("D2")</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                               OnClick="() => ChangeHour(-1)" Size="Size.Small"/>
+                            </div>
+                            <MudText Typo="Typo.body1" Class="time-colon">:</MudText>
+
+                            <!-- 分钟 -->
+                            <div class="time-selector">
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                               OnClick="() => ChangeMinute(1)" Size="Size.Small"/>
+                                <MudText Typo="Typo.body1">@CurrentMinute.ToString("D2")</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                               OnClick="() => ChangeMinute(-1)" Size="Size.Small"/>
+                            </div>
+                            <MudText Typo="Typo.body1" Class="time-colon">:</MudText>
+
+                            <!-- 秒钟 -->
+                            <div class="time-selector">
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                               OnClick="() => ChangeSecond(1)" Size="Size.Small"/>
+                                <MudText Typo="Typo.body1">@CurrentSecond.ToString("D2")</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                               OnClick="() => ChangeSecond(-1)" Size="Size.Small"/>
+                            </div>
+
+                            <!-- 小数点 -->
+                            <MudText Typo="Typo.body1" class="time-colon">.</MudText>
+
+                            <!-- 毫秒 -->
+                            <div class="time-selector">
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                               OnClick="() => ChangeMillisecond(1)" Size="Size.Small"/>
+                                <MudText Typo="Typo.body1">@CurrentMillisecond.ToString("D3")</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                               OnClick="() => ChangeMillisecond(-1)" Size="Size.Small"/>
+                            </div>
+                        </div>
+
+                        <div class="time-actions">
+                            <MudButton Variant="Variant.Text" OnClick="SetCurrentTime">现在</MudButton>
+                        </div>
+                    </div>
+                }
+
+                <!-- 确认按钮 -->
+                <div class="confirm-button">
+                    <MudButton FullWidth="true" Color="Color.Primary" OnClick="ConfirmSelection">确认</MudButton>
+                </div>
+            </div>
+        </MudPaper>
+    }
+</MudItem>
+
+<style>
+    .picker-panel { padding: 16px; background: #fff; border-radius: 8px; }
+    .picker-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: #f5f5f5; border-radius: 6px; padding: 4px; }
+    .picker-tabs .mud-button { flex: 1; border-radius: 4px; min-height: 36px; font-size: 14px; font-weight: 500; text-transform: none; }
+    .picker-tabs .mud-button-text-primary { background: #594ae2; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .date-nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding:0 8px; }
+    .date-nav .mud-text { font-weight:600; font-size:16px; color:#1a1a1a; }
+    .date-nav .mud-icon-button { color:#666; border-radius:6px; padding:8px; }
+    .date-nav .mud-icon-button:hover { background:#f0f0f0; }
+
+    .weekdays { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:12px; padding:0 4px; }
+    .weekday { font-weight:500; font-size:12px; color:#666; padding:8px 0; }
+
+    .date-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; padding:4px; }
+    .date-btn { min-width:36px; height:36px; border-radius:6px; font-size:14px; font-weight:400; margin:0; padding:0; color:#1a1a1a !important; }
+    .date-btn:hover { background:#f0f0f0 !important; }
+    .date-btn.other-month { color:#ccc !important; }
+    .date-btn.today { background:#e3f2fd !important; color:#1976d2 !important; font-weight:500; }
+    .date-btn.selected { background:#594ae2 !important; color:white !important; font-weight:500; box-shadow:0 2px 4px rgba(89,74,226,0.3); }
+
+    .time-picker { display:flex; flex-direction:column; align-items:center; padding:16px 8px; }
+    .time-selectors { display:flex; align-items:center; justify-content:center; margin-bottom:20px; background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%); border-radius:12px; padding:24px 16px; border:1px solid #e9ecef; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    .time-selector { display:flex; flex-direction:column; align-items:center; margin:0 8px; min-width:60px; }
+    .time-selector .mud-text { font-size:20px; font-weight:600; color:#1a1a1a; margin:12px 0; min-width:56px; text-align:center; background:white; padding:8px 12px; border-radius:8px; border:2px solid #e9ecef; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .time-selector .mud-icon-button { color:#594ae2; border-radius:8px; padding:8px; background:white; border:1px solid #e9ecef; box-shadow:0 1px 3px rgba(0,0,0,0.1); transition:all 0.2s ease; }
+    .time-selector .mud-icon-button:hover { background:#594ae2; color:white; transform:translateY(-1px); box-shadow:0 2px 6px rgba(89,74,226,0.3); }
+    .time-colon { font-size:20px; font-weight:600; color:#666; margin:0 4px; align-self:center; }
+
+    .time-actions { margin-bottom:16px; width:100%; display:flex; justify-content:center; }
+    .time-actions .mud-button { text-transform:none; font-size:14px; color:#594ae2; border:1px solid #594ae2; border-radius:6px; padding:6px 16px; font-weight:500; transition:all 0.2s ease; }
+    .time-actions .mud-button:hover { background:#594ae2; color:white; transform:translateY(-1px); box-shadow:0 2px 6px rgba(89,74,226,0.3); }
+
+    .confirm-button { margin-top:16px; width:100%; }
+    .confirm-button .mud-button { border-radius:8px; text-transform:none; font-weight:500; font-size:14px; height:44px; background:#594ae2; color:white; transition:all 0.2s ease; }
+    .confirm-button .mud-button:hover { background:#4a3bc7; transform:translateY(-1px); box-shadow:0 4px 12px rgba(89,74,226,0.3); }
+</style>
+
+@code {
+
+    // 选择器标签枚举
+    private enum PickerTab
+    {
+        Date,
+        Time
+    }
+
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    // 标签相关
+    [Parameter] public string Label { get; set; } = "请选择日期时间";
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string RequiredError { get; set; } = "请选择日期时间";
+
+    // 内部状态
+    private bool IsOpen = false;
+    private PickerTab ActiveTab = PickerTab.Date;
+    private string FormattedValue = "";
+
+    // 日期相关
+    private DateTime CurrentDisplayMonth;
+    private DateTime? SelectedDate;
+
+    // 时间相关
+    private int CurrentHour;
+    private int CurrentMinute;
+    private int CurrentSecond;
+    private int CurrentMillisecond; // ★ 新增：毫秒
+
+    protected override void OnInitialized()
+    {
+        CurrentDisplayMonth = DateTime.Today;
+
+        // 初始化值
+        if (Value.HasValue)
+        {
+            SelectedDate = Value.Value.Date;
+            CurrentHour = Value.Value.Hour;
+            CurrentMinute = Value.Value.Minute;
+            CurrentSecond = Value.Value.Second;
+            CurrentMillisecond = Value.Value.Millisecond; // ★
+            UpdateFormattedValue();
+        }
+        else
+        {
+            // 默认时间为 00:00:00.000
+            CurrentHour = 0;
+            CurrentMinute = 0;
+            CurrentSecond = 0;
+            CurrentMillisecond = 0; // ★
+        }
+    }
+
+    // 切换选择器显示/隐藏
+    private void TogglePicker()
+    {
+        IsOpen = !IsOpen;
+
+        // 如果是第一次打开且没有值，默认选择今天
+        if (IsOpen && !SelectedDate.HasValue)
+        {
+            SelectedDate = DateTime.Today;
+        }
+    }
+
+    // 切换标签
+    private void ShowTab(PickerTab tab)
+    {
+        ActiveTab = tab;
+    }
+
+    // 获取日历天数
+    private List<CalendarDay> GetCalendarDays()
+    {
+        var days = new List<CalendarDay>();
+
+        var firstDayOfMonth = new DateTime(CurrentDisplayMonth.Year, CurrentDisplayMonth.Month, 1);
+        var dayOfWeek = (int)firstDayOfMonth.DayOfWeek;
+
+        for (int i = 0; i < dayOfWeek; i++)
+        {
+            var date = firstDayOfMonth.AddDays(-(dayOfWeek - i));
+            days.Add(new CalendarDay { Date = date, IsCurrentMonth = false });
+        }
+
+        var daysInMonth = DateTime.DaysInMonth(CurrentDisplayMonth.Year, CurrentDisplayMonth.Month);
+        for (int i = 1; i <= daysInMonth; i++)
+        {
+            var date = new DateTime(CurrentDisplayMonth.Year, CurrentDisplayMonth.Month, i);
+            days.Add(new CalendarDay { Date = date, IsCurrentMonth = true });
+        }
+
+        var remainingDays = 42 - days.Count;
+        if (remainingDays > 0)
+        {
+            for (int i = 1; i <= remainingDays; i++)
+            {
+                var date = firstDayOfMonth.AddMonths(1).AddDays(i - 1);
+                days.Add(new CalendarDay { Date = date, IsCurrentMonth = false });
+            }
+        }
+
+        return days;
+    }
+
+    // 获取日期按钮的CSS类
+    private string GetDateButtonClass(CalendarDay day)
+    {
+        var classes = new List<string> { "date-btn" };
+
+        if (!day.IsCurrentMonth) classes.Add("other-month");
+        if (day.Date.Date == DateTime.Today) classes.Add("today");
+        if (SelectedDate.HasValue && day.Date.Date == SelectedDate.Value.Date) classes.Add("selected");
+
+        return string.Join(" ", classes);
+    }
+
+    // 选择日期
+    private void SelectDate(DateTime date)
+    {
+        SelectedDate = date.Date;
+
+        // 如果是第一次选择日期，且时间未设置，则默认 00:00:00.000
+        if (CurrentHour == 0 && CurrentMinute == 0 && CurrentSecond == 0 && CurrentMillisecond == 0 && !Value.HasValue)
+        {
+            CurrentHour = 0;
+            CurrentMinute = 0;
+            CurrentSecond = 0;
+            CurrentMillisecond = 0;
+        }
+    }
+
+    // 上一个月 / 下一个月
+    private void PrevMonth() => CurrentDisplayMonth = CurrentDisplayMonth.AddMonths(-1);
+    private void NextMonth() => CurrentDisplayMonth = CurrentDisplayMonth.AddMonths(1);
+
+    // 改变小时/分钟/秒/毫秒
+    private void ChangeHour(int delta)
+    {
+        CurrentHour = (CurrentHour + delta + 24) % 24;
+        if (!SelectedDate.HasValue) SelectedDate = DateTime.Today;
+    }
+
+    private void ChangeMinute(int delta)
+    {
+        CurrentMinute = (CurrentMinute + delta + 60) % 60;
+        if (!SelectedDate.HasValue) SelectedDate = DateTime.Today;
+    }
+
+    private void ChangeSecond(int delta)
+    {
+        CurrentSecond = (CurrentSecond + delta + 60) % 60;
+        if (!SelectedDate.HasValue) SelectedDate = DateTime.Today;
+    }
+
+    private void ChangeMillisecond(int delta)
+    {
+        // 0-999 循环
+        var v = CurrentMillisecond + delta;
+        v %= 1000;
+        if (v < 0) v += 1000;
+        CurrentMillisecond = v;
+        if (!SelectedDate.HasValue) SelectedDate = DateTime.Today;
+    }
+
+    // 设置为当前时间（含毫秒）
+    private void SetCurrentTime()
+    {
+        var now = DateTime.Now;
+        CurrentHour = now.Hour;
+        CurrentMinute = now.Minute;
+        CurrentSecond = now.Second;
+        CurrentMillisecond = now.Millisecond; // ★
+
+        if (!SelectedDate.HasValue) SelectedDate = DateTime.Today;
+    }
+
+    // 确认选择
+    private async Task ConfirmSelection()
+    {
+        if (SelectedDate.HasValue)
+        {
+            var selectedDateTime = new DateTime(
+                SelectedDate.Value.Year,
+                SelectedDate.Value.Month,
+                SelectedDate.Value.Day,
+                CurrentHour,
+                CurrentMinute,
+                CurrentSecond,
+                CurrentMillisecond // ★
+            );
+
+            await ValueChanged.InvokeAsync(selectedDateTime);
+            UpdateFormattedValue();
+        }
+
+        IsOpen = false;
+    }
+
+    // 清除值
+    private async Task ClearValue()
+    {
+        SelectedDate = null;
+        CurrentHour = 0;
+        CurrentMinute = 0;
+        CurrentSecond = 0;
+        CurrentMillisecond = 0;
+        FormattedValue = "";
+        await ValueChanged.InvokeAsync(null);
+    }
+
+    // 更新格式化的值（含毫秒）
+    private void UpdateFormattedValue()
+    {
+        if (Value.HasValue)
+        {
+            // 显示到毫秒位
+            FormattedValue = Value.Value.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        }
+        else
+        {
+            FormattedValue = "";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // 当绑定值变化时更新内部状态
+        if (Value.HasValue)
+        {
+            SelectedDate = Value.Value.Date;
+            CurrentHour = Value.Value.Hour;
+            CurrentMinute = Value.Value.Minute;
+            CurrentSecond = Value.Value.Second;
+            CurrentMillisecond = Value.Value.Millisecond; // ★
+        }
+        else
+        {
+            SelectedDate = null;
+            CurrentHour = 0;
+            CurrentMinute = 0;
+            CurrentSecond = 0;
+            CurrentMillisecond = 0; // ★
+        }
+
+        UpdateFormattedValue();
+    }
+
+    // 日历天数的辅助类
+    private class CalendarDay
+    {
+        public DateTime Date { get; set; }
+        public bool IsCurrentMonth { get; set; }
+    }
+
+}

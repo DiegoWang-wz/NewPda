@@ -1,0 +1,160 @@
+is_global = true
+build_property.MudDebugAnalyzer = 
+build_property.MudAllowedAttributePattern = 
+build_property.MudAllowedAttributeList = 
+build_property.TargetFramework = net9.0
+build_property.TargetFramework = net9.0
+build_property.TargetPlatformMinVersion = 
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = DexRobotPDA
+build_property.RootNamespace = DexRobotPDA
+build_property.ProjectDir = D:\JC_Project\DexRobot\DexRobotPDA\DexRobotPDA\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 9.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = D:\JC_Project\DexRobot\DexRobotPDA\DexRobotPDA
+build_property._RazorSourceGeneratorDebug = 
+build_property.EffectiveAnalysisLevelStyle = 9.0
+build_property.EnableCodeStyleSeverity = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/App.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHAucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Layout/EmptyLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcRW1wdHlMYXlvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Layout/MainLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTWFpbkxheW91dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Layout/MyNavMenu.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTXlOYXZNZW51LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Components/AddTaskDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXEFkZFRhc2tEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Components/BarcodeScanner.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXEJhcmNvZGVTY2FubmVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Components/CustomDateTimePicker.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXEN1c3RvbURhdGVUaW1lUGlja2VyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Components/MyDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXE15RGlhbG9nLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Detection/Detect1.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0MS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Detection/Detect2.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0Mi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Detection/Detect3.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0My5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Detection/Detect4.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0NC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Detection/Detect5.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0NS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Error.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFcnJvci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Home.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xIb21lLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xMb2dpbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/ProcessOne.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFByb2Nlc3NPbmUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/ProcessThree.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFByb2Nlc3NUaHJlZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/ProcessTwo.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFByb2Nlc3NUd28ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/ReBind.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFJlQmluZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/Stepper.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFN0ZXBwZXIucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Process/UnBind.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9jZXNzXFVuQmluZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/ProductionTask/DataSummary.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9kdWN0aW9uVGFza1xEYXRhU3VtbWFyeS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/ProductionTask/LogSummary.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9kdWN0aW9uVGFza1xMb2dTdW1tYXJ5LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/ProductionTask/TaskDetail.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9kdWN0aW9uVGFza1xUYXNrRGV0YWlsLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/ProductionTask/TaskList.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcm9kdWN0aW9uVGFza1xUYXNrTGlzdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Test/BarcodeScanner1.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZXN0XEJhcmNvZGVTY2FubmVyMS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Test/FocusExample.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZXN0XEZvY3VzRXhhbXBsZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Test/InputDetect.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZXN0XElucHV0RGV0ZWN0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Pages/Test/MotorCheck.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZXN0XE1vdG9yQ2hlY2sucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/Routes.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSb3V0ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/JC_Project/DexRobot/DexRobotPDA/DexRobotPDA/Components/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xfSW1wb3J0cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 

@@ -1,0 +1,955 @@
+﻿@page "/DataSummary"
+@using DocumentFormat.OpenXml.Wordprocessing
+@using Color = MudBlazor.Color
+@inject IServiceProvider ServiceProvider
+@inject IJSRuntime JS
+<MudPaper Elevation="3" Class="pa-4 ma-2 mx-md-8">
+
+    <MudFadeTransition Visible="@hasSearched">
+        <div class="min-vh-40 d-flex flex-column justify-center">
+
+            @if (!hasSearched)
+            {
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="text-center mt-8">
+                    请输入生产单号并点击查询，加载任务详情
+                </MudText>
+            }
+            else if (isLoading)
+            {
+                <div class="d-flex justify-content-center align-items-center">
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7"/>
+                </div>
+            }
+            else if (fullTaskData == null || !fullTaskData.Any())
+            {
+                <div class="d-flex justify-content-center align-items-center text-center my-10">
+                    <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Color="Color.Error" Size="Size.Large"
+                             Class="mr-3"/>
+                    <MudText Typo="Typo.body1" Color="Color.Error">
+                        无法加载任务数据，请检查生产单号是否正确
+                    </MudText>
+                </div>
+            }
+            else
+            {
+                <MudPaper Elevation="2" Class="mb-4 px-4 py-3 d-flex align-center justify-between flex-wrap">
+
+                    <!-- 左侧：任务详情文字 -->
+                    <div class="d-flex flex-wrap align-center gap-4">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Primary" Size="Size.Medium"
+                                     Class="mr-1"/>
+                            <MudText Typo="Typo.h6" Color="Color.Primary" Class="mr-2">任务详情</MudText>
+                        </div>
+
+                        <MudText Typo="Typo.body1" Class="mx-2">
+                            <b>任务单号：</b>@(fullTaskData?.FirstOrDefault()?.task?.task_id ?? "—")
+                        </MudText>
+
+                        <MudText Typo="Typo.body1" Class="mx-2">
+                            <b>产品数量：</b>@(fullTaskData?.FirstOrDefault()?.task?.product_num ?? 0)
+                        </MudText>
+
+                        <MudText Typo="Typo.body1" Class="mx-2">
+                            <b>创建时间：</b>@(fullTaskData?.FirstOrDefault()?.task?.created_at.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                        </MudText>
+                    </div>
+
+                    <MudSpacer/>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportExcel"
+                               Size="Size.Medium">
+                        导出 Excel
+                    </MudButton>
+                </MudPaper>
+
+
+                @foreach (var palmData in fullTaskData)
+                {
+                    var palmTitle = $"手掌信息：{palmData.palm?.palm_id ?? "未知"}";
+
+                    <MudExpansionPanels Elevation="2" Class="mb-5">
+                        <MudExpansionPanel Text="@palmTitle"
+                                           ExpandIcon="@Icons.Material.Filled.ExpandMore"
+                                           CollapseIcon="@Icons.Material.Filled.ExpandLess">
+                            <div class="pl-2">
+
+                                <!-- Palm 检测部分可折叠 -->
+                                <MudExpansionPanels Elevation="1" Class="my-3">
+                                    <MudExpansionPanel Text="整手标定检测"
+                                                       ExpandIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                                                       CollapseIcon="@Icons.Material.Filled.KeyboardArrowUp">
+                                        <MudTable Items="palmData.detects" Dense="true" Hover="true" Bordered="true">
+                                            <HeaderContent>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.id">
+                                                        检测ID
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.palm_id">
+                                                        手掌外壳ID
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.proximity_sensing">
+                                                        接近觉
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.normal_force">法向力
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.fan_function">
+                                                        风扇功能
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.software_version">
+                                                        软件版本号
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.electricity">电流
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.inspector">检测人员
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.remarks">
+                                                        备注
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                                <MudTh Style="@MinColWidthStyle">
+                                                    <MudTableSortLabel
+                                                        SortBy="(PalmCalibrateDetectDto x) => x.if_qualified">
+                                                        是否合格
+                                                    </MudTableSortLabel>
+                                                </MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="检测ID">@context.id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="手掌外壳ID">@context.palm_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="接近觉">@context.proximity_sensing</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="法向力">@context.normal_force</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="风扇功能">@context.fan_function</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="软件版本号">@context.software_version</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="电流">@context.electricity</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="操作员ID">@context.inspector</MudTd>
+                                                <MudTd Style="@MinColWidthStyle"
+                                                       DataLabel="备注">@context.remarks</MudTd>
+                                                <MudTd>
+                                                    @if (context.if_qualified == true)
+                                                    {
+                                                        <span>✅ 合格</span>
+                                                    }
+                                                    else if (context.if_qualified == false)
+                                                    {
+                                                        <span>❌ 不合格</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>未知</span>
+                                                    }
+                                                </MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    </MudExpansionPanel>
+                                </MudExpansionPanels>
+
+                                <!-- 手指部分 -->
+                                @foreach (var fingerData in palmData.fingers)
+                                {
+                                    string fingerTypeText = fingerData.finger?.type switch
+                                    {
+                                        2 => "分指",
+                                        1 => "拇指",
+                                        0 => "单指",
+                                        _ => "未知类型"
+                                    };
+                                    var fingerTitle = $"{fingerTypeText}编号：{fingerData.finger?.finger_id ?? "未知"}";
+
+                                    <MudExpansionPanels Elevation="1" Class="mt-4">
+                                        <MudExpansionPanel Text="@fingerTitle"
+                                                           ExpandIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                                                           CollapseIcon="@Icons.Material.Filled.KeyboardArrowUp">
+                                            <div class="pl-2">
+                                                @if (fingerData.finger?.type == 2)
+                                                {
+                                                    <MudText Typo="Typo.subtitle1" Class="mb-2">分指标定检测
+                                                    </MudText>
+                                                    <MudTable Items="fingerData.detect3" Dense="true" Hover="true"
+                                                              Bordered="true">
+                                                        <HeaderContent>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.id">
+                                                                    检测ID
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.finger_id">
+                                                                    手指外壳ID
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.electricity">
+                                                                    电流记录
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.test_action">
+                                                                    测试动作
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.begin_time">
+                                                                    动作发起时间
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.finish_time">
+                                                                    动作结束时间
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.consume_time">
+                                                                    耗时（秒）
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.near_angle">
+                                                                    近端关节角度
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.remote_angle">
+                                                                    远端关节角度
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.motor_1_max">
+                                                                    电机1电流峰值
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.motor_2_max">
+                                                                    电机2电流峰值
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.inspector">
+                                                                    检测人员
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.calibrate_time">
+                                                                    标记日期
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.remarks">备注
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitCalibrateDetectDto x) => x.if_qualified">
+                                                                    是否合格
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                        </HeaderContent>
+                                                        <RowTemplate>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="检测ID">@context.id</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="分指机构外壳ID">@context.finger_id</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电流记录">@context.electricity</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="测试动作">@context.test_action</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="耗时（秒）">@context.consume_time</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="近端关节角度">@context.near_angle</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="远端关节角度">@context.remote_angle</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电机1电流峰值">@context.motor_1_max</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电机2电流峰值">@context.motor_2_max</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="检测人员">@context.inspector</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="备注">@context.remarks</MudTd>
+                                                            <MudTd>
+                                                                @if (context.if_qualified == true)
+                                                                {
+                                                                    <span>✅ 合格</span>
+                                                                }
+                                                                else if (context.if_qualified == false)
+                                                                {
+                                                                    <span>❌ 不合格</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>未知</span>
+                                                                }
+                                                            </MudTd>
+                                                        </RowTemplate>
+                                                    </MudTable>
+
+                                                    <MudText Typo="Typo.subtitle1" Class="mt-3 mb-2">
+                                                        分指蜗杆粘接检测
+                                                    </MudText>
+                                                    <MudTable Items="fingerData.detect2" Dense="true" Hover="true"
+                                                              Bordered="true">
+                                                        <HeaderContent>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.id">
+                                                                    检测ID
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.finger_id">
+                                                                    分指ID
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.combine_time">
+                                                                    粘接时间
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.using_time">使用时间
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.inspector">检测员
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.if_qualified">
+                                                                    是否合格
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                <MudTableSortLabel
+                                                                    SortBy="(SplitWormDetectDto x) => x.remarks">备注
+                                                                </MudTableSortLabel>
+                                                            </MudTh>
+                                                        </HeaderContent>
+                                                        <RowTemplate>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="序号">@context.id</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="分指ID">@context.finger_id</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="粘合时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="使用时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="检测人员">@context.inspector</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="备注">@context.remarks</MudTd>
+                                                            <MudTd>
+                                                                @if (context.if_qualified)
+                                                                {
+                                                                    <span>✅ 合格</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>❌ 不合格</span>
+                                                                }
+                                                            </MudTd>
+
+                                                        </RowTemplate>
+                                                    </MudTable>
+                                                }
+                                                else
+                                                {
+                                                    <MudText Typo="Typo.subtitle1" Class="mt-2 mb-2">单指标定检测
+                                                    </MudText>
+                                                    <MudTable Items="fingerData.detect4" Dense="true" Hover="true"
+                                                              Bordered="true">
+                                                        <HeaderContent>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                检测ID
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                电机使用时间
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                手指使用时间
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                安装时间判定
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                电流记录
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                测试动作
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                动作发起时间
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                动作结束时间
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                耗时（秒）
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                近端关节角度
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                远端关节角度
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                电机1电流峰值
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                电机2电流峰值
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                标记日期
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                接近觉
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                法向力
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                是否合格
+                                                            </MudTh>
+                                                            <MudTh Style="@MinColWidthStyle">
+                                                                备注
+                                                            </MudTh>
+                                                        </HeaderContent>
+                                                        <RowTemplate>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="序号">@context.id</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电机使用时间">@context.motor_using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="手指使用时间">@context.finger_using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle" DataLabel="安装时间判定">
+                                                                <MudChip T="bool?"
+                                                                         Color="@(context.if_time_qualified.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                                    @(context.if_time_qualified.HasValue ? (context.if_time_qualified.Value ? "是" : "否") : "未知")
+                                                                </MudChip>
+                                                            </MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电流记录">@context.electricity</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="测试动作">@context.test_action</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="耗时（秒）">@context.consume_time</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="近端关节角度">@context.near_angle</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="远端关节角度">@context.remote_angle</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电机1电流峰值">@context.motor_1_max</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="电机2电流峰值">@context.motor_2_max</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="接近觉">@context.proximity_sensing</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="法向力">@context.normal_force</MudTd>
+                                                            <MudTd Style="@MinColWidthStyle"
+                                                                   DataLabel="备注">@context.remarks</MudTd>
+                                                            <MudTd>
+                                                                @if (context.if_qualified == true)
+                                                                {
+                                                                    <span>✅ 合格</span>
+                                                                }
+                                                                else if (context.if_qualified == false)
+                                                                {
+                                                                    <span>❌ 不合格</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>未知</span>
+                                                                }
+                                                            </MudTd>
+                                                        </RowTemplate>
+                                                    </MudTable>
+                                                }
+
+                                                <MudDivider Class="my-3"/>
+                                                <MudText Typo="Typo.subtitle1" Class="mb-2">电机数据</MudText>
+
+                                                @foreach (var motorData in fingerData.motors)
+                                                {
+                                                    <MudCard Elevation="0" Class="ml-2 mb-3 pa-3" Outlined="true">
+                                                        <MudText Typo="Typo.subtitle2" Color="Color.Primary"
+                                                                 Class="mb-2">
+                                                            电机: @motorData.motor?.motor_id
+                                                        </MudText>
+
+                                                        <MudTable Items="@(new[] { motorData.motor })" Dense="true"
+                                                                  Hover="true" Bordered="true">
+                                                            <HeaderContent>
+                                                                <MudTh>电机ID</MudTh>
+                                                                <MudTh>任务号</MudTh>
+                                                                <MudTh>粘接时间</MudTh>
+                                                                <MudTh>绑定时间</MudTh>
+                                                                <MudTh>操作员</MudTh>
+                                                                <MudTh>备注</MudTh>
+                                                                <MudTh>是否合格</MudTh>
+                                                            </HeaderContent>
+                                                            <RowTemplate>
+                                                                <MudTd>@context.motor_id</MudTd>
+                                                                <MudTd>@context.task_id</MudTd>
+                                                                <MudTd>@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                                <MudTd>@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                                <MudTd>@context.operator_id</MudTd>
+                                                                <MudTd>@context.remarks</MudTd>
+                                                                <MudTd>@(context.is_qualified ? "✅ 合格" : "❌ 不合格")</MudTd>
+                                                            </RowTemplate>
+                                                        </MudTable>
+
+                                                        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">蜗杆粘接检测
+                                                        </MudText>
+                                                        <MudTable Items="motorData.detects" Dense="true" Hover="true"
+                                                                  Bordered="true">
+                                                            <HeaderContent>
+                                                                <MudTh>编号</MudTh>
+                                                                <MudTh>作用力</MudTh>
+                                                                <MudTh>检测前距离</MudTh>
+                                                                <MudTh>检测后距离</MudTh>
+                                                                <MudTh>距离差</MudTh>
+                                                                <MudTh>粘结时间</MudTh>
+                                                                <MudTh>使用时间</MudTh>
+                                                                <MudTh>检测员</MudTh>
+                                                                <MudTh>备注</MudTh>
+                                                                <MudTh>是否合格</MudTh>
+                                                            </HeaderContent>
+                                                            <RowTemplate>
+                                                                <MudTd DataLabel="编号">@context.id</MudTd>
+                                                                <MudTd DataLabel="作用力">@context.force</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="检测前距离">@context.distance_before</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="检测后距离">@context.distance_after</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="距离差">@context.distance_result</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="创建时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="更新时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                                                <MudTd
+                                                                    DataLabel="操作员ID">@context.inspector_id</MudTd>
+                                                                <MudTd DataLabel="备注">@context.remarks</MudTd>
+                                                                <MudTd>
+                                                                    @if (context.if_qualified)
+                                                                    {
+                                                                        <span>✅ 合格</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span>❌ 不合格</span>
+                                                                    }
+                                                                </MudTd>
+                                                            </RowTemplate>
+                                                        </MudTable>
+                                                    </MudCard>
+                                                }
+                                            </div>
+                                        </MudExpansionPanel>
+                                    </MudExpansionPanels>
+                                }
+                            </div>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                }
+            }
+        </div>
+    </MudFadeTransition>
+
+    <MudDivider Class="my-6"/>
+
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudTextField
+            @bind-Value="taskId"
+            Label="生产单号"
+            Variant="Variant.Outlined"
+            Required="true"
+            Clearable="true"
+            Error="@hasInputError"
+            ErrorText="请输入生产单号"
+            AutoFocus="true"
+            Id="taskId"
+            Class="flex-1"/>
+
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Error"
+            StartIcon="@Icons.Material.Filled.DeleteForever"
+            OnClick="ClearTaskId"
+            Size="Size.Large"
+            Class="w-full md:w-auto">
+            清除
+        </MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Search"
+            OnClick="LoadTaskDetail"
+            Size="Size.Large"
+            Disabled="isLoading"
+            Class="w-full md:w-auto">
+            @(isLoading ? "查询中..." : "查询")
+        </MudButton>
+    </MudStack>
+
+</MudPaper>
+
+@code {
+    private string TableBodyMaxHeight => "600px";
+    private const int MinColWidthPx = 140;
+    private string MinColWidthStyle => $"min-width:{MinColWidthPx}px;";
+
+    private string taskId = string.Empty;
+    private bool hasInputError = false;
+    private bool isLoading = false;
+    private bool hasSearched = false;
+    private List<FullTaskDataDto> fullTaskData = new();
+
+    private async Task LoadTaskDetail()
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            hasInputError = true;
+            StateHasChanged();
+            return;
+        }
+
+        hasInputError = false;
+        isLoading = true;
+        hasSearched = true;
+        StateHasChanged();
+
+        try
+        {
+            var resp = await TaskService.GetFullTaskData(taskId.Trim());
+            fullTaskData = resp ?? new List<FullTaskDataDto>();
+        }
+        catch
+        {
+            fullTaskData = new List<FullTaskDataDto>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearTaskId()
+    {
+        taskId = string.Empty;
+        hasSearched = false;
+        hasInputError = false;
+        fullTaskData.Clear();
+        StateHasChanged();
+    }
+
+    private async Task ExportExcel()
+    {
+        if (fullTaskData == null || !fullTaskData.Any())
+        {
+            await JS.InvokeVoidAsync("alert", "没有可导出的数据");
+            return;
+        }
+
+        var rows = new List<List<object>>();
+        var merges = new List<object>();
+
+        // ========== 第一部分：任务详情 ==========
+        var task = fullTaskData.FirstOrDefault()?.task;
+        rows.Add(new() { "任务详情" });
+        rows.Add(new() { "任务号", "任务名称", "产品数量", "操作员", "创建时间" });
+        rows.Add(new()
+        {
+            task?.task_id ?? "—",
+            task?.title ?? "—",
+            task?.product_num.ToString() ?? "—",
+            task?.assignee_id ?? "—",
+            task?.created_at.ToString("yyyy-MM-dd HH:mm")
+        });
+        rows.Add(new());
+
+        void AddMerge(List<object> merges, int startRow, int endRow, int col)
+        {
+            if (endRow <= startRow) return; // 一行不合并
+            merges.Add(new
+            {
+                s = new { r = startRow, c = col },
+                e = new { r = endRow, c = col }
+            });
+        }
+
+        rows.Add(new() { "手掌-手指-电机 对应关系" });
+        rows.Add(new() { "手掌编号", "手指编号", "手指类型", "电机编号", "操作员", "绑定时间", "是否合格" });
+
+        foreach (var palm in fullTaskData)
+        {
+            int palmRowStart = rows.Count; // 记录当前手掌数据开始行
+
+            // ✅ finger 排序
+            var orderedFingers = palm.fingers?
+                .OrderBy(f => f.finger?.finger_id)
+                .ThenBy(f => f.finger?.type)
+                .ToList() ?? new();
+
+            foreach (var finger in orderedFingers)
+            {
+                int fingerRowStart = rows.Count; // 注意：在添加前记录
+
+                // ✅ motor 排序
+                var orderedMotors = finger.motors?
+                    .OrderBy(m => m.motor?.motor_id)
+                    .ToList() ?? new();
+
+                // 如果没有 motor，至少保留一行
+                if (orderedMotors.Count == 0)
+                {
+                    rows.Add(new()
+                    {
+                        palm.palm?.palm_id ?? "—",
+                        finger.finger?.finger_id ?? "—",
+                        finger.finger?.type switch
+                        {
+                            0 => "单指",
+                            1 => "拇指",
+                            2 => "分指",
+                            _ => "未知"
+                        },
+                        "—", "—", "—", "—"
+                    });
+                }
+                else
+                {
+                    foreach (var motor in orderedMotors)
+                    {
+                        rows.Add(new()
+                        {
+                            palm.palm?.palm_id ?? "—",
+                            finger.finger?.finger_id ?? "—",
+                            finger.finger?.type switch
+                            {
+                                0 => "单指",
+                                1 => "拇指",
+                                2 => "分指",
+                                _ => "未知"
+                            },
+                            motor.motor?.motor_id ?? "—",
+                            motor.motor?.operator_id ?? "—",
+                            motor.motor?.updated_at?.ToString("yyyy-MM-dd HH:mm") ?? "—",
+                            motor.motor?.is_qualified == true ? "✅ 合格" : "❌ 不合格"
+                        });
+                    }
+                }
+
+                int fingerRowEnd = rows.Count - 1; // 最后一行是当前 finger 的末尾
+                Console.WriteLine($"fingerRowStart:{fingerRowStart},fingerRowEnd{fingerRowEnd}");
+                AddMerge(merges, fingerRowStart - 1, fingerRowEnd - 1, 1); // 合并 手指编号
+                AddMerge(merges, fingerRowStart - 1, fingerRowEnd - 1, 2); // 合并 手指类型
+            }
+
+            int palmRowEnd = rows.Count - 1; // 当前 palm 最后一行
+            AddMerge(merges, palmRowStart-1, palmRowEnd-1, 0); // 合并 手掌编号
+        }
+
+        rows.Add(new());
+
+        // ========== 第三部分：检测结果 ==========
+        rows.Add(new() { "检测结果汇总" });
+
+        foreach (var palm in fullTaskData)
+        {
+            // Palm 检测
+            if (palm.detects?.Any() == true)
+            {
+                rows.Add(new() { $"手掌检测" });
+                rows.Add(new()
+                {
+                    "部件ID", "检测ID", "接近觉", "法向力", "风扇功能",
+                    "软件版本", "电流", "检测员", "备注", "是否合格"
+                });
+                foreach (var d in palm.detects)
+                {
+                    rows.Add(new()
+                    {
+                        palm.palm?.palm_id ?? "—",
+                        d.id, d.proximity_sensing, d.normal_force,
+                        d.fan_function, d.software_version,
+                        d.electricity, d.inspector, d.remarks,
+                        d.if_qualified
+                    });
+                }
+
+                rows.Add(new());
+            }
+
+            // 各类手指 / 电机检测
+            foreach (var finger in palm.fingers)
+            {
+                // 分指标定检测
+                if (finger.detect3?.Any() == true)
+                {
+                    rows.Add(new() { $"分指标定检测" });
+                    rows.Add(new()
+                    {
+                        "部件ID", "检测ID", "测试动作", "电机1峰值", "电机2峰值",
+                        "耗时(s)", "近端角度", "远端角度", "检测员", "备注", "是否合格"
+                    });
+                    foreach (var d in finger.detect3)
+                    {
+                        rows.Add(new()
+                        {
+                            finger.finger?.finger_id ?? "—",
+                            d.id, d.test_action, d.motor_1_max, d.motor_2_max,
+                            d.consume_time, d.near_angle, d.remote_angle,
+                            d.inspector, d.remarks, d.if_qualified
+                        });
+                    }
+
+                    rows.Add(new());
+                }
+
+                // 分指蜗杆粘接检测
+                if (finger.detect2?.Any() == true)
+                {
+                    rows.Add(new() { $"分指蜗杆粘接检测" });
+                    rows.Add(new()
+                    {
+                        "部件ID", "检测ID", "粘接时间", "使用时间", "检测员", "备注", "是否合格"
+                    });
+                    foreach (var d in finger.detect2)
+                    {
+                        rows.Add(new()
+                        {
+                            finger.finger?.finger_id ?? "—",
+                            d.id,
+                            d.combine_time?.ToString("yyyy-MM-dd HH:mm"),
+                            d.using_time?.ToString("yyyy-MM-dd HH:mm"),
+                            d.inspector, d.remarks,
+                            d.if_qualified
+                        });
+                    }
+
+                    rows.Add(new());
+                }
+
+                // 单指标定检测
+                if (finger.detect4?.Any() == true)
+                {
+                    rows.Add(new() { $"单指标定检测" });
+                    rows.Add(new()
+                    {
+                        "部件ID", "检测ID", "测试动作", "近端角度", "远端角度",
+                        "耗时(s)", "电机1峰值", "电机2峰值", "接近觉", "法向力", "备注", "是否合格"
+                    });
+                    foreach (var d in finger.detect4)
+                    {
+                        rows.Add(new()
+                        {
+                            finger.finger?.finger_id ?? "—",
+                            d.id, d.test_action, d.near_angle, d.remote_angle,
+                            d.consume_time, d.motor_1_max, d.motor_2_max,
+                            d.proximity_sensing, d.normal_force, d.remarks,
+                            d.if_qualified
+                        });
+                    }
+
+                    rows.Add(new());
+                }
+
+                // 电机蜗杆粘接检测
+                foreach (var motor in finger.motors)
+                {
+                    if (motor.detects?.Any() == true)
+                    {
+                        rows.Add(new() { $"电机蜗杆粘接检测" });
+                        rows.Add(new()
+                        {
+                            "部件ID", "检测ID", "作用力", "检测前距离", "检测后距离",
+                            "距离差", "检测员", "备注", "是否合格"
+                        });
+                        foreach (var d in motor.detects)
+                        {
+                            rows.Add(new()
+                            {
+                                motor.motor?.motor_id ?? "—",
+                                d.id, d.force, d.distance_before, d.distance_after,
+                                d.distance_result, d.inspector_id, d.remarks,
+                                d.if_qualified
+                            });
+                        }
+
+                        rows.Add(new());
+                    }
+                }
+            }
+        }
+
+        await JS.InvokeVoidAsync("excel.exportArrayToExcelMerged",
+            $"{task?.task_id ?? "任务报告"}.xlsx", rows, merges);
+    }
+
+}

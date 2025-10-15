@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+  <link href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" rel="stylesheet" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+<Routes @rendermode="InteractiveServer" />
+
+<script src="_framework/blazor.web.js"></script>
+<script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+<script src="js/barcode-scanner.js"></script>
+<script src="js/enterKeyHandler.js"></script>
+<script src="js/input-utils.js"></script>
+
+<script src="/xlsx/dist/xlsx.full.min.js"></script>
+@* <script> *@
+@*   window.excel = { *@
+@*     export: function (fileName, rows) { *@
+@*       if (!Array.isArray(rows) || rows.length === 0) { *@
+@*         alert('没有可导出的数据'); *@
+@*         return; *@
+@*       } *@
+@*       const wb = XLSX.utils.book_new(); *@
+@*       const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: false }); *@
+@* *@
+@*       const headers = Object.keys(rows[0]); *@
+@*       const colWidths = headers.map(h => { *@
+@*         const maxLen = Math.max( *@
+@*           h.length, *@
+@*           ...rows.map(r => (r[h] == null ? 1 : String(r[h]).length)) *@
+@*         ); *@
+@*         return { wch: maxLen + 2 }; *@
+@*       }); *@
+@*       ws['!cols'] = colWidths; *@
+@* *@
+@*       XLSX.utils.book_append_sheet(wb, ws, 'Logs'); *@
+@*       XLSX.writeFile(wb, fileName || 'Logs.xlsx'); *@
+@*     } *@
+@*   }; *@
+@* </script> *@
+<script>
+window.excel = window.excel || {};
+
+window.excel.exportArrayToExcelMerged = function (fileName, rows, merges) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    alert("没有数据可导出");
+    return;
+  }
+
+  // === 生成基础表格 ===
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // === 自动列宽 ===
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const colWidths = [];
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    let max = 10;
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell && cell.v != null) {
+        const len = String(cell.v).length;
+        if (len > max) max = len;
+      }
+    }
+    colWidths.push({ wch: max + 2 });
+  }
+  ws['!cols'] = colWidths;
+
+  // === 设置单元格样式（左对齐 + 垂直居中 + 自动换行） ===
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = ws[addr];
+      if (cell) {
+        if (!cell.s) cell.s = {};
+        cell.s.alignment = {
+          horizontal: "left",   // ✅ 水平靠左
+          vertical: "center",   // ✅ 垂直居中
+          wrapText: true        // ✅ 自动换行
+        };
+      }
+    }
+  }
+
+  // === 合并单元格 ===
+  if (Array.isArray(merges) && merges.length > 0) {
+    ws['!merges'] = merges.map(m => ({
+      s: { r: m.s.r + 1, c: m.s.c },
+      e: { r: m.e.r + 1, c: m.e.c }
+    }));
+  }
+
+  // === 生成工作簿 ===
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "任务报告");
+
+  // === 导出文件 ===
+  XLSX.writeFile(wb, fileName || "任务报告.xlsx", { compression: true });
+};
+</script>
+
+</body>
+</html>

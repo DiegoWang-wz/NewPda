@@ -1,0 +1,120 @@
+﻿@page "/memos"
+@using DexRobotPDA.DTOs
+@using DexRobotPDA.Services
+@inject OperatorService OperatorService
+@inject MudBlazor.ISnackbar Snackbar
+
+<!-- 操作按钮区 -->
+<div style="margin-bottom: 16px; display: flex; gap: 8px;">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadMemos">
+        @(_loading ? "加载中..." : "重新加载")
+    </MudButton>
+
+    <!-- 错误提示（加载失败时显示） -->
+    @if (hasError)
+    {
+        <MudAlert Color="Color.Error" Severity="Severity.Error" Style="flex: 1;" Variant="Variant.Outlined">
+            加载失败：@errorMessage（点击"重新加载"重试）
+        </MudAlert>
+    }
+</div>
+<MudTable
+    Items="@memos"
+    Hover="true"
+    Breakpoint="Breakpoint.Sm"
+    Loading="@_loading"
+    LoadingProgressColor="Color.Info"
+    Style="max-width: 1200px; margin: 0 auto;">
+
+    <!-- 表头 -->
+    <HeaderContent>
+        <MudTh Width="100px">MemoId</MudTh>
+        <MudTh Width="300px">标题（Title）</MudTh>
+        <MudTh>内容（Content）</MudTh>
+    </HeaderContent>
+
+    <!-- 行数据 -->
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.MemoId</MudTd>
+        <MudTd DataLabel="标题">@(context.Title ?? "无标题")</MudTd> <!-- 处理Title为null的情况 -->
+        <MudTd DataLabel="内容">@(context.Content ?? "无内容")</MudTd> <!-- 处理Content为null的情况 -->
+    </RowTemplate>
+
+    <!-- 无数据时提示（区别于加载中状态） -->
+    <NoRecordsContent>
+        <MudTypography Color="Color.Info" Style="text-align: center; padding: 32px;">
+            暂无备忘录数据<br/>
+            <small>点击"重新加载"获取最新数据</small>
+        </MudTypography>
+    </NoRecordsContent>
+
+    <!-- 表格分页（可选，若后续需要显示更多数据） -->
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] {4, 8, 12}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    // 1. 关键修复：memos初始化为空列表，避免null.Take(4)抛异常
+    private List<OperatorDto> memos = new List<OperatorDto>();
+
+    private bool _loading = true;
+    private bool hasError = false;
+    private string errorMessage = string.Empty;
+
+    // 2. 页面初始化自动加载数据（无需手动点击按钮）
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMemos();
+    }
+
+    // 3. 加载逻辑（优化异常处理+空值保护）
+    private async Task LoadMemos()
+    {
+        // 重置状态：开始加载前清空错误、置为加载中
+        _loading = true;
+        hasError = false;
+        errorMessage = string.Empty;
+
+        try
+        {
+            Console.WriteLine("[MemoPage] 开始加载备忘录列表...");
+            var result = await OperatorService.get();
+
+            // 安全赋值：即使接口返回null，也转为空列表（避免后续操作null）
+            memos = result ?? new List<OperatorDto>();
+
+            // 日志+用户提示
+            var logMsg = memos.Count == 0
+                ? "[MemoPage] 备忘录列表为空（接口返回空或null）"
+                : $"[MemoPage] 成功加载 {memos.Count} 条备忘录";
+
+            Console.WriteLine(logMsg);
+            if (memos.Count == 0)
+            {
+                Snackbar.Add("备忘录列表为空", Severity.Info); // 空数据提示（可选）
+            }
+        }
+        catch (Exception ex)
+        {
+            // 异常处理：捕获错误并记录详情
+            hasError = true;
+            memos = new List<OperatorDto>(); // 异常时确保memos仍为空列表（避免表格报错）
+
+            // 错误信息处理（用户友好提示，避免暴露敏感堆栈）
+            errorMessage = ex.InnerException != null
+                ? ex.InnerException.Message
+                : ex.Message;
+
+            // 日志记录（便于调试）
+            Console.WriteLine($"[MemoPage] 加载失败：{ex.Message}\n堆栈：{ex.StackTrace}");
+            Snackbar.Add("加载备忘录失败，请检查API连接", Severity.Error); // 简洁提示
+        }
+        finally
+        {
+            // 结束加载：无论成功/失败，都关闭加载动画
+            _loading = false;
+            // 无需手动调用StateHasChanged()：async方法结束后Blazor会自动更新UI
+        }
+    }
+}

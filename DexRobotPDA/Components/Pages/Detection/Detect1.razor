@@ -1,0 +1,419 @@
+﻿@page "/Detect1"
+@implements IAsyncDisposable
+
+<MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
+    @if (isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true"/>
+    }
+    else if (_motor?.id > 0)
+    {
+        <MudGrid Spacing="4">
+            <MudItem xs="12" sm="8">
+                <MudPaper Class="pa-4">
+                    <MudForm @ref="form" @bind-Errors="@errors" Model="@_detectDto">
+                        <MudTextField Label="电机编号"
+                                      Disabled="true"
+                                      Class="my-2"
+                                      @bind-Value="_detectDto.motor_id"
+                                      RequiredError="请输入电机编号"/>
+
+                        <MudNumericField T="double?" Label="检测用力"
+                                         Required="true"
+                                         Class="my-2"
+                                         RequiredError="请输入检测用力"
+                                         @bind-Value="_detectDto.force"/>
+
+                        <MudNumericField T="double?" Label="测试前的距离"
+                                         Required="true"
+                                         RequiredError="请输入测试前的距离"
+                                         Step=".01"
+                                         Class="my-2"
+                                         OnBlur="CalculateDistanceResult"
+                                         @bind-Value="_detectDto.distance_before"/>
+
+                        <MudNumericField T="double?" Label="测试前的距离"
+                                         Required="true"
+                                         RequiredError="请输入测试前的距离"
+                                         Step=".01"
+                                         Class="my-2"
+                                         OnBlur="CalculateDistanceResult"
+                                         @bind-Value="_detectDto.distance_after"/>
+
+                        <MudTextField T="double?" Label="距离差"
+                                      @bind-Value="_detectDto.distance_result"
+                                      Disabled="true"
+                                      Required="true"
+                                      Class="my-2"
+                                      RequiredError="请输入距离差"/>
+
+                        <MudDatePicker T="DateTime?"
+                                       Label="粘合时间"
+                                       Disabled="true"
+                                       @bind-Date="_detectDto.combine_time"
+                                       DateFormat="yyyy-MM-dd HH:mm:ss"
+                                       Adornment="Adornment.End"
+                                       AdornmentIcon="@Icons.Material.Filled.Event"
+                                       Class="my-2"/>
+
+                        <MudDatePicker T="DateTime?"
+                                       Label="使用时间"
+                                       Disabled="true"
+                                       @bind-Date="_detectDto.using_time"
+                                       DateFormat="yyyy-MM-dd HH:mm:ss"
+                                       Adornment="Adornment.End"
+                                       AdornmentIcon="@Icons.Material.Filled.Event"
+                                       Class="my-2"/>
+
+                        <MudTextField Class="my-2" T="double?" Label="已过去的小时" Disabled="true"
+                                      @bind-Value="_timeDiffHours"
+                                      RequiredError="请输入距离差"/>
+
+                        <MudTextField Class="my-2" T="string?" Label="备注"
+                                      @bind-Value="_detectDto.remarks"/>
+
+                        <div class="d-flex">
+                            <MudRadioGroup @bind-Value="_detectDto.if_qualified">
+                                <MudRadio Value="true" Color="Color.Success" Dense="true">合格</MudRadio>
+                                <MudRadio Value="false" Color="Color.Secondary" Dense="false">不合格</MudRadio>
+                            </MudRadioGroup>
+                        </div>
+
+                        <div class="d-flex align-center justify-space-between">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="HandleSubmit"
+                                       Disabled="@(!CanSubmit)"
+                                       Class="ml-auto">
+                                提交检测结果
+                            </MudButton>
+                        </div>
+                    </MudForm>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="pa-4 mud-height-full">
+                    <MudText Typo="Typo.subtitle2">@($"Errors ({errors.Length})")</MudText>
+                    @foreach (var error in errors)
+                    {
+                        <MudText Color="@Color.Error">@error</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else if (hasSearched)
+    {
+        <MudText Align="Align.Center" Color="Color.Warning">
+            未查询到相关数据
+        </MudText>
+    }
+    <MudDivider Class="my-4"/>
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudTextField
+            @bind-Value="motor_id"
+            Label="电机编号"
+            Variant="Variant.Outlined"
+            Required="true"
+            Clearable="true"
+            Error="@hasInputError"
+            ErrorText="请输入电机编号"
+            AutoFocus="true"
+            Id="taskId"
+            Class="flex-1"/>
+
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Error"
+            StartIcon="@Icons.Material.Filled.DeleteForever"
+            OnClick="ClearTaskId"
+            Size="Size.Large"
+            Class="w-full md:w-auto">
+            清除
+        </MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Search"
+            OnClick="GetMotorWormDetect"
+            Size="Size.Large"
+            Disabled="isLoading"
+            Class="w-full md:w-auto">
+            @(isLoading ? "查询中..." : "查询")
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string motor_id = string.Empty;
+    private bool isLoading = false;
+    private bool hasInputError = false;
+    private bool hasSearched = false;
+    private UserDto? currentUser;
+    private DotNetObjectReference<Detect1>? dotNetRef;
+    private MotorDetectCreateDto _detectDto = new();
+    private MotorDto? _motor = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void ClearTaskId()
+    {
+        motor_id = string.Empty;
+        hasSearched = false;
+        hasInputError = false;
+        _detectDto = new();
+        _motor = new();
+
+        if (currentUser != null)
+        {
+            _detectDto.inspector_id = currentUser.employee_id;
+        }
+
+        StateHasChanged();
+    }
+
+    // [JSInvokable]
+    // public async Task OnEnterKeyPressed()
+    // {
+    //     await InvokeAsync(GetMotorWormDetect);
+    // }
+
+    private async Task GetMotorWormDetect()
+    {
+        if (string.IsNullOrWhiteSpace(motor_id))
+        {
+            hasInputError = true;
+            StateHasChanged();
+            return;
+        }
+
+        _motor = new();
+        _detectDto = new();
+        hasInputError = false;
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _motor = await DetectService.GetMotor(motor_id);
+            if (_motor != null)
+            {
+                _detectDto.combine_time = _motor.created_at;
+                _detectDto.using_time = DateTime.Now;
+            }
+
+            _detectDto.motor_id = _motor.motor_id;
+            _detectDto.force = 500.00;
+            _detectDto.distance_before = 18.0;
+            _detectDto.distance_after = 18.0;
+            _detectDto.inspector_id = currentUser?.employee_id;
+            CalculateDistanceResult();
+            CalculateTimeDiff();
+            hasSearched = true;
+        }
+        catch (Exception ex)
+        {
+            _detectDto = new MotorDetectCreateDto();
+            SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dotNetRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
+            dotNetRef.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    bool success;
+    string[] errors = { };
+    MudTextField<string> pwField1;
+    MudForm form;
+
+    private bool CanSubmit => CheckRequiredFields();
+
+    private bool CheckRequiredFields()
+    {
+        return _detectDto.distance_before.HasValue &&
+               _detectDto.force.HasValue &&
+               _detectDto.distance_after.HasValue &&
+               _detectDto.distance_result.HasValue;
+    }
+
+    private void CalculateDistanceResult()
+    {
+        if (_detectDto.distance_before.HasValue && _detectDto.distance_after.HasValue)
+        {
+            _detectDto.distance_result = Math.Round(
+                _detectDto.distance_before.Value - _detectDto.distance_after.Value,
+                2
+            );
+            StateHasChanged();
+        }
+    }
+
+    private double? _timeDiffHours;
+
+    private void CalculateTimeDiff()
+    {
+        if (_detectDto.combine_time.HasValue && _detectDto.using_time.HasValue)
+        {
+            TimeSpan timeDiff = _detectDto.using_time.Value - _detectDto.combine_time.Value;
+
+            if (timeDiff.TotalHours >= 0)
+            {
+                _timeDiffHours = Math.Round(timeDiff.TotalHours, 1);
+            }
+            else
+            {
+                _timeDiffHours = null;
+                Snackbar.Add("使用时间不能早于粘结时间", Severity.Warning);
+            }
+        }
+        else
+        {
+            _timeDiffHours = null;
+        }
+    }
+
+    private bool isSubmitting = false;
+
+    private async Task HandleSubmit()
+    {
+        CalculateDistanceResult();
+
+        if (form.IsValid)
+        {
+            try
+            {
+                isSubmitting = true;
+                StateHasChanged();
+
+                if (string.IsNullOrEmpty(_detectDto.inspector_id))
+                {
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 电机编号: {_detectDto.motor_id}, 原因: 检测员信息缺失", false);
+
+                    SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
+                    return;
+                }
+
+                var response = await DetectService.AddDetect1(_detectDto);
+
+                if (response?.ResultCode == 1)
+                {
+                    // 记录检测操作日志
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                        $"检测完成 - 电机编号: {_detectDto.motor_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+
+                    SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
+                    try
+                    {
+                        var updateQualifyDto = new UpdateQualifyDto
+                        {
+                            id = _detectDto.motor_id,
+                            qualified = _detectDto.if_qualified ? true : false
+                        };
+
+                        var response2 = await DetectService.UpdateMotorQualify(updateQualifyDto);
+                        if (response2?.ResultCode == 1)
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新{_detectDto.motor_id}的状态成功", Severity.Success);
+                        }
+                        else
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新失败：{response2?.Msg}", Severity.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
+                    }
+
+                    try
+                    {
+                        var response2 = await DetectService.UpdateDetect1StatusAsync(_motor.task_id);
+                        if (response2?.ResultCode == 1)
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新{_detectDto.motor_id}的状态成功", Severity.Success);
+                        }
+                        else
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新失败：{response2?.Msg}", Severity.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
+                    }
+
+                    await TaskService.UpdateSingleTaskStatus(_motor.task_id);
+                    ClearTaskId();
+                }
+                else
+                {
+                    await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                        $"检测失败 - 电机编号: {_detectDto.motor_id}, 原因: {response?.Msg}", false);
+
+                    SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                await LogService.AddLog("电机蜗杆粘接检测", currentUser.employee_id,
+                    $"检测异常 - 电机编号: {_detectDto.motor_id}, 异常: {ex.Message}", false);
+
+                SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                isSubmitting = false;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            await LogService.AddLog("电机蜗杆粘接检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 电机编号: {_detectDto.motor_id}", false);
+
+            SnackbarHelper.Show(Snackbar, "表单存在错误，请检查后提交", Severity.Warning);
+        }
+    }
+
+}

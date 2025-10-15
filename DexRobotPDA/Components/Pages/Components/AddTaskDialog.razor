@@ -1,0 +1,174 @@
+﻿@inject TaskService taskService;
+
+<MudDialog>
+    <DialogContent>
+        <MudPaper Elevation="1" Class="pa-6 ms-4" Style="min-width: 400px;">
+            <MudText Typo="Typo.h6" Class="mb-4" Align="Align.Center">创建新任务</MudText>
+
+            <MudForm @ref="form" Model="@_addTaskDto" @bind-Errors="@errors">
+                <MudStack Spacing="4">
+
+                    <MudTextField T="string"
+                                  Label="任务ID"
+                                  Required="true"
+                                  RequiredError="任务ID未填"
+                                  @bind-Value="_addTaskDto.task_id"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Title">
+                    </MudTextField>
+
+                    <MudTextField T="string"
+                                  Label="任务标题"
+                                  Required="true"
+                                  RequiredError="任务标题未填"
+                                  @bind-Value="_addTaskDto.title"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Title">
+                    </MudTextField>
+
+                    <MudTextField T="string"
+                                  Label="任务描述"
+                                  @bind-Value="_addTaskDto.description"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Description"
+                                  Lines="2">
+                    </MudTextField>
+                    <MudNumericField T="int"
+                                     @bind-Value="_addTaskDto.product_num"
+                                     Label="生产数量"
+                                     Required="true"
+                                     InvertMouseWheel="true"
+                                     Variant="Variant.Outlined"
+                                     Min="1"
+                                     Adornment="@Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.PriorityHigh">
+                    </MudNumericField>
+                    <MudTextField T="string"
+                                  Label="负责人ID"
+                                  Required="true"
+                                  @bind-Value="_addTaskDto.assignee_id"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Person">
+                    </MudTextField>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+    </DialogContent>
+
+    <DialogActions>
+        <MudItem xs="12" md="5" Class="d-flex justify-end">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="Cancel"
+                       Class="mx-1"
+                       Color="Color.Secondary">
+                <MudIcon Icon="@Icons.Material.Filled.Close" Class="me-1"/>
+                取消
+            </MudButton>
+            <MudButton OnClick="Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Class="mx-1"
+                       Disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2"/>
+                    <MudText>提交中...</MudText>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Class="me-1"/>
+                    <MudText>提交</MudText>
+                }
+            </MudButton>
+        </MudItem>
+    </DialogActions>
+
+
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+    string[] errors = { };
+    AddTaskDto _addTaskDto = new();
+    MudForm form;
+    private bool isLoading = false;
+    private UserDto? currentUser;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task Submit()
+    {
+        // 关键修改：先进行表单验证
+        await form.Validate();
+
+        // 如果验证失败，直接返回，不执行后续提交逻辑
+        if (!form.IsValid)
+        {
+            SnackbarHelper.Show(Snackbar, "请填写必填字段", Severity.Error);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var response = await taskService.AddTask(_addTaskDto);
+
+            if (response != null && response.ResultCode == 1)
+            {
+                SnackbarHelper.Show(Snackbar, "新增成功！", Severity.Success);
+                await LogService.AddLog("新增任务", currentUser.employee_id,
+                    $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", true);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var errorMessage = response?.Msg ?? "新增失败";
+                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
+                await LogService.AddLog("新增任务", currentUser.employee_id,
+                    $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"新增失败: {ex.Message}");
+            SnackbarHelper.Show(Snackbar, "新增失败", Severity.Error);
+            await LogService.AddLog("新增任务", currentUser.employee_id,
+                $"任务ID: {_addTaskDto.task_id}, 任务标题: {_addTaskDto.title}, 生产数量: {_addTaskDto.product_num}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

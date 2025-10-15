@@ -1,0 +1,71 @@
+﻿@using DexRobotPDA.Services
+@inject NavigationManager NavManager
+@inject AuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Error" Size="Size.Medium"/>
+            <MudText Typo="Typo.h6">提示</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText >确认要退出吗？</MudText>
+    </DialogContent>
+    <DialogActions >
+        <MudButton OnClick="Cancel" Color="Color.Secondary">
+            取消
+        </MudButton>
+        <MudButton Color="Color.Error" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   Disabled="isLoggingOut"
+                   Class="ml-4">
+            @if (isLoggingOut)
+            {
+                <MudCircularProgress Size="Size.Small" Color="Color.Inherit" Class="mr-2"/>
+                <span>退出中...</span>
+            }
+            else
+            {
+                <span>确定</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private bool isLoggingOut = false;
+
+    private async Task Submit()
+    {
+        if (isLoggingOut) return;
+        
+        isLoggingOut = true;
+        
+        try
+        {
+            await AuthService.LogoutAsync();
+            MudDialog.Close(); 
+            Snackbar.Add("退出成功", Severity.Success);
+            await Task.Delay(1000); 
+            NavManager.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("退出登录失败", Severity.Error);
+            MudDialog.Cancel(); 
+        }
+        finally
+        {
+            isLoggingOut = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
