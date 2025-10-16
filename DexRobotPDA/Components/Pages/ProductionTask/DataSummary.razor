@@ -708,6 +708,14 @@
         StateHasChanged();
     }
 
+    private class ExportConstants
+    {
+        public const string EmptyValue = "—";
+        public const string DateFormat = "yyyy-MM-dd HH:mm";
+        public const string Qualified = "✅ 合格";
+        public const string Unqualified = "❌ 不合格";
+    }
+
     private async Task ExportExcel()
     {
         if (fullTaskData == null || !fullTaskData.Any())
@@ -716,41 +724,66 @@
             return;
         }
 
+        try
+        {
+            // 显示导出中提示
+            await JS.InvokeVoidAsync("showLoading", "正在生成Excel文件...");
+
+            // 异步构建数据，避免UI阻塞
+            var (rows, merges) = await Task.Run(() => BuildExcelData());
+
+            await JS.InvokeVoidAsync("excel.exportArrayToExcelMerged",
+                $"{fullTaskData.FirstOrDefault()?.task?.task_id ?? "任务报告"}.xlsx",
+                rows, merges);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"导出失败: {ex.Message}");
+        }
+        finally
+        {
+            await JS.InvokeVoidAsync("hideLoading");
+        }
+    }
+
+    private (List<List<object>> rows, List<object> merges) BuildExcelData()
+    {
         var rows = new List<List<object>>();
         var merges = new List<object>();
 
-        // ========== 第一部分：任务详情 ==========
+        BuildTaskDetails(rows);
+        BuildPalmFingerMotorRelations(rows, merges);
+        BuildDetectionResults(rows);
+
+        return (rows, merges);
+    }
+
+    private void BuildTaskDetails(List<List<object>> rows)
+    {
         var task = fullTaskData.FirstOrDefault()?.task;
+
         rows.Add(new() { "任务详情" });
         rows.Add(new() { "任务号", "任务名称", "产品数量", "操作员", "创建时间" });
         rows.Add(new()
         {
-            task?.task_id ?? "—",
-            task?.title ?? "—",
-            task?.product_num.ToString() ?? "—",
-            task?.assignee_id ?? "—",
-            task?.created_at.ToString("yyyy-MM-dd HH:mm")
+            task?.task_id ?? ExportConstants.EmptyValue,
+            task?.title ?? ExportConstants.EmptyValue,
+            task?.product_num.ToString() ?? ExportConstants.EmptyValue,
+            task?.assignee_id ?? ExportConstants.EmptyValue,
+            task?.created_at.ToString(ExportConstants.DateFormat)
         });
         rows.Add(new());
+    }
 
-        void AddMerge(List<object> merges, int startRow, int endRow, int col)
-        {
-            if (endRow <= startRow) return; // 一行不合并
-            merges.Add(new
-            {
-                s = new { r = startRow, c = col },
-                e = new { r = endRow, c = col }
-            });
-        }
-
+    private void BuildPalmFingerMotorRelations(List<List<object>> rows, List<object> merges)
+    {
         rows.Add(new() { "手掌-手指-电机 对应关系" });
-        rows.Add(new() { "手掌编号", "手指编号", "手指类型", "电机编号", "操作员", "绑定时间", "是否合格" });
+        rows.Add(new() { "手掌编号", "手指编号", "手指类型", "电机编号", "操作员", "粘接时间", "绑定时间", "是否合格" });
 
         foreach (var palm in fullTaskData)
         {
-            int palmRowStart = rows.Count; // 记录当前手掌数据开始行
+            int palmRowStart = rows.Count;
 
-            // ✅ finger 排序
             var orderedFingers = palm.fingers?
                 .OrderBy(f => f.finger?.finger_id)
                 .ThenBy(f => f.finger?.type)
@@ -758,28 +791,24 @@
 
             foreach (var finger in orderedFingers)
             {
-                int fingerRowStart = rows.Count; // 注意：在添加前记录
+                int fingerRowStart = rows.Count;
 
-                // ✅ motor 排序
                 var orderedMotors = finger.motors?
                     .OrderBy(m => m.motor?.motor_id)
                     .ToList() ?? new();
 
-                // 如果没有 motor，至少保留一行
                 if (orderedMotors.Count == 0)
                 {
                     rows.Add(new()
                     {
-                        palm.palm?.palm_id ?? "—",
-                        finger.finger?.finger_id ?? "—",
-                        finger.finger?.type switch
-                        {
-                            0 => "单指",
-                            1 => "拇指",
-                            2 => "分指",
-                            _ => "未知"
-                        },
-                        "—", "—", "—", "—"
+                        palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                        finger.finger?.finger_id ?? ExportConstants.EmptyValue,
+                        GetFingerTypeText(finger.finger?.type),
+                        ExportConstants.EmptyValue,
+                        ExportConstants.EmptyValue,
+                        ExportConstants.EmptyValue,
+                        ExportConstants.EmptyValue,
+                        ExportConstants.EmptyValue
                     });
                 }
                 else
@@ -788,168 +817,268 @@
                     {
                         rows.Add(new()
                         {
-                            palm.palm?.palm_id ?? "—",
-                            finger.finger?.finger_id ?? "—",
-                            finger.finger?.type switch
-                            {
-                                0 => "单指",
-                                1 => "拇指",
-                                2 => "分指",
-                                _ => "未知"
-                            },
-                            motor.motor?.motor_id ?? "—",
-                            motor.motor?.operator_id ?? "—",
-                            motor.motor?.updated_at?.ToString("yyyy-MM-dd HH:mm") ?? "—",
-                            motor.motor?.is_qualified == true ? "✅ 合格" : "❌ 不合格"
+                            palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                            finger.finger?.finger_id ?? ExportConstants.EmptyValue,
+                            GetFingerTypeText(finger.finger?.type),
+                            motor.motor?.motor_id ?? ExportConstants.EmptyValue,
+                            motor.motor?.operator_id ?? ExportConstants.EmptyValue,
+                            motor.motor?.created_at.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                            motor.motor?.updated_at?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                            motor.motor?.is_qualified == true ? ExportConstants.Qualified : ExportConstants.Unqualified
                         });
                     }
                 }
 
-                int fingerRowEnd = rows.Count - 1; // 最后一行是当前 finger 的末尾
-                Console.WriteLine($"fingerRowStart:{fingerRowStart},fingerRowEnd{fingerRowEnd}");
-                AddMerge(merges, fingerRowStart - 1, fingerRowEnd - 1, 1); // 合并 手指编号
-                AddMerge(merges, fingerRowStart - 1, fingerRowEnd - 1, 2); // 合并 手指类型
+                int fingerRowEnd = rows.Count - 1;
+                if (fingerRowEnd > fingerRowStart)
+                {
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 1); // 合并手指编号
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 2); // 合并手指类型
+                }
             }
 
-            int palmRowEnd = rows.Count - 1; // 当前 palm 最后一行
-            AddMerge(merges, palmRowStart-1, palmRowEnd-1, 0); // 合并 手掌编号
+            int palmRowEnd = rows.Count - 1;
+            if (palmRowEnd > palmRowStart)
+            {
+                AddMerge(merges, palmRowStart, palmRowEnd, 0); // 合并手掌编号
+            }
         }
 
         rows.Add(new());
+    }
 
-        // ========== 第三部分：检测结果 ==========
+    private void BuildDetectionResults(List<List<object>> rows)
+    {
         rows.Add(new() { "检测结果汇总" });
 
-        foreach (var palm in fullTaskData)
+        var palmDetectRows = BuildPalmDetectionRows();
+        var fingerD4Rows = BuildFingerD4Rows();
+        var fingerD3Rows = BuildFingerD3Rows();
+        var fingerD2Rows = BuildFingerD2Rows();
+        var motorWormRows = BuildMotorWormRows();
+
+        // 统一输出检测结果
+        AddDetectionSection(rows, "手掌检测", palmDetectRows,
+            new[] { "手掌编号", "检测编号", "标定时间","轮指100次", "接近觉", "法向力", "风扇功能", "软件版本", "电流", "检测员", "备注", "是否合格" });
+
+        AddDetectionSection(rows, "单指标定检测", fingerD4Rows,
+            new[] { "手指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值","手指电流", "接近觉", "法向力","检测员", "备注", "是否合格" });
+
+        AddDetectionSection(rows, "分指标定检测", fingerD3Rows,
+            new[] { "分指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值", "检测员", "备注", "是否合格" });
+
+        AddDetectionSection(rows, "分指蜗杆粘接检测", fingerD2Rows,
+            new[] { "分指编号", "检测编号", "粘接时间", "使用时间", "检测员", "备注", "是否合格" });
+
+        AddDetectionSection(rows, "电机蜗杆粘接检测", motorWormRows,
+            new[] { "电机编号", "检测编号", "粘接时间", "使用时间", "作用力", "检测前距离", "检测后距离", "距离差", "检测员", "备注", "是否合格" });
+    }
+
+    private List<List<object>> BuildPalmDetectionRows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p?.detects != null))
         {
-            // Palm 检测
-            if (palm.detects?.Any() == true)
+            foreach (var d in palm.detects)
             {
-                rows.Add(new() { $"手掌检测" });
                 rows.Add(new()
                 {
-                    "部件ID", "检测ID", "接近觉", "法向力", "风扇功能",
-                    "软件版本", "电流", "检测员", "备注", "是否合格"
+                    palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                    d.id,
+                    d.calibrate_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                    d.hundred_times?.ToString() ?? ExportConstants.EmptyValue,
+                    d.proximity_sensing?.ToString() ?? ExportConstants.EmptyValue,
+                    d.normal_force?.ToString() ?? ExportConstants.EmptyValue,
+                    d.fan_function?.ToString() ?? ExportConstants.EmptyValue,
+                    d.software_version?.ToString() ?? ExportConstants.EmptyValue,
+                    d.electricity?.ToString() ?? ExportConstants.EmptyValue,
+                    d.inspector?.ToString() ?? ExportConstants.EmptyValue,
+                    d.remarks?.ToString() ?? ExportConstants.EmptyValue,
+                    d.if_qualified switch
+                    {
+                        true => ExportConstants.Qualified,
+                        false => ExportConstants.Unqualified,
+                        null => "未知"
+                    }
                 });
-                foreach (var d in palm.detects)
-                {
-                    rows.Add(new()
-                    {
-                        palm.palm?.palm_id ?? "—",
-                        d.id, d.proximity_sensing, d.normal_force,
-                        d.fan_function, d.software_version,
-                        d.electricity, d.inspector, d.remarks,
-                        d.if_qualified
-                    });
-                }
-
-                rows.Add(new());
             }
+        }
 
-            // 各类手指 / 电机检测
-            foreach (var finger in palm.fingers)
+        return rows;
+    }
+
+    private List<List<object>> BuildFingerD4Rows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p?.fingers != null))
+        {
+            foreach (var finger in palm.fingers.Where(f => f?.detect4 != null))
             {
-                // 分指标定检测
-                if (finger.detect3?.Any() == true)
+                foreach (var d in finger.detect4)
                 {
-                    rows.Add(new() { $"分指标定检测" });
                     rows.Add(new()
                     {
-                        "部件ID", "检测ID", "测试动作", "电机1峰值", "电机2峰值",
-                        "耗时(s)", "近端角度", "远端角度", "检测员", "备注", "是否合格"
-                    });
-                    foreach (var d in finger.detect3)
-                    {
-                        rows.Add(new()
+                        finger.finger?.finger_id ?? ExportConstants.EmptyValue,
+                        d.id,
+                        d.calibrate_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                        d.test_action ?? ExportConstants.EmptyValue,
+                        d.near_angle?.ToString() ?? ExportConstants.EmptyValue,
+                        d.remote_angle?.ToString() ?? ExportConstants.EmptyValue,
+                        d.consume_time?.ToString() ?? ExportConstants.EmptyValue,
+                        d.motor_1_max?.ToString() ?? ExportConstants.EmptyValue,
+                        d.motor_2_max?.ToString() ?? ExportConstants.EmptyValue,
+                        d.electricity?.ToString() ?? ExportConstants.EmptyValue,
+                        d.proximity_sensing?.ToString() ?? ExportConstants.EmptyValue,
+                        d.normal_force?.ToString() ?? ExportConstants.EmptyValue,
+                        d.inspector ?? ExportConstants.EmptyValue,
+                        d.remarks ?? ExportConstants.EmptyValue,
+                        d.if_qualified switch
                         {
-                            finger.finger?.finger_id ?? "—",
-                            d.id, d.test_action, d.motor_1_max, d.motor_2_max,
-                            d.consume_time, d.near_angle, d.remote_angle,
-                            d.inspector, d.remarks, d.if_qualified
-                        });
-                    }
-
-                    rows.Add(new());
-                }
-
-                // 分指蜗杆粘接检测
-                if (finger.detect2?.Any() == true)
-                {
-                    rows.Add(new() { $"分指蜗杆粘接检测" });
-                    rows.Add(new()
-                    {
-                        "部件ID", "检测ID", "粘接时间", "使用时间", "检测员", "备注", "是否合格"
-                    });
-                    foreach (var d in finger.detect2)
-                    {
-                        rows.Add(new()
-                        {
-                            finger.finger?.finger_id ?? "—",
-                            d.id,
-                            d.combine_time?.ToString("yyyy-MM-dd HH:mm"),
-                            d.using_time?.ToString("yyyy-MM-dd HH:mm"),
-                            d.inspector, d.remarks,
-                            d.if_qualified
-                        });
-                    }
-
-                    rows.Add(new());
-                }
-
-                // 单指标定检测
-                if (finger.detect4?.Any() == true)
-                {
-                    rows.Add(new() { $"单指标定检测" });
-                    rows.Add(new()
-                    {
-                        "部件ID", "检测ID", "测试动作", "近端角度", "远端角度",
-                        "耗时(s)", "电机1峰值", "电机2峰值", "接近觉", "法向力", "备注", "是否合格"
-                    });
-                    foreach (var d in finger.detect4)
-                    {
-                        rows.Add(new()
-                        {
-                            finger.finger?.finger_id ?? "—",
-                            d.id, d.test_action, d.near_angle, d.remote_angle,
-                            d.consume_time, d.motor_1_max, d.motor_2_max,
-                            d.proximity_sensing, d.normal_force, d.remarks,
-                            d.if_qualified
-                        });
-                    }
-
-                    rows.Add(new());
-                }
-
-                // 电机蜗杆粘接检测
-                foreach (var motor in finger.motors)
-                {
-                    if (motor.detects?.Any() == true)
-                    {
-                        rows.Add(new() { $"电机蜗杆粘接检测" });
-                        rows.Add(new()
-                        {
-                            "部件ID", "检测ID", "作用力", "检测前距离", "检测后距离",
-                            "距离差", "检测员", "备注", "是否合格"
-                        });
-                        foreach (var d in motor.detects)
-                        {
-                            rows.Add(new()
-                            {
-                                motor.motor?.motor_id ?? "—",
-                                d.id, d.force, d.distance_before, d.distance_after,
-                                d.distance_result, d.inspector_id, d.remarks,
-                                d.if_qualified
-                            });
+                            true => ExportConstants.Qualified,
+                            false => ExportConstants.Unqualified,
+                            null => "未知"
                         }
+                    });
+                }
+            }
+        }
 
-                        rows.Add(new());
+        return rows;
+    }
+
+    private List<List<object>> BuildFingerD3Rows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p?.fingers != null))
+        {
+            foreach (var finger in palm.fingers.Where(f => f?.detect3 != null))
+            {
+                foreach (var d in finger.detect3)
+                {
+                    rows.Add(new()
+                    {
+                        finger.finger?.finger_id ?? ExportConstants.EmptyValue,
+                        d.id,
+                        d.calibrate_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                        d.test_action?.ToString() ?? ExportConstants.EmptyValue,
+                        d.near_angle?.ToString() ?? ExportConstants.EmptyValue,
+                        d.remote_angle?.ToString() ?? ExportConstants.EmptyValue,
+                        d.consume_time?.ToString() ?? ExportConstants.EmptyValue,
+                        d.motor_1_max?.ToString() ?? ExportConstants.EmptyValue,
+                        d.motor_2_max?.ToString() ?? ExportConstants.EmptyValue,
+                        d.inspector ?? ExportConstants.EmptyValue,
+                        d.remarks ?? ExportConstants.EmptyValue,
+                        d.if_qualified switch
+                        {
+                            true => ExportConstants.Qualified,
+                            false => ExportConstants.Unqualified,
+                            null => "未知"
+                        }
+                    });
+                }
+            }
+        }
+
+        return rows;
+    }
+
+    private List<List<object>> BuildFingerD2Rows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p?.fingers != null))
+        {
+            foreach (var finger in palm.fingers.Where(f => f?.detect2 != null))
+            {
+                foreach (var d in finger.detect2)
+                {
+                    rows.Add(new()
+                    {
+                        finger.finger?.finger_id ?? ExportConstants.EmptyValue,
+                        d.id,
+                        d.combine_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                        d.using_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                        d.inspector ?? ExportConstants.EmptyValue,
+                        d.remarks ?? ExportConstants.EmptyValue,
+                        d.if_qualified ? ExportConstants.Qualified : ExportConstants.Unqualified
+                    });
+                }
+            }
+        }
+
+        return rows;
+    }
+
+
+    private List<List<object>> BuildMotorWormRows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p?.fingers != null))
+        {
+            foreach (var finger in palm.fingers.Where(f => f?.motors != null))
+            {
+                foreach (var motor in finger.motors.Where(m => m?.detects != null))
+                {
+                    foreach (var d in motor.detects)
+                    {
+                        rows.Add(new()
+                        {
+                            motor.motor?.motor_id ?? ExportConstants.EmptyValue,
+                            d.id,
+                            d.combine_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                            d.using_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                            d.force?.ToString() ?? ExportConstants.EmptyValue,
+                            d.distance_before?.ToString() ?? ExportConstants.EmptyValue,
+                            d.distance_after?.ToString() ?? ExportConstants.EmptyValue,
+                            d.distance_result?.ToString() ?? ExportConstants.EmptyValue,
+                            d.inspector_id ?? ExportConstants.EmptyValue,
+                            d.remarks ?? ExportConstants.EmptyValue,
+                            d.if_qualified ? ExportConstants.Qualified : ExportConstants.Unqualified
+                        });
                     }
                 }
             }
         }
 
-        await JS.InvokeVoidAsync("excel.exportArrayToExcelMerged",
-            $"{task?.task_id ?? "任务报告"}.xlsx", rows, merges);
+        return rows;
+    }
+
+    private void AddDetectionSection(List<List<object>> rows, string sectionTitle,
+        List<List<object>> dataRows, string[] headers)
+    {
+        if (dataRows.Count > 0)
+        {
+            rows.Add(new() { sectionTitle });
+            rows.Add(new List<object>(headers));
+            rows.AddRange(dataRows);
+            rows.Add(new());
+        }
+    }
+
+    private string GetFingerTypeText(int? type)
+    {
+        return type switch
+        {
+            0 => "单指",
+            1 => "拇指",
+            2 => "分指",
+            _ => "未知"
+        };
+    }
+
+    private void AddMerge(List<object> merges, int startRow, int endRow, int col)
+    {
+        if (endRow <= startRow) return;
+
+        merges.Add(new
+        {
+            s = new { r = startRow, c = col },
+            e = new { r = endRow, c = col }
+        });
     }
 
 }

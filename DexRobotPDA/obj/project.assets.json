@@ -6476,11 +6476,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\JC_Project\\NewDexRobot\\DexRobotPDA\\DexRobotPDA\\DexRobotPDA.csproj",
+      "projectUniqueName": "D:\\C# Projects\\NewPda\\DexRobotPDA\\DexRobotPDA.csproj",
       "projectName": "DexRobotPDA",
-      "projectPath": "D:\\JC_Project\\NewDexRobot\\DexRobotPDA\\DexRobotPDA\\DexRobotPDA.csproj",
+      "projectPath": "D:\\C# Projects\\NewPda\\DexRobotPDA\\DexRobotPDA.csproj",
       "packagesPath": "D:\\NugetPackages",
-      "outputPath": "D:\\JC_Project\\NewDexRobot\\DexRobotPDA\\DexRobotPDA\\obj\\",
+      "outputPath": "D:\\C# Projects\\NewPda\\DexRobotPDA\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
