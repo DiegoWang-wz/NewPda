@@ -367,35 +367,7 @@ public class DetectService : BaseService
             throw;
         }
     }
-    public async Task<ApiResponse> UpdateSplitQualify(UpdateQualifyDto qualifyDto)
-    {
-        var request = new RestRequest("api/Split/UpdateQualify", Method.Put);
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        string requestJson = JsonSerializer.Serialize(qualifyDto, options);
-        request.AddJsonBody(qualifyDto);
-        _logger.LogInformation("尝试更新检测记录 - 配件ID: {ID}", qualifyDto.id);
-        try
-        {
-            var apiResponse = await ExecuteCommand(request);
-            string responseJson = JsonSerializer.Serialize(apiResponse, options);
 
-            if (apiResponse.ResultCode == 1)
-            {
-                _logger.LogInformation("检测记录更新成功 - 配件ID: {ID}", qualifyDto.id);
-            }
-            else
-            {
-                _logger.LogWarning("检测记录更新失败 - 配件ID: {ID}, 错误信息: {Msg}", qualifyDto.id, apiResponse.Msg);
-            }
-
-            return apiResponse;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "更新配件状态时发生异常 - 配件ID: {ID}", qualifyDto.id);
-            throw;
-        }
-    }
     public async Task<ApiResponse> UpdateDetect1StatusAsync(string taskId)
     {
         try

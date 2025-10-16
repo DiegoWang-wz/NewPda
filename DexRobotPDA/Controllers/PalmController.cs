@@ -494,9 +494,17 @@ public class PalmController : ControllerBase
                         res.Msg = $"手指 {componentId} 已被绑定";
                         return BadRequest(res);
                     }
+                    
+                    if (finger.is_qualified == false)
+                    {
+                        res.ResultCode = -1;
+                        res.Msg = $"手指 {componentId} 不合格";
+                        return BadRequest(res);
+                    }
 
                     continue;
                 }
+                
 
                 // 组件不存在
                 res.ResultCode = -1;

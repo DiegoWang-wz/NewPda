@@ -258,6 +258,12 @@
         try
         {
             _finger = await DetectService.GetFinger(finger_id);
+            if (_finger.type == 2)
+            {
+                SnackbarHelper.Show(Snackbar, "请输入正确的手指编号！", Severity.Error);
+                _finger = new();
+                return;
+            }
             _detectDto.motor_using_time = _finger.created_at;
             _detectDto.finger_using_time = DateTime.Now;
             _detectDto.calibrate_time = DateTime.Now;

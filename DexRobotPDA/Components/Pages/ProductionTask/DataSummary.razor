@@ -714,7 +714,7 @@
     private class ExportConstants
     {
         public const string EmptyValue = "—";
-        public const string DateFormat = "yyyy-MM-dd HH:mm";
+        public const string DateFormat = "yyyy-MM-dd HH:mm:ss";
         public const string Qualified = "✅ 合格";
         public const string Unqualified = "❌ 不合格";
     }
@@ -788,20 +788,23 @@
         AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
             h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
 
-        rows.Add(new() { "任务号", "任务名称", "产品数量", "操作员", "创建时间" });
+        rows.Add(new() { "任务号","创建时间", "任务名称", "产品数量","更新时间", "负责人"});
         // 表头样式（整行居中加粗、浅绿底）
-        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 4,
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 5,
             h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
 
         rows.Add(new()
         {
             task?.task_id ?? ExportConstants.EmptyValue,
+            task?.created_at.ToString(ExportConstants.DateFormat),
             task?.title ?? ExportConstants.EmptyValue,
             task?.product_num.ToString() ?? ExportConstants.EmptyValue,
-            task?.assignee_id ?? ExportConstants.EmptyValue,
-            task?.created_at.ToString(ExportConstants.DateFormat)
+            task?.updated_at.ToString(ExportConstants.DateFormat),
+            task?.assignee_id ?? ExportConstants.EmptyValue
         });
-
+        rows.Add(new()) ;
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 5,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
         rows.Add(new());
         rows.Add(new());
     }
@@ -886,7 +889,9 @@
                 AddMerge(merges, palmRowStart, palmRowEnd, 1); // 合并手掌组装时间
             }
         }
-
+        rows.Add(new()) ;
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 8,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
         rows.Add(new());
         rows.Add(new());
     }
@@ -894,17 +899,13 @@
     // ================== 区块：检测结果 ==================
     private void BuildDetectionResults(List<List<object>> rows, List<object> styles)
     {
-        rows.Add(new() { "检测结果汇总" });
-        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
-            h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
-
         var palmDetectRows = BuildPalmDetectionRows();
         var fingerD4Rows = BuildFingerD4Rows();
         var fingerD3Rows = BuildFingerD3Rows();
         var fingerD2Rows = BuildFingerD2Rows();
         var motorWormRows = BuildMotorWormRows();
 
-        AddDetectionSection(rows, styles, "手掌检测", palmDetectRows,
+        AddDetectionSection(rows, styles, "整手标定检测", palmDetectRows,
             new[] { "手掌编号", "检测编号", "标定时间", "轮指100次", "接近觉", "法向力", "风扇功能", "软件版本", "电流", "检测员", "备注", "是否合格" });
 
         AddDetectionSection(rows, styles, "单指标定检测", fingerD4Rows,
@@ -914,7 +915,7 @@
             new[] { "分指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值", "检测员", "备注", "是否合格" });
 
         AddDetectionSection(rows, styles, "分指蜗杆粘接检测", fingerD2Rows,
-            new[] { "分指编号", "检测编号", "粘接时间", "使用时间", "检测员", "备注", "是否合格" });
+            new[] { "分指编号", "检测编号", "粘接时间", "使用时间", "电机编号", "检测员", "备注", "是否合格" });
 
         AddDetectionSection(rows, styles, "电机蜗杆粘接检测", motorWormRows,
             new[] { "电机编号", "检测编号", "粘接时间", "使用时间", "作用力", "检测前距离", "检测后距离", "距离差", "检测员", "备注", "是否合格" });
@@ -934,6 +935,10 @@
                 h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
 
             rows.AddRange(dataRows);
+            rows.Add(new()) ;
+            AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, headers.Length - 1,
+                h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
+            rows.Add(new());
             rows.Add(new());
         }
     }
@@ -1066,6 +1071,7 @@
                         d.id,
                         d.combine_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
                         d.using_time?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
+                        d.motor_id ?? ExportConstants.EmptyValue,
                         d.inspector ?? ExportConstants.EmptyValue,
                         d.remarks ?? ExportConstants.EmptyValue,
                         d.if_qualified ? ExportConstants.Qualified : ExportConstants.Unqualified
@@ -1175,7 +1181,7 @@
         var titleSet = new HashSet<string>
         {
             "任务详情", "手掌-手指-电机 对应关系", "检测结果汇总",
-            "手掌检测", "分指标定检测", "分指蜗杆粘接检测",
+            "整手标定检测", "分指标定检测", "分指蜗杆粘接检测",
             "单指标定检测", "电机蜗杆粘接检测"
         };
         for (int r = 0; r < rows.Count; r++)

@@ -10,8 +10,8 @@ using RestSharp;
 using System.Text.Json;
 using RestSharp.Serializers.Json;
 using Blazored.LocalStorage;
+using Microsoft.OpenApi.Models;
 
-    
 // 初始化构建器
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,12 +38,20 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new()
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "DexRobotPDA API",
         Version = "v1",
         Description = "DexRobotPDA项目的API接口文档"
     });
+    
+    // 添加对XML注释的支持（可选）
+    // var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    // var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    // if (File.Exists(xmlPath))
+    // {
+    //     c.IncludeXmlComments(xmlPath);
+    // }
 });
 
 // 注入数据库上下文
@@ -112,14 +120,18 @@ builder.Services.AddBlazoredLocalStorage();
 
 var app = builder.Build();
 
+// ========== 修改的 Swagger 配置部分 ==========
+// 移除环境判断，让 Swagger 在所有环境都可用
+app.UseSwagger();
+app.UseSwaggerUI(c => 
+{ 
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DexRobotPDA API V1"); 
+    c.RoutePrefix = "swagger"; // 明确指定路由前缀
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI(c => 
-    { 
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "DexRobotPDA API V1"); 
-    });
 }
 else
 {
@@ -148,7 +160,7 @@ app.UseSerilogRequestLogging(options =>
             path.EndsWith(".js") || path.EndsWith(".css") || path.EndsWith(".png") ||
             path.EndsWith(".jpg") || path.EndsWith(".ico"))
         {
-            return Serilog.Events.LogEventLevel.Verbose; // 或直接 LogEventLevel.Debug 以便被过滤
+            return Serilog.Events.LogEventLevel.Verbose;
         }
         return Serilog.Events.LogEventLevel.Information;
     };
@@ -161,4 +173,3 @@ app.MapRazorComponents<App>()
 app.MapControllers();
 
 app.Run();
-    

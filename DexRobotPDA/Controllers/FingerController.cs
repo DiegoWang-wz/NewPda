@@ -492,6 +492,19 @@ public class FingerController : ControllerBase
             var existingFinger = await db.Fingers
                 .FirstOrDefaultAsync(f => f.finger_id == dto.finger_id);
 
+            // 4. 创建手指对象
+            var fingerModel = new FingerModel
+            {
+                finger_id = dto.finger_id,
+                task_id = dto.task_id,
+                operator_id = dto.operator_id,
+                remarks = dto.remarks,
+                type = dto.type,
+                is_qualified = false,
+                created_at = DateTime.Now,
+                updated_at = null
+            };
+            
             if (existingFinger != null)
             {
                 res.ResultCode = -1;
@@ -532,20 +545,18 @@ public class FingerController : ControllerBase
                     res.Msg = $"电机 {motorId} 已被绑定";
                     return BadRequest(res);
                 }
+                
+                if (fingerModel.type != 2 && motor.is_qualified == false)
+                {
+                    res.ResultCode = -1;
+                    res.Msg = $"电机 {motorId} 不合格";
+                    return BadRequest(res);
+                }
             }
+            
+            
 
-            // 4. 创建手指对象
-            var fingerModel = new FingerModel
-            {
-                finger_id = dto.finger_id,
-                task_id = dto.task_id,
-                operator_id = dto.operator_id,
-                remarks = dto.remarks,
-                type = dto.type,
-                is_qualified = false,
-                created_at = DateTime.Now,
-                updated_at = null
-            };
+            
 
             await db.Fingers.AddAsync(fingerModel);
 

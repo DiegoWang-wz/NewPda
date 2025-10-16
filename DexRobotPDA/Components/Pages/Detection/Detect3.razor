@@ -224,7 +224,18 @@
         try
         {
             _split = await DetectService.GetFinger(finger_id);
-
+            if (_split.type != 2)
+            {
+                SnackbarHelper.Show(Snackbar, "请输入正确的分指编号！", Severity.Error);
+                _split = new();
+                return;
+            }
+            if (TimeHelper.GetHoursDifference(_split.created_at,DateTime.Now) < 72)
+            {
+                SnackbarHelper.Show(Snackbar, "分指粘接时间不足72小时，请重新输入！", Severity.Error);
+                _split = new();
+                return;
+            }
             _detectDto.calibrate_time = DateTime.Now;
             _detectDto.finger_id = _split.finger_id;
             _detectDto.inspector = currentUser?.employee_id;
@@ -293,7 +304,7 @@
                             qualified = _detectDto.if_qualified ?? false
                         };
 
-                        var response2 = await DetectService.UpdateSplitQualify(updateQualifyDto);
+                        var response2 = await DetectService.UpdateFingerQualify(updateQualifyDto);
                         if (response2?.ResultCode == 1)
                         {
                             SnackbarHelper.Show(Snackbar, $"更新{_detectDto.finger_id}的状态成功", Severity.Success);
@@ -313,16 +324,16 @@
                         var response2 = await DetectService.UpdateDetect3StatusAsync(_split.task_id);
                         if (response2?.ResultCode == 1)
                         {
-                            SnackbarHelper.Show(Snackbar, $"更新{_detectDto.finger_id}的状态成功", Severity.Success);
+                            SnackbarHelper.Show(Snackbar, $"更新分指标定检测成功", Severity.Success);
                         }
                         else
                         {
-                            SnackbarHelper.Show(Snackbar, $"更新失败：{response2?.Msg}", Severity.Error);
+                            SnackbarHelper.Show(Snackbar, $"更新分指标定检测失败：{response2?.Msg}", Severity.Error);
                         }
                     }
                     catch (Exception ex)
                     {
-                        SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
+                        SnackbarHelper.Show(Snackbar, $"分指标定检测提交异常：{ex.Message}", Severity.Error);
                     }
 
                     await TaskService.UpdateSingleTaskStatus(_split.task_id);

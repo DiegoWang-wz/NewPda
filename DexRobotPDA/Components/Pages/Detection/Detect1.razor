@@ -9,9 +9,9 @@
     else if (_motor?.id > 0)
     {
         <MudGrid Spacing="4">
-            <MudItem xs="12" sm="8">
+            <MudItem xs="12" sm="12">
                 <MudPaper Class="pa-4">
-                    <MudForm @ref="form" @bind-Errors="@errors" Model="@_detectDto">
+                    <MudForm @ref="form" Model="@_detectDto">
                         <MudTextField Label="电机编号"
                                       Disabled="true"
                                       Class="my-2"
@@ -89,15 +89,6 @@
                             </MudButton>
                         </div>
                     </MudForm>
-                </MudPaper>
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudPaper Class="pa-4 mud-height-full">
-                    <MudText Typo="Typo.subtitle2">@($"Errors ({errors.Length})")</MudText>
-                    @foreach (var error in errors)
-                    {
-                        <MudText Color="@Color.Error">@error</MudText>
-                    }
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -199,12 +190,6 @@
         StateHasChanged();
     }
 
-    // [JSInvokable]
-    // public async Task OnEnterKeyPressed()
-    // {
-    //     await InvokeAsync(GetMotorWormDetect);
-    // }
-
     private async Task GetMotorWormDetect()
     {
         if (string.IsNullOrWhiteSpace(motor_id))
@@ -223,8 +208,16 @@
         try
         {
             _motor = await DetectService.GetMotor(motor_id);
+            
             if (_motor != null)
             {
+                if (TimeHelper.GetHoursDifference(_motor.created_at,DateTime.Now) < 72)
+                {
+                    SnackbarHelper.Show(Snackbar, "电机粘接时间不足72小时，请重新输入！", Severity.Error);
+                    _motor = new();
+                    return;
+                }
+
                 _detectDto.combine_time = _motor.created_at;
                 _detectDto.using_time = DateTime.Now;
             }
@@ -261,9 +254,6 @@
         GC.SuppressFinalize(this);
     }
 
-    bool success;
-    string[] errors = { };
-    MudTextField<string> pwField1;
     MudForm form;
 
     private bool CanSubmit => CheckRequiredFields();
@@ -415,5 +405,4 @@
             SnackbarHelper.Show(Snackbar, "表单存在错误，请检查后提交", Severity.Warning);
         }
     }
-
 }

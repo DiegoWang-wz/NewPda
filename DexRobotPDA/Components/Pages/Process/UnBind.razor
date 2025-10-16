@@ -313,11 +313,11 @@
             {
                 _motor = await DetectService.GetMotor(_partId);
             }
-            else if (_partId.StartsWith("FG", StringComparison.OrdinalIgnoreCase))
+            else if (_partId.StartsWith("FG", StringComparison.OrdinalIgnoreCase) || _partId.StartsWith("MO-", StringComparison.OrdinalIgnoreCase))
             {
                 _finger = await DetectService.GetFinger(_partId);
             }
-            else if (_partId.StartsWith("PM", StringComparison.OrdinalIgnoreCase))
+            else if (_partId.StartsWith("PM", StringComparison.OrdinalIgnoreCase) || _partId.StartsWith("DX", StringComparison.OrdinalIgnoreCase))
             {
                 _palm = await DetectService.GetPalm(_partId);
             }

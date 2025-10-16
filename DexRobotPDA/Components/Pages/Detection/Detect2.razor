@@ -192,6 +192,18 @@
         {
             var motor = await DetectService.GetMotorByFinger(finger_id);
             _split = await DetectService.GetFinger(finger_id);
+            if (_split.type != 2)
+            {
+                SnackbarHelper.Show(Snackbar, "请输入正确的分指编号！", Severity.Error);
+                _split = new();
+                return;
+            }
+            if (TimeHelper.GetHoursDifference(_split.created_at,DateTime.Now) < 72)
+            {
+                SnackbarHelper.Show(Snackbar, "分指粘接时间不足72小时，请重新输入！", Severity.Error);
+                _split = new();
+                return;
+            }
             _detectDto.finger_id = _split.finger_id;
             _detectDto.motor_id = motor.motor_id;
             _detectDto.inspector = currentUser?.employee_id;
@@ -278,7 +290,30 @@
                         $"检测完成 - 分指机构编号: {_detectDto.finger_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
 
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
+                    
+                    try
+                    {
+                        var updateQualifyDto = new UpdateQualifyDto
+                        {
+                            id = _detectDto.motor_id,
+                            qualified = _detectDto.if_qualified ? true : false
+                        };
 
+                        var response2 = await DetectService.UpdateMotorQualify(updateQualifyDto);
+                        if (response2?.ResultCode == 1)
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新{_detectDto.motor_id}的状态成功", Severity.Success);
+                        }
+                        else
+                        {
+                            SnackbarHelper.Show(Snackbar, $"更新失败：{response2?.Msg}", Severity.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
+                    }
+                    
                     try
                     {
                         var response2 = await DetectService.UpdateDetect2StatusAsync(_split.task_id);

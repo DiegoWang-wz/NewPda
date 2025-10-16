@@ -352,7 +352,7 @@
             // 1) 先添加电机（两种模式都需要）
             _motorDto.motor_id = motorIdInput.Value;
             _motorDto.remarks = remarks;
-
+            _motorDto.created_at = DateTime.Now;
             var addMotorResp = await ProcessOneService.AddMotor(_motorDto);
             if (addMotorResp == null || addMotorResp.ResultCode != 1)
             {
