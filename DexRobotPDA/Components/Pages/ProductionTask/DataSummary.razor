@@ -1,6 +1,8 @@
 ﻿@page "/DataSummary"
 @using DocumentFormat.OpenXml.Wordprocessing
 @using Color = MudBlazor.Color
+@using ClosedXML.Excel;
+@using System.Text;
 @inject IServiceProvider ServiceProvider
 @inject IJSRuntime JS
 <MudPaper Elevation="3" Class="pa-4 ma-2 mx-md-8">
@@ -707,7 +709,8 @@
         fullTaskData.Clear();
         StateHasChanged();
     }
-
+    
+    // ================== 常量 ==================
     private class ExportConstants
     {
         public const string EmptyValue = "—";
@@ -716,6 +719,7 @@
         public const string Unqualified = "❌ 不合格";
     }
 
+    // ================== 导出入口（ClosedXML） ==================
     private async Task ExportExcel()
     {
         if (fullTaskData == null || !fullTaskData.Any())
@@ -726,15 +730,17 @@
 
         try
         {
-            // 显示导出中提示
-            await JS.InvokeVoidAsync("showLoading", "正在生成Excel文件...");
+            await JS.InvokeVoidAsync("excel.showLoading", "正在生成Excel文件...");
 
-            // 异步构建数据，避免UI阻塞
-            var (rows, merges) = await Task.Run(() => BuildExcelData());
+            // 异步拼装数据
+            var (rows, merges, styles) = await Task.Run(() => BuildExcelData());
 
-            await JS.InvokeVoidAsync("excel.exportArrayToExcelMerged",
-                $"{fullTaskData.FirstOrDefault()?.task?.task_id ?? "任务报告"}.xlsx",
-                rows, merges);
+            // 用 ClosedXML 生成字节
+            var bytes = await Task.Run(() => BuildXlsxBytes(rows, merges, styles));
+            var b64 = Convert.ToBase64String(bytes);
+
+            var fileName = $"{fullTaskData.FirstOrDefault()?.task?.task_id ?? "任务报告"}.xlsx";
+            await JS.InvokeVoidAsync("excel.saveBase64", fileName, b64);
         }
         catch (Exception ex)
         {
@@ -742,28 +748,51 @@
         }
         finally
         {
-            await JS.InvokeVoidAsync("hideLoading");
+            await JS.InvokeVoidAsync("excel.hideLoading");
         }
     }
 
-    private (List<List<object>> rows, List<object> merges) BuildExcelData()
+    // ================== 组装数据（含 merges + styles） ==================
+    private (List<List<object>> rows, List<object> merges, List<object> styles) BuildExcelData()
     {
         var rows = new List<List<object>>();
-        var merges = new List<object>();
+        var merges = new List<object>(); // [{ s:{r,c}, e:{r,c} }]
+        var styles = new List<object>(); // [{ rs,re,cs,ce,h,v,wrap,bold,bg,border }]
 
-        BuildTaskDetails(rows);
-        BuildPalmFingerMotorRelations(rows, merges);
-        BuildDetectionResults(rows);
+        BuildTaskDetails(rows, styles);
+        BuildPalmFingerMotorRelations(rows, merges, styles);
+        BuildDetectionResults(rows, styles);
 
-        return (rows, merges);
+        return (rows, merges, styles);
     }
 
-    private void BuildTaskDetails(List<List<object>> rows)
+
+    private void AddStyle(List<object> styles, int rs, int re, int cs, int ce,
+        string h = "left", string v = "middle", bool wrap = true, bool? bold = null,
+        string? bg = null, string? border = null)
+    {
+        styles.Add(new
+        {
+            rs, re, cs, ce,
+            h, v, wrap, bold, bg, border
+        });
+    }
+
+    // ================== 区块：任务详情 ==================
+    private void BuildTaskDetails(List<List<object>> rows, List<object> styles)
     {
         var task = fullTaskData.FirstOrDefault()?.task;
 
         rows.Add(new() { "任务详情" });
+        // 标题：整行稍后会合并；此处标记左上主单元格的对齐/加粗
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
+
         rows.Add(new() { "任务号", "任务名称", "产品数量", "操作员", "创建时间" });
+        // 表头样式（整行居中加粗、浅绿底）
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 4,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
+
         rows.Add(new()
         {
             task?.task_id ?? ExportConstants.EmptyValue,
@@ -772,13 +801,21 @@
             task?.assignee_id ?? ExportConstants.EmptyValue,
             task?.created_at.ToString(ExportConstants.DateFormat)
         });
+
+        rows.Add(new());
         rows.Add(new());
     }
 
-    private void BuildPalmFingerMotorRelations(List<List<object>> rows, List<object> merges)
+    // ================== 区块：手掌-手指-电机 对应关系 ==================
+    private void BuildPalmFingerMotorRelations(List<List<object>> rows, List<object> merges, List<object> styles)
     {
         rows.Add(new() { "手掌-手指-电机 对应关系" });
-        rows.Add(new() { "手掌编号", "手指编号", "手指类型", "电机编号", "操作员", "粘接时间", "绑定时间", "是否合格" });
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
+
+        rows.Add(new() { "手掌编号", "手掌组装时间", "手指编号", "手指类型", "手指组装时间", "电机编号", "操作员", "粘接时间", "是否合格" });
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 8,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
 
         foreach (var palm in fullTaskData)
         {
@@ -802,6 +839,9 @@
                     rows.Add(new()
                     {
                         palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                        finger.finger?.updated_at.HasValue == true
+                            ? finger.finger.updated_at.Value.ToString(ExportConstants.DateFormat)
+                            : ExportConstants.EmptyValue,
                         finger.finger?.finger_id ?? ExportConstants.EmptyValue,
                         GetFingerTypeText(finger.finger?.type),
                         ExportConstants.EmptyValue,
@@ -818,12 +858,13 @@
                         rows.Add(new()
                         {
                             palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                            palm.palm?.created_at.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
                             finger.finger?.finger_id ?? ExportConstants.EmptyValue,
                             GetFingerTypeText(finger.finger?.type),
+                            motor.motor?.updated_at?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
                             motor.motor?.motor_id ?? ExportConstants.EmptyValue,
                             motor.motor?.operator_id ?? ExportConstants.EmptyValue,
                             motor.motor?.created_at.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
-                            motor.motor?.updated_at?.ToString(ExportConstants.DateFormat) ?? ExportConstants.EmptyValue,
                             motor.motor?.is_qualified == true ? ExportConstants.Qualified : ExportConstants.Unqualified
                         });
                     }
@@ -832,8 +873,9 @@
                 int fingerRowEnd = rows.Count - 1;
                 if (fingerRowEnd > fingerRowStart)
                 {
-                    AddMerge(merges, fingerRowStart, fingerRowEnd, 1); // 合并手指编号
-                    AddMerge(merges, fingerRowStart, fingerRowEnd, 2); // 合并手指类型
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 2); // 合并手指编号
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 3); // 合并手指类型
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 4); // 合并手指组装时间
                 }
             }
 
@@ -841,15 +883,20 @@
             if (palmRowEnd > palmRowStart)
             {
                 AddMerge(merges, palmRowStart, palmRowEnd, 0); // 合并手掌编号
+                AddMerge(merges, palmRowStart, palmRowEnd, 1); // 合并手掌组装时间
             }
         }
 
         rows.Add(new());
+        rows.Add(new());
     }
 
-    private void BuildDetectionResults(List<List<object>> rows)
+    // ================== 区块：检测结果 ==================
+    private void BuildDetectionResults(List<List<object>> rows, List<object> styles)
     {
         rows.Add(new() { "检测结果汇总" });
+        AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
+            h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
 
         var palmDetectRows = BuildPalmDetectionRows();
         var fingerD4Rows = BuildFingerD4Rows();
@@ -857,23 +904,41 @@
         var fingerD2Rows = BuildFingerD2Rows();
         var motorWormRows = BuildMotorWormRows();
 
-        // 统一输出检测结果
-        AddDetectionSection(rows, "手掌检测", palmDetectRows,
-            new[] { "手掌编号", "检测编号", "标定时间","轮指100次", "接近觉", "法向力", "风扇功能", "软件版本", "电流", "检测员", "备注", "是否合格" });
+        AddDetectionSection(rows, styles, "手掌检测", palmDetectRows,
+            new[] { "手掌编号", "检测编号", "标定时间", "轮指100次", "接近觉", "法向力", "风扇功能", "软件版本", "电流", "检测员", "备注", "是否合格" });
 
-        AddDetectionSection(rows, "单指标定检测", fingerD4Rows,
-            new[] { "手指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值","手指电流", "接近觉", "法向力","检测员", "备注", "是否合格" });
+        AddDetectionSection(rows, styles, "单指标定检测", fingerD4Rows,
+            new[] { "手指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值", "手指电流", "接近觉", "法向力", "检测员", "备注", "是否合格" });
 
-        AddDetectionSection(rows, "分指标定检测", fingerD3Rows,
+        AddDetectionSection(rows, styles, "分指标定检测", fingerD3Rows,
             new[] { "分指编号", "检测编号", "标定时间", "测试动作", "近端角度", "远端角度", "耗时(s)", "电机1峰值", "电机2峰值", "检测员", "备注", "是否合格" });
 
-        AddDetectionSection(rows, "分指蜗杆粘接检测", fingerD2Rows,
+        AddDetectionSection(rows, styles, "分指蜗杆粘接检测", fingerD2Rows,
             new[] { "分指编号", "检测编号", "粘接时间", "使用时间", "检测员", "备注", "是否合格" });
 
-        AddDetectionSection(rows, "电机蜗杆粘接检测", motorWormRows,
+        AddDetectionSection(rows, styles, "电机蜗杆粘接检测", motorWormRows,
             new[] { "电机编号", "检测编号", "粘接时间", "使用时间", "作用力", "检测前距离", "检测后距离", "距离差", "检测员", "备注", "是否合格" });
     }
 
+    private void AddDetectionSection(List<List<object>> rows, List<object> styles,
+        string sectionTitle, List<List<object>> dataRows, string[] headers)
+    {
+        if (dataRows.Count > 0)
+        {
+            rows.Add(new() { sectionTitle });
+            AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, 0,
+                h: "center", v: "middle", wrap: true, bold: true, bg: "#DDEBF7");
+
+            rows.Add(new List<object>(headers));
+            AddStyle(styles, rows.Count - 1, rows.Count - 1, 0, headers.Length - 1,
+                h: "center", v: "middle", wrap: true, bold: true, bg: "#E2EFDA");
+
+            rows.AddRange(dataRows);
+            rows.Add(new());
+        }
+    }
+
+    // ================== 数据明细（保持你的原实现） ==================
     private List<List<object>> BuildPalmDetectionRows()
     {
         var rows = new List<List<object>>();
@@ -1012,7 +1077,6 @@
         return rows;
     }
 
-
     private List<List<object>> BuildMotorWormRows()
     {
         var rows = new List<List<object>>();
@@ -1047,18 +1111,7 @@
         return rows;
     }
 
-    private void AddDetectionSection(List<List<object>> rows, string sectionTitle,
-        List<List<object>> dataRows, string[] headers)
-    {
-        if (dataRows.Count > 0)
-        {
-            rows.Add(new() { sectionTitle });
-            rows.Add(new List<object>(headers));
-            rows.AddRange(dataRows);
-            rows.Add(new());
-        }
-    }
-
+    // ================== 工具：合并与文本 ==================
     private string GetFingerTypeText(int? type)
     {
         return type switch
@@ -1080,5 +1133,139 @@
             e = new { r = endRow, c = col }
         });
     }
+
+    // ================== 用 ClosedXML 生成字节 ==================
+    private byte[] BuildXlsxBytes(List<List<object>> rows, List<object> merges, List<object> styles)
+    {
+        using var wb = new XLWorkbook();
+        var ws = wb.AddWorksheet("任务报告");
+
+        // 1) 写数据 + 默认样式（左 / 中 / 换行）
+        int maxCols = 0;
+        for (int r = 0; r < rows.Count; r++)
+        {
+            var row = rows[r] ?? new List<object>();
+            maxCols = Math.Max(maxCols, row.Count);
+
+            for (int c = 0; c < row.Count; c++)
+            {
+                var cell = ws.Cell(r + 1, c + 1);
+                cell.Value = row[c]?.ToString() ?? string.Empty;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                cell.Style.Alignment.WrapText = true;
+            }
+        }
+
+        // 2) 合并（0基 -> 1基）
+        if (merges != null)
+        {
+            foreach (dynamic m in merges)
+            {
+                int rs = (int)m.s.r + 1;
+                int cs = (int)m.s.c + 1;
+                int re = (int)m.e.r + 1;
+                int ce = (int)m.e.c + 1;
+                if (re >= rs && ce >= cs)
+                    ws.Range(rs, cs, re, ce).Merge();
+            }
+        }
+
+        // 3) 标题整行合并（视觉一致）：凡是第一列是标题文本的行合并到 maxCols
+        var titleSet = new HashSet<string>
+        {
+            "任务详情", "手掌-手指-电机 对应关系", "检测结果汇总",
+            "手掌检测", "分指标定检测", "分指蜗杆粘接检测",
+            "单指标定检测", "电机蜗杆粘接检测"
+        };
+        for (int r = 0; r < rows.Count; r++)
+        {
+            var first = rows[r].Count > 0 ? rows[r][0]?.ToString() ?? "" : "";
+            if (titleSet.Contains(first) && maxCols > 0)
+            {
+                ws.Range(r + 1, 1, r + 1, maxCols).Merge();
+            }
+        }
+
+        // 4) 覆写样式（styles）
+        if (styles != null)
+        {
+            foreach (dynamic st in styles)
+            {
+                int rs = (int)st.rs + 1;
+                int re = (int)st.re + 1;
+                int cs = (int)st.cs + 1;
+                int ce = (int)st.ce + 1;
+
+                string h = (string)(st.h ?? "left");
+                string v = (string)(st.v ?? "middle");
+                bool wrap = st.wrap is bool b1 ? b1 : true;
+                bool? bold = st.bold is bool b2 ? b2 : (bool?)null;
+                string? bg = st.bg is string s1 ? s1 : null;
+                string? border = st.border is string s2 ? s2 : null;
+
+                for (int r = rs; r <= re; r++)
+                {
+                    for (int c = cs; c <= ce; c++)
+                    {
+                        var cell = ws.Cell(r, c);
+                        cell.Style.Alignment.Horizontal = MapH(h);
+                        cell.Style.Alignment.Vertical = MapV(v);
+                        cell.Style.Alignment.WrapText = wrap;
+
+                        if (bold.HasValue)
+                            cell.Style.Font.Bold = bold.Value;
+
+                        if (!string.IsNullOrWhiteSpace(bg))
+                            cell.Style.Fill.BackgroundColor = XLColor.FromHtml(bg);
+
+                        if (!string.IsNullOrWhiteSpace(border))
+                        {
+                            var bstyle = MapBorder(border);
+                            cell.Style.Border.OutsideBorder = bstyle;
+                            cell.Style.Border.InsideBorder = bstyle;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5) 自动列宽 + 限制
+        ws.Columns().AdjustToContents();
+        for (int c = 1; c <= Math.Max(1, maxCols); c++)
+        {
+            var col = ws.Column(c);
+            if (col.Width < 10) col.Width = 10;
+            if (col.Width > 50) col.Width = 50;
+        }
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        return ms.ToArray();
+    }
+
+    // ================== 小工具：样式映射 ==================
+    private static XLAlignmentHorizontalValues MapH(string h) => h?.ToLowerInvariant() switch
+    {
+        "center" => XLAlignmentHorizontalValues.Center,
+        "right" => XLAlignmentHorizontalValues.Right,
+        "justify" => XLAlignmentHorizontalValues.Justify,
+        _ => XLAlignmentHorizontalValues.Left
+    };
+
+    private static XLAlignmentVerticalValues MapV(string v) => v?.ToLowerInvariant() switch
+    {
+        "top" => XLAlignmentVerticalValues.Top,
+        "bottom" => XLAlignmentVerticalValues.Bottom,
+        _ => XLAlignmentVerticalValues.Center
+    };
+
+    private static XLBorderStyleValues MapBorder(string b) => b?.ToLowerInvariant() switch
+    {
+        "thin" => XLBorderStyleValues.Thin,
+        "medium" => XLBorderStyleValues.Medium,
+        "thick" => XLBorderStyleValues.Thick,
+        _ => XLBorderStyleValues.Thin
+    };
 
 }

@@ -23,148 +23,46 @@
 <script>
   window.excel = window.excel || {};
 
-  window.excel.exportArrayToExcelMerged = function (fileName, rows, merges) {
-    if (!Array.isArray(rows) || rows.length === 0) {
-      alert("没有数据可导出");
-      return;
-    }
+  // 把后端传来的 base64 保存为 .xlsx
+  window.excel.saveBase64 = function (fileName, base64) {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
-    try {
-      // === 生成基础表格 ===
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-
-      // === 自动列宽 ===
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      const colWidths = [];
-      const maxCols = range.e.c - range.s.c + 1;
-
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        let max = 10;
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-          const cell = ws[XLSX.utils.encode_cell({r: R, c: C})];
-          if (cell && cell.v != null) {
-            const len = String(cell.v).length;
-            if (len > max) max = len;
-          }
-        }
-        colWidths.push({wch: Math.min(max + 2, 50)}); // 限制最大列宽
-      }
-      ws['!cols'] = colWidths;
-
-      // === 设置单元格样式 ===
-      const titleStyles = ['任务详情', '手掌-手指-电机 对应关系', '检测结果汇总',
-        '手掌检测', '分指标定检测', '分指蜗杆粘接检测',
-        '单指标定检测', '电机蜗杆粘接检测'];
-
-      const headerCells = ['手掌编号', '手指编号', '手指类型', '电机编号', '操作员',
-        '绑定时间', '是否合格', 'PalmID', 'FingerID', 'MotorID',
-        '任务号', '任务名称', '产品数量', '操作员', '创建时间'];
-
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const addr = XLSX.utils.encode_cell({r: R, c: C});
-          const cell = ws[addr];
-          if (!cell) continue;
-
-          const cellValue = String(cell.v || '');
-
-          // 标题行样式
-          if (C === 0 && titleStyles.includes(cellValue)) {
-            cell.s = {
-              font: {bold: true, sz: 14},
-              alignment: {horizontal: "left", vertical: "center", wrapText: true},
-              fill: {fgColor: {rgb: "DDEBF7"}} // 浅蓝色背景
-            };
-          }
-          // 表头行样式
-          else if (headerCells.includes(cellValue) || (R > 0 && isHeaderRow(R, rows))) {
-            cell.s = {
-              font: {bold: true},
-              alignment: {horizontal: "center", vertical: "center", wrapText: true},
-              fill: {fgColor: {rgb: "E2EFDA"}} // 浅绿色背景
-            };
-          }
-          // 数据行样式
-          else {
-            cell.s = {
-              alignment: {
-                horizontal: "left",
-                vertical: "center",
-                wrapText: true
-              }
-            };
-          }
-        }
-      }
-
-      // === 合并单元格 ===
-      if (Array.isArray(merges) && merges.length > 0) {
-        ws['!merges'] = merges.map(m => ({
-          s: {r: m.s.r, c: m.s.c},
-          e: {r: m.e.r, c: m.e.c}
-        }));
-      }
-
-      // === 添加标题行合并 ===
-      if (!ws['!merges']) ws['!merges'] = [];
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        const firstCell = ws[XLSX.utils.encode_cell({r: R, c: 0})];
-        if (firstCell && firstCell.s && firstCell.s.fill && firstCell.s.fill.fgColor && firstCell.s.fill.fgColor.rgb === "DDEBF7") {
-          ws['!merges'].push({
-            s: {r: R, c: 0},
-            e: {r: R, c: maxCols - 1}
-          });
-        }
-      }
-
-      // === 生成工作簿 ===
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "任务报告");
-
-      // === 导出文件 ===
-      XLSX.writeFile(wb, fileName || "任务报告.xlsx", {compression: true});
-
-    } catch (error) {
-      console.error("Excel导出错误:", error);
-      alert("导出失败: " + error.message);
-    }
-  };
-
-  // 辅助函数判断是否为表头行
-  function isHeaderRow(rowIndex, rows) {
-    if (!rows[rowIndex] || rows[rowIndex].length === 0) return false;
-
-    const firstCell = rows[rowIndex][0]?.toString();
-    const headerIndicators = ['手掌编号', 'PalmID', 'FingerID', 'MotorID', '任务号'];
-
-    return headerIndicators.includes(firstCell);
-  }
-
-  // 加载提示函数
-  window.showLoading = function (message) {
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = 'export-loading';
-    loadingDiv.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.8);
-    color: white;
-    padding: 20px;
-    border-radius: 5px;
-    z-index: 10000;
-  `;
-    loadingDiv.textContent = message || '正在导出...';
-    document.body.appendChild(loadingDiv);
-  };
-
-  window.hideLoading = function () {
-    const loadingDiv = document.getElementById('export-loading');
-    if (loadingDiv) {
-      document.body.removeChild(loadingDiv);
-    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName || '任务报告.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    a.remove();
   };
 </script>
+<script>
+  window.excel = window.excel || {};
+
+  window.excel.showLoading = function (message) {
+    const id = 'export-loading';
+    if (document.getElementById(id)) return;
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = `
+      position: fixed; inset: 0; display:flex; align-items:center; justify-content:center;
+      background: rgba(0,0,0,0.35); z-index: 99999;
+    `;
+    div.innerHTML = `<div style="
+      background:#222;color:#fff;padding:14px 18px;border-radius:8px;min-width:200px;
+      text-align:center;font-size:14px;">${message || '正在导出...'}</div>`;
+    document.body.appendChild(div);
+  };
+
+  window.excel.hideLoading = function () {
+    const el = document.getElementById('export-loading');
+    if (el) el.remove();
+  };
+</script>
+
 </body>
 </html>
