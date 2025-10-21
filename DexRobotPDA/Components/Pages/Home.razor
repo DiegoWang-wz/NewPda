@@ -155,10 +155,11 @@
     private List<OperationItem> operations3 = new()
     {
         new() { Name = "蜗杆粘接检测", Icon = Icons.Material.Filled.LooksOne, CompletedToday = 30, Route = "/Detect1" },
-        new() { Name = "分指机构蜗杆粘接检测", Icon = Icons.Material.Filled.LooksTwo, CompletedToday = 30, Route = "/Detect2" },
+        // new() { Name = "分指机构蜗杆粘接检测", Icon = Icons.Material.Filled.LooksTwo, CompletedToday = 30, Route = "/Detect2" },
+        new() { Name = "拇指标定检测", Icon = Icons.Material.Filled.LooksTwo, CompletedToday = 30, Route = "/ThumbDetect" },
         new() { Name = "分指机构标定检测", Icon = Icons.Material.Filled.Looks3, CompletedToday = 30, Route = "/Detect3" },
-        new() { Name = "单指标定检测", Icon = Icons.Material.Filled.Looks4, CompletedToday = 30, Route = "/Detect4" },
-        new() { Name = "整手标定检测", Icon = Icons.Material.Filled.Looks5, CompletedToday = 30, Route = "/Detect5" }
+        new() { Name = "四指标定检测", Icon = Icons.Material.Filled.Looks4, CompletedToday = 30, Route = "/Detect4" },
+        new() { Name = "整手功能测试", Icon = Icons.Material.Filled.Looks5, CompletedToday = 30, Route = "/Detect5" }
     };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

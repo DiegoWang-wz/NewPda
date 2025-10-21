@@ -33,4 +33,5 @@ public class AddTaskDto
     public byte process_7 { get; set; } = 0;
     public byte process_8 { get; set; } = 0;
     public int product_num { get; set; } = 1;
+    public string sale_order_number { get; set; }
 }

@@ -19,4 +19,5 @@ public class GetTaskDetailDto
     
     public DateTime created_at { get; set; } = DateTime.Now;
     public DateTime updated_at { get; set; } = DateTime.Now;
+    public string sale_order_number { get; set; }
 }

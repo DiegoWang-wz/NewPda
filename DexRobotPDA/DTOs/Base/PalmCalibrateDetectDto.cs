@@ -23,7 +23,7 @@ public class PalmCalibrateDetectDto
     /// <summary>
     /// 接近传感值（传感器读数）
     /// </summary>
-    public double? proximity_sensing { get; set; }
+    public bool? proximity_sensing { get; set; }
 
     /// <summary>
     /// 法向力（压力传感器读数）

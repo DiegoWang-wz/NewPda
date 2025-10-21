@@ -239,7 +239,7 @@
             _detectDto.calibrate_time = DateTime.Now;
             _detectDto.finger_id = _split.finger_id;
             _detectDto.inspector = currentUser?.employee_id;
-            _detectDto.if_qualified = false;
+            _detectDto.if_qualified ??= false;
             hasSearched = true;
         }
         catch (Exception ex)

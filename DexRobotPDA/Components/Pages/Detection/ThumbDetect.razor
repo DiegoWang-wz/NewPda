@@ -1,4 +1,4 @@
-﻿@page "/Detect4"
+﻿@page "/ThumbDetect"
 
 @using DexRobotPDA.Components.Pages.Components
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -12,11 +12,11 @@
             <MudGrid Spacing="4">
                 <MudItem xs="12" sm="6">
                     <MudPaper Class="pa-4">
-                        <MudTextField Label="单指编号"
+                        <MudTextField Label="拇指编号"
                                       Disabled="true"
                                       Class="my-2"
                                       @bind-Value="_detectDto.finger_id"
-                                      RequiredError="请输入单指编号"/>
+                                      RequiredError="请输入拇指编号"/>
                         <MudDatePicker T="DateTime?"
                                        Label="电机使用时间"
                                        Disabled="true"
@@ -26,7 +26,7 @@
                                        AdornmentIcon="@Icons.Material.Filled.Event"
                                        Class="my-2"/>
                         <MudDatePicker T="DateTime?"
-                                       Label="单指使用时间"
+                                       Label="拇指使用时间"
                                        Disabled="true"
                                        @bind-Date="_detectDto.finger_using_time"
                                        DateFormat="yyyy-MM-dd HH:mm:ss"
@@ -102,11 +102,10 @@
                                        Adornment="Adornment.End"
                                        AdornmentIcon="@Icons.Material.Filled.Event"
                                        Class="my-2"/>
-                        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">接近觉</MudText>
-                        <MudRadioGroup T="bool?" @bind-Value="_detectDto.proximity_sensing" Required="true">
-                            <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
-                            <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
-                        </MudRadioGroup>
+                        <MudTextField Label="接近觉"
+                                      Class="my-2"
+                                      @bind-Value="_detectDto.proximity_sensing"
+                                      RequiredError="请输入接近觉"/>
                         <MudTextField Label="法向力"
                                       Class="my-2"
                                       @bind-Value="_detectDto.normal_force"
@@ -142,12 +141,12 @@
     <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
         <MudTextField
             @bind-Value="finger_id"
-            Label="单指编号"
+            Label="拇指编号"
             Variant="Variant.Outlined"
             Required="true"
             Clearable="true"
             Error="@hasInputError"
-            ErrorText="请输入单指编号"
+            ErrorText="请输入拇指编号"
             AutoFocus="true"
             Id="taskId"
             Class="flex-1"/>
@@ -261,7 +260,7 @@
             _finger = await DetectService.GetFinger(finger_id);
             if (_finger.type != 1)
             {
-                SnackbarHelper.Show(Snackbar, "请输入正确的单指编号！", Severity.Error);
+                SnackbarHelper.Show(Snackbar, "请输入正确的拇指编号！", Severity.Error);
                 _finger = new();
                 return;
             }
@@ -270,8 +269,7 @@
             _detectDto.calibrate_time = DateTime.Now;
             _detectDto.finger_id = _finger.finger_id;
             _detectDto.inspector = currentUser?.employee_id;
-            _detectDto.if_qualified ??= false;
-            _detectDto.proximity_sensing ??= true;
+            _detectDto.if_qualified = false;
             hasSearched = true;
         }
         catch (Exception ex)
@@ -313,8 +311,8 @@
 
                 if (string.IsNullOrEmpty(_detectDto.inspector))
                 {
-                    await LogService.AddLog("单指标定检测", currentUser?.employee_id ?? "未知用户",
-                        $"检测失败 - 单指编号: {_detectDto.finger_id}, 原因: 检测员信息缺失", false);
+                    await LogService.AddLog("拇指标定检测", currentUser?.employee_id ?? "未知用户",
+                        $"检测失败 - 拇指编号: {_detectDto.finger_id}, 原因: 检测员信息缺失", false);
 
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
@@ -324,8 +322,8 @@
 
                 if (response?.ResultCode == 1)
                 {
-                    await LogService.AddLog("单指标定检测", currentUser.employee_id,
-                        $"检测完成 - 单指编号: {_detectDto.finger_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
+                    await LogService.AddLog("拇指标定检测", currentUser.employee_id,
+                        $"检测完成 - 拇指编号: {_detectDto.finger_id}, 检测结果: {(_detectDto.if_qualified == true ? "合格" : "不合格")}", true);
 
                     SnackbarHelper.Show(Snackbar, "提交成功", Severity.Success);
                     try
@@ -373,16 +371,16 @@
                 }
                 else
                 {
-                    await LogService.AddLog("单指标定检测", currentUser.employee_id,
-                        $"检测失败 - 单指编号: {_detectDto.finger_id}, 原因: {response?.Msg}", false);
+                    await LogService.AddLog("拇指标定检测", currentUser.employee_id,
+                        $"检测失败 - 拇指编号: {_detectDto.finger_id}, 原因: {response?.Msg}", false);
 
                     SnackbarHelper.Show(Snackbar, $"提交失败：{response?.Msg}", Severity.Error);
                 }
             }
             catch (Exception ex)
             {
-                await LogService.AddLog("单指标定检测", currentUser.employee_id,
-                    $"检测异常 - 单指编号: {_detectDto.finger_id}, 异常: {ex.Message}", false);
+                await LogService.AddLog("拇指标定检测", currentUser.employee_id,
+                    $"检测异常 - 拇指编号: {_detectDto.finger_id}, 异常: {ex.Message}", false);
 
                 SnackbarHelper.Show(Snackbar, $"提交异常：{ex.Message}", Severity.Error);
             }
@@ -394,8 +392,8 @@
         }
         else
         {
-            await LogService.AddLog("单指标定检测", currentUser?.employee_id ?? "未知用户",
-                $"表单验证失败 - 单指编号: {_detectDto.finger_id}", false);
+            await LogService.AddLog("拇指标定检测", currentUser?.employee_id ?? "未知用户",
+                $"表单验证失败 - 拇指编号: {_detectDto.finger_id}", false);
 
             SnackbarHelper.Show(Snackbar, "表单存在错误（如未选择时间/耗时未计算），请检查后提交", Severity.Warning);
         }

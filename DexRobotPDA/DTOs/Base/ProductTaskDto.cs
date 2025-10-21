@@ -19,5 +19,6 @@ public class ProductTaskDto
     public bool process_8 { get; set; }
     
     public int product_num { get; set; } = 1;
+    public string sale_order_number { get; set; }
 
 }

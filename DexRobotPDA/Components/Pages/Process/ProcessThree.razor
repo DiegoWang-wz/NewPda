@@ -1,6 +1,7 @@
 ﻿@page "/process_3"
 @page "/process_3/{task_id}/{palm_id}"
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -31,9 +32,12 @@
             @if (!string.IsNullOrEmpty(palm_id))
             {
                 <BarcodeScanner
+                    @ref="scanner"
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
-                    OnInputValueChanged="HandleInputValueChanged"/>
+                    OnInputValueChanged="HandleInputValueChanged"
+                    DuplicateCheckInputIds="DuplicateCheckList"
+                    DuplicateErrorMessage="编号重复"/>
                 <MudDivider Class="my-4"/>
                 <MudButton OnClick="HandleUpdateDemo" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
                            FullWidth="true" Disabled="@isBinding">
@@ -80,10 +84,14 @@
                         已完成数量@(finishedPalms.Count)/@task.product_num
                     </MudButton>
                 </MudStack>
+
                 <BarcodeScanner
+                    @ref="scanner"
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
-                    OnInputValueChanged="HandleInputValueChanged"/>
+                    OnInputValueChanged="HandleInputValueChanged"
+                    DuplicateCheckInputIds="DuplicateCheckList"
+                    DuplicateErrorMessage="编号重复"/>
                 <MudDivider Class="my-4"/>
                 <MudButton OnClick="HandleBinding" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
                            FullWidth="true" Disabled="@isBinding">
@@ -143,6 +151,26 @@
 @code {
     private const string StorageKey = "process3_taskId";
 
+    // ====== 统一编码正则（忽略左右手位 0/L/R）======
+    // 形如：MO-20250411-001-ML-0001 / MO-...-DO-... / MO-...-FL-...
+    private static readonly Regex FingerCodeRegex =
+        new(@"^MO-\d{8}-\d{3}-(D|M|F)[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private const string FingerFormatError =
+        "编码格式错误，应为 MO-YYYYMMDD-XXX-(D|M|F)[0/L/R]-####";
+
+    // 手掌外壳前缀（设为 "" 可关闭 palmId 前缀校验）
+    private const string PalmPrefix = "pl";
+    private const string PalmPrefixError = "手掌外壳编号格式错误，应以 pl 开头";
+
+    private enum FingerClass
+    {
+        Unknown,
+        Thumb_M,
+        Single_D,
+        Split_F
+    }
+
     [Parameter] public string task_id { get; set; }
     [Parameter] public string palm_id { get; set; }
     private string taskId = string.Empty;
@@ -151,20 +179,102 @@
     private bool hasSearched = false;
     private bool hasInputError = false;
     private UserDto? currentUser;
-    private List<PalmDto> finishedPalms = new List<PalmDto>();
+    private List<PalmDto> finishedPalms = new();
     private MudForm? form;
     private bool validation = true;
 
-    private AddPalmDto _PalmDto = new AddPalmDto();
+    private AddPalmDto _PalmDto = new();
     private string _split = string.Empty;
     private string _finger1 = string.Empty;
     private string _finger2 = string.Empty;
     private string _finger3 = string.Empty;
     private string _finger4 = string.Empty;
     private string _finger5 = string.Empty;
+
     private DotNetObjectReference<ProcessThree>? dotNetRef;
+
+    private BarcodeScanner? scanner; // 引用子组件
     private List<BarcodeScanner.InputField> scannerInputs = new();
+
+    // 去重字段（分指=F 型 + 五指）
+    private readonly List<string> DuplicateCheckList = new() { "splitId", "finger1", "finger2", "finger3", "finger4", "finger5" };
+
     private bool isBinding = false;
+
+    private static string Norm(string? s) => (s ?? string.Empty).Trim();
+
+    private static FingerClass ParseFingerClass(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return FingerClass.Unknown;
+        var m = Regex.Match(code.Trim(), @"-(D|M|F)[0LR]-", RegexOptions.IgnoreCase);
+        if (!m.Success) return FingerClass.Unknown;
+        return m.Groups[1].Value.ToUpperInvariant() switch
+        {
+            "M" => FingerClass.Thumb_M,
+            "D" => FingerClass.Single_D,
+            "F" => FingerClass.Split_F,
+            _ => FingerClass.Unknown
+        };
+    }
+
+    private void SetFieldError(string fieldId, bool isError, string? errorText = null)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+        input.Error = isError;
+        input.ErrorText = isError ? (errorText ?? "") : "";
+    }
+
+    // —— 字段校验（空值不报错）；“分指机构”只认 F 型编码 —— //
+    private void ValidateField(string fieldId)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+
+        var val = Norm(input.Value);
+        if (string.IsNullOrEmpty(val))
+        {
+            SetFieldError(fieldId, false);
+            return;
+        }
+
+        if (fieldId == "palmId")
+        {
+            if (string.IsNullOrEmpty(PalmPrefix))
+            {
+                SetFieldError(fieldId, false);
+            }
+            else
+            {
+                bool ok = val.StartsWith(PalmPrefix, StringComparison.OrdinalIgnoreCase);
+                SetFieldError(fieldId, !ok, ok ? null : PalmPrefixError);
+            }
+
+            return;
+        }
+
+        if (fieldId == "splitId")
+        {
+            // 分指机构 == 分指(F)；只认 F 型编码
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Split_F;
+            SetFieldError(fieldId, !ok, ok ? null : "分指机构必须为 F 型编码");
+            return;
+        }
+
+        if (fieldId == "finger1")
+        {
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Thumb_M;
+            SetFieldError(fieldId, !ok, ok ? null : "拇指位置必须为 M 型编码");
+            return;
+        }
+
+        if (fieldId is "finger2" or "finger3" or "finger4" or "finger5")
+        {
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Single_D;
+            SetFieldError(fieldId, !ok, ok ? null : "该位置必须为 D 型（单指）编码");
+            return;
+        }
+    }
 
     private async Task ToggleScanModeAsync()
     {
@@ -182,7 +292,7 @@
             await LoadTaskDetail();
 
             var list = await ProcessThreeService.GetPalmDetail(palm_id);
-            var inputMappings = new Dictionary<string, int>
+            var map = new Dictionary<string, int>
             {
                 { "palmId", -1 },
                 { "splitId", 0 },
@@ -194,11 +304,21 @@
                 { "remarks", 6 }
             };
 
-            foreach (var mapping in inputMappings)
+            foreach (var kv in map)
             {
-                var input = scannerInputs.FirstOrDefault(i => i.Id == mapping.Key);
-                if (input != null) input.Value = mapping.Key == "palmId" ? palm_id : list[mapping.Value];
+                var input = scannerInputs.FirstOrDefault(i => i.Id == kv.Key);
+                if (input != null) input.Value = kv.Key == "palmId" ? palm_id : (list.Count > kv.Value && kv.Value >= 0 ? list[kv.Value] : "");
             }
+
+            // 回填后：统一重算重复 + 校验
+            if (scanner is not null) await scanner.RevalidateDuplicates();
+            ValidateField("palmId");
+            ValidateField("splitId");
+            ValidateField("finger1");
+            ValidateField("finger2");
+            ValidateField("finger3");
+            ValidateField("finger4");
+            ValidateField("finger5");
         }
     }
 
@@ -207,12 +327,12 @@
         scannerInputs = new List<BarcodeScanner.InputField>
         {
             new BarcodeScanner.InputField { Index = 1, Label = "手掌外壳编号", Id = "palmId", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 2, Label = "分指机构", Id = "splitId", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 3, Label = "大拇指编号", Id = "finger1", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 4, Label = "食指编号", Id = "finger2", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 5, Label = "中指编号", Id = "finger3", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 6, Label = "无名指编号", Id = "finger4", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 7, Label = "小拇指编号", Id = "finger5", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 2, Label = "分指机构（F 型）", Id = "splitId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 3, Label = "大拇指编号（M 型）", Id = "finger1", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 4, Label = "食指编号（D 型）", Id = "finger2", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 5, Label = "中指编号（D 型）", Id = "finger3", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 6, Label = "无名指编号（D 型）", Id = "finger4", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 7, Label = "小拇指编号（D 型）", Id = "finger5", IsSpecialInput = false },
             new BarcodeScanner.InputField { Index = 8, Label = "备注", Id = "remarks", IsSpecialInput = true }
         };
     }
@@ -280,15 +400,21 @@
         finishedPalms.Clear();
         _PalmDto = new AddPalmDto();
         foreach (var input in scannerInputs) input.Value = string.Empty;
-        _split = string.Empty;
-        _finger1 = string.Empty;
-        _finger2 = string.Empty;
-        _finger3 = string.Empty;
-        _finger4 = string.Empty;
-        _finger5 = string.Empty;
+        _split = _finger1 = _finger2 = _finger3 = _finger4 = _finger5 = string.Empty;
         if (currentUser != null) _PalmDto.operator_id = currentUser.employee_id;
         await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
+
+        if (scanner is not null) await scanner.RevalidateDuplicates();
+
+        // 清除提示
+        ValidateField("palmId");
+        ValidateField("splitId");
+        ValidateField("finger1");
+        ValidateField("finger2");
+        ValidateField("finger3");
+        ValidateField("finger4");
+        ValidateField("finger5");
     }
 
     private async Task LoadTaskDetail()
@@ -366,57 +492,69 @@
 
         if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                "手掌绑定失败 - 手掌编号为空", false);
             SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
             return;
         }
 
         if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 分指机构编号为空", false);
-            SnackbarHelper.Show(Snackbar, "分指机构编号不能为空", Severity.Warning);
+            SnackbarHelper.Show(Snackbar, "分指机构（F 型）不能为空", Severity.Warning);
             return;
         }
 
         if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 大拇指编号为空", false);
             SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning);
             return;
         }
 
         if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 食指编号为空", false);
             SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning);
             return;
         }
 
         if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 中指编号为空", false);
             SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning);
             return;
         }
 
         if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 无名指编号为空", false);
             SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning);
             return;
         }
 
         if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value))
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定失败 - 手掌编号: {palmInput.Value}, 小拇指编号为空", false);
             SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning);
+            return;
+        }
+
+        // 提交前最后一次校验（防漏）
+        ValidateField("palmId");
+        ValidateField("splitId");
+        ValidateField("finger1");
+        ValidateField("finger2");
+        ValidateField("finger3");
+        ValidateField("finger4");
+        ValidateField("finger5");
+
+        bool hasFormatError = scannerInputs.Any(i =>
+            (i.Id == "palmId" || i.Id == "splitId" || i.Id == "finger1" || i.Id == "finger2" || i.Id == "finger3" || i.Id == "finger4" || i.Id == "finger5")
+            && i.Error && !string.IsNullOrWhiteSpace(i.ErrorText));
+        if (hasFormatError)
+        {
+            SnackbarHelper.Show(Snackbar, "存在编号格式错误，请修正后再绑定", Severity.Warning);
+            return;
+        }
+
+        // 重复检测拦截
+        if (scannerInputs.Where(i => DuplicateCheckList.Contains(i.Id))
+            .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
+        {
+            SnackbarHelper.Show(Snackbar, "存在重复编号（分指/五指），请先修改后再绑定", Severity.Warning);
             return;
         }
 
@@ -426,7 +564,6 @@
             _PalmDto.palm_id = palmInput.Value;
             _PalmDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
 
-            // 准备所有需要绑定的部件ID列表
             var componentIds = new List<string>
             {
                 splitInput.Value,
@@ -437,7 +574,6 @@
                 finger5Input.Value
             };
 
-            // 创建包含手掌和所有部件信息的DTO
             var palmWithComponentsDto = new AddPalmWithComponentsDto
             {
                 palm_id = _PalmDto.palm_id,
@@ -447,25 +583,17 @@
                 component_ids = componentIds
             };
 
-            // 调用新的原子操作接口
             var palmResponse = await ProcessThreeService.AddPalmWithComponents(palmWithComponentsDto);
 
             if (palmResponse.ResultCode == 1)
             {
-                await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                    $"手掌绑定成功 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, " +
-                    $"绑定详情: 分指机构({splitInput.Value}) " +
-                    $"大拇指({finger1Input.Value}) 食指({finger2Input.Value}) 中指({finger3Input.Value}) " +
-                    $"无名指({finger4Input.Value}) 小拇指({finger5Input.Value})", true);
-
-                palmInput.Value = "";
-                splitInput.Value = "";
-                finger1Input.Value = "";
-                finger2Input.Value = "";
-                finger3Input.Value = "";
-                finger4Input.Value = "";
-                finger5Input.Value = "";
+                // 清空表单
+                palmInput.Value = splitInput.Value =
+                    finger1Input.Value = finger2Input.Value = finger3Input.Value =
+                        finger4Input.Value = finger5Input.Value = "";
                 scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+
+                if (scanner is not null) await scanner.RevalidateDuplicates();
 
                 await LoadTaskDetail();
                 await TaskService.UpdateSingleTaskStatus(taskId);
@@ -473,23 +601,15 @@
             }
             else
             {
-                var errorMsg = palmResponse?.Msg ?? "手掌绑定失败";
-                await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                    $"手掌绑定失败 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 错误信息: {errorMsg}", false);
-                SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{errorMsg}", Severity.Error);
+                SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{palmResponse?.Msg ?? "未知错误"}", Severity.Error);
             }
         }
         catch (JsonException jsonEx)
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定JSON解析失败 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 错误信息: {jsonEx.Message}", false);
             SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
-            
         }
         catch (Exception ex)
         {
-            await LogService.AddLog("手掌绑定", _PalmDto.operator_id,
-                $"手掌绑定异常 - 手掌编号: {_PalmDto.palm_id}, 任务单号: {_PalmDto.task_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
         }
         finally
@@ -499,7 +619,6 @@
         }
     }
 
-    
     private async Task<ApiResponse> HandleFingerBindPalm(string finger_id, string palm_id)
     {
         ApiResponse response = null;
@@ -512,15 +631,13 @@
             }
             else
             {
-                var errorMessage = $"手指 {finger_id} 绑定失败：{(response?.Msg ?? "未知错误")}";
-                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
+                SnackbarHelper.Show(Snackbar, $"手指 {finger_id} 绑定失败：{(response?.Msg ?? "未知错误")}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            var errorMessage = $"手指 {finger_id} 绑定异常：{ex.Message}";
-            SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
-            response = new ApiResponse { ResultCode = -1, Msg = errorMessage };
+            SnackbarHelper.Show(Snackbar, $"手指 {finger_id} 绑定异常：{ex.Message}", Severity.Error);
+            response = new ApiResponse { ResultCode = -1, Msg = ex.Message };
         }
 
         return response;
@@ -570,6 +687,15 @@
             await CheckAndShowFingerChange("无名指", originalFinger4, newFinger4);
             await CheckAndShowFingerChange("小拇指", originalFinger5, newFinger5);
 
+            if (scanner is not null) await scanner.RevalidateDuplicates();
+            ValidateField("palmId");
+            ValidateField("splitId");
+            ValidateField("finger1");
+            ValidateField("finger2");
+            ValidateField("finger3");
+            ValidateField("finger4");
+            ValidateField("finger5");
+
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
         }
         catch (Exception ex)
@@ -605,32 +731,57 @@
             SnackbarHelper.Show(Snackbar, $"{fingerName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
         }
     }
+
+    // —— 自动匹配规则：先看 M/D/F，再按空位兜底 —— //
     private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
     {
-        var palmInput = scannerInputs.FirstOrDefault(i => i.Id == "palmId" && string.IsNullOrEmpty(i.Value));
-        if (palmInput != null) return palmInput;
+        var code = Norm(barcodeData);
 
-        var splitInput = scannerInputs.FirstOrDefault(i => i.Id == "splitId" && string.IsNullOrEmpty(i.Value));
-        if (splitInput != null) return splitInput;
+        // 1) M/D/F 自动落位
+        if (FingerCodeRegex.IsMatch(code))
+        {
+            switch (ParseFingerClass(code))
+            {
+                case FingerClass.Split_F:
+                    return scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+                case FingerClass.Thumb_M:
+                    return scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+                case FingerClass.Single_D:
+                {
+                    var f2 = scannerInputs.FirstOrDefault(i => i.Id == "finger2" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f2 != null) return f2;
+                    var f3 = scannerInputs.FirstOrDefault(i => i.Id == "finger3" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f3 != null) return f3;
+                    var f4 = scannerInputs.FirstOrDefault(i => i.Id == "finger4" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f4 != null) return f4;
+                    var f5 = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f5 != null) return f5;
+                    return scannerInputs.FirstOrDefault(i => i.Id == "finger2"); // 都有值时回到 finger2
+                }
+            }
+        }
 
-        var finger1Input = scannerInputs.FirstOrDefault(i => i.Id == "finger1" && string.IsNullOrEmpty(i.Value));
-        if (finger1Input != null) return finger1Input;
+        // 2) 兜底：按空位顺序
+        var palmEmpty = scannerInputs.FirstOrDefault(i => i.Id == "palmId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (palmEmpty != null) return palmEmpty;
 
-        var finger2Input = scannerInputs.FirstOrDefault(i => i.Id == "finger2" && string.IsNullOrEmpty(i.Value));
-        if (finger2Input != null) return finger2Input;
+        var splitEmpty = scannerInputs.FirstOrDefault(i => i.Id == "splitId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (splitEmpty != null) return splitEmpty;
 
-        var finger3Input = scannerInputs.FirstOrDefault(i => i.Id == "finger3" && string.IsNullOrEmpty(i.Value));
-        if (finger3Input != null) return finger3Input;
-
-        var finger4Input = scannerInputs.FirstOrDefault(i => i.Id == "finger4" && string.IsNullOrEmpty(i.Value));
-        if (finger4Input != null) return finger4Input;
-
-        var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(i.Value));
-        if (finger5Input != null) return finger5Input;
+        var f1 = scannerInputs.FirstOrDefault(i => i.Id == "finger1" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f1 != null) return f1;
+        var f2e = scannerInputs.FirstOrDefault(i => i.Id == "finger2" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f2e != null) return f2e;
+        var f3e = scannerInputs.FirstOrDefault(i => i.Id == "finger3" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f3e != null) return f3e;
+        var f4e = scannerInputs.FirstOrDefault(i => i.Id == "finger4" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f4e != null) return f4e;
+        var f5e = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f5e != null) return f5e;
 
         return scannerInputs.FirstOrDefault(i => i.Id == "remarks");
     }
-   
+
     private async Task HandleInputValueChanged(BarcodeScanner.InputField input)
     {
         switch (input.Id)
@@ -644,6 +795,9 @@
             case "finger5": _finger5 = input.Value; break;
             case "remarks": _PalmDto.remarks = input.Value; break;
         }
+
+        // 实时校验
+        ValidateField(input.Id);
 
         await Task.CompletedTask;
     }
@@ -660,3 +814,6 @@
     }
 
 }
+
+@inject BarcodeScannerService ScannerService
+@inject ISnackbar Snackbar

@@ -5,10 +5,6 @@ using System.Runtime.CompilerServices;
 
 namespace DexRobotPDA.DTOs;
 
-/// <summary>
-/// 手指校准检测创建DTO
-/// 用于新增记录，包含必要的输入字段
-/// </summary>
 public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
 {
     private DateTime? _motor_using_time;
@@ -19,9 +15,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     private DateTime? _begin_time;
     private DateTime? _finish_time;
 
-    // ★ 改为“毫秒”语义（仍使用 int?，0–2,147,483,647 ms）
     private int? _consume_time;
-
     private double? _remote_angle;
     private double? _near_angle;
     private double? _motor_1_max;
@@ -31,7 +25,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     private string? _remarks;
     private bool? _if_qualified;
     private double? _electricity;
-    private double? _proximity_sensing;
+    private bool? _proximity_sensing;
     private double? _normal_force;
 
     /// <summary>
@@ -234,7 +228,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     /// <summary>
     /// 接近传感值（传感器读数）
     /// </summary>
-    public double? proximity_sensing
+    public bool? proximity_sensing
     {
         get => _proximity_sensing;
         set => SetProperty(ref _proximity_sensing, value);

@@ -13,9 +13,11 @@ public class BarcodeScannerService : IAsyncDisposable
     private readonly ISnackbar _snackbar;
     private DotNetObjectReference<BarcodeScannerService>? _dotNetRef;
     private ElementReference _barcodeInput;
-    private bool _isAutoMode = true;
+
+    // 默认改为“手动模式”
+    private bool _isAutoMode = false;          // ← 默认手动
     private int _manualFocusIndex = 1;
-    private bool _autoFocusActive = true;
+    private bool _autoFocusActive = false;     // ← 默认不自动聚焦
     private bool _isActive;
     private string? _currentFocusedInputId;
     
@@ -43,7 +45,12 @@ public class BarcodeScannerService : IAsyncDisposable
                 _dotNetRef,
                 _barcodeInput
             );
-            await EnsureAutoFocusAsync();
+
+            // 只有自动模式下才尝试自动聚焦
+            if (_isAutoMode && _autoFocusActive)
+            {
+                await EnsureAutoFocusAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -71,6 +78,7 @@ public class BarcodeScannerService : IAsyncDisposable
         OnAutoFocusChanged?.Invoke(_isAutoMode);
     }
     
+    // 显式设置模式（页面可用这个在首渲染时确保手动/自动）
     public async Task ToggleModeAsync2(bool isAutoMode)
     {
         _isAutoMode = isAutoMode;
@@ -178,10 +186,6 @@ public class BarcodeScannerService : IAsyncDisposable
     public Task ReceiveBarcode(string barcodeData)
     {
         if (string.IsNullOrWhiteSpace(barcodeData)) return Task.CompletedTask;
-        
-        // 移除扫描成功提示，减少UI更新
-        // SnackbarHelper.Show(_snackbar, $"扫描到条码: {barcodeData}", Severity.Success);
-        
         OnBarcodeScanned?.Invoke(barcodeData);
         return Task.CompletedTask;
     }

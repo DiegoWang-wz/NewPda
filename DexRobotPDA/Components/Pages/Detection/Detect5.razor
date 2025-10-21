@@ -8,54 +8,66 @@
     else if (_palm?.id > 0)
     {
         <MudForm @ref="form" @bind-Errors="@errors" Model="@_detectDto">
-            <MudPaper Class="pa-4">
-                <MudTextField Label="手掌编号"
-                              Disabled="true"
-                              Class="my-2"
-                              @bind-Value="_detectDto.palm_id"
-                              RequiredError="请输入手掌编号"/>
-                <MudTextField Label="轮指100次"
-                              Class="my-2"
-                              @bind-Value="_detectDto.hundred_times"
-                              RequiredError="请输入轮指100次"/>
-                <MudTextField Label="接近觉"
-                              Class="my-2"
-                              @bind-Value="_detectDto.proximity_sensing"
-                              RequiredError="请输入接近觉"/>
-                <MudTextField Label="法向力"
-                              Class="my-2"
-                              @bind-Value="_detectDto.normal_force"
-                              RequiredError="法向力"/>
-                <MudTextField Label="风扇功能"
-                              Class="my-2"
-                              @bind-Value="_detectDto.fan_function"
-                              RequiredError="风扇功能"/>
-                <MudTextField Label="软件版本"
-                              Class="my-2"
-                              @bind-Value="_detectDto.software_version"
-                              RequiredError="软件版本"/>
-                <MudTextField Label="测试电流"
-                              Class="my-2"
-                              @bind-Value="_detectDto.electricity"
-                              RequiredError="测试电流"/>
-                <MudTextField Class="my-2" T="string?" Label="备注"
-                              @bind-Value="_detectDto.remarks"/>
-            </MudPaper>
-            <div class="d-flex mt-2">
-                <MudRadioGroup T="bool?" @bind-Value="_detectDto.if_qualified">
-                    <MudRadio T="bool?" Value="true" Color="Color.Success" Dense="true">合格</MudRadio>
-                    <MudRadio T="bool?" Value="false" Color="Color.Error" Dense="true">不合格</MudRadio>
-                </MudRadioGroup>
-                <MudSpacer/>
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Class="ml-auto mt-2"
-                           OnClick="HandleSubmit"
-                           Disabled="isSubmitting">
-                    @(isSubmitting ? "提交中..." : "提交检测结果")
-                </MudButton>
-            </div>
-        </MudForm>
+    <MudPaper Class="pa-4">
+        <MudTextField Label="手掌编号"
+                      Disabled="true"
+                      Class="my-2"
+                      @bind-Value="_detectDto.palm_id"
+                      RequiredError="请输入手掌编号"/>
+
+        <MudTextField Label="轮指100次"
+                      Class="my-2"
+                      @bind-Value="_detectDto.hundred_times"
+                      RequiredError="请输入轮指100次"/>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">接近觉</MudText>
+        <MudRadioGroup T="bool?" @bind-Value="_detectDto.proximity_sensing" Required="true">
+            <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
+            <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
+        </MudRadioGroup>
+
+        <MudTextField Label="法向力"
+                      Class="my-2"
+                      @bind-Value="_detectDto.normal_force"
+                      RequiredError="请输入法向力"/>
+
+        <MudTextField Label="风扇功能"
+                      Class="my-2"
+                      @bind-Value="_detectDto.fan_function"
+                      RequiredError="请输入风扇功能"/>
+
+        <MudTextField Label="软件版本"
+                      Class="my-2"
+                      @bind-Value="_detectDto.software_version"
+                      RequiredError="请输入软件版本"/>
+
+        <MudTextField Label="测试电流"
+                      Class="my-2"
+                      @bind-Value="_detectDto.electricity"
+                      RequiredError="请输入测试电流"/>
+
+        <MudTextField Class="my-2" T="string?" Label="备注"
+                      @bind-Value="_detectDto.remarks"/>
+    </MudPaper>
+
+    <div class="d-flex mt-2">
+        <MudRadioGroup T="bool?" @bind-Value="_detectDto.if_qualified">
+            <MudRadio T="bool?" Value="true" Color="Color.Success" Dense="true">合格</MudRadio>
+            <MudRadio T="bool?" Value="false" Color="Color.Error" Dense="true">不合格</MudRadio>
+        </MudRadioGroup>
+
+        <MudSpacer/>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Class="ml-auto mt-2"
+                   OnClick="HandleSubmit"
+                   Disabled="isSubmitting">
+            @(isSubmitting ? "提交中..." : "提交检测结果")
+        </MudButton>
+    </div>
+</MudForm>
+
     }
     else if (hasSearched)
     {
@@ -184,7 +196,8 @@
             _palm = await DetectService.GetPalm(palm_id);
             _detectDto.palm_id = _palm.palm_id;
             _detectDto.inspector = currentUser?.employee_id;
-            _detectDto.if_qualified = false;
+            _detectDto.if_qualified ??= false;
+            _detectDto.proximity_sensing ??= true;
             hasSearched = true;
         }
         catch (Exception ex)

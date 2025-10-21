@@ -102,4 +102,7 @@ public class ProductTaskModel
     [Required]
     public int product_num { get; set; } = 1;
     
+    [MaxLength(64)]
+    public string sale_order_number { get; set; }
+    
 }

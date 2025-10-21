@@ -32,6 +32,7 @@
             @if (!string.IsNullOrEmpty(finger_id))
             {
                 <BarcodeScanner
+                    @ref="scanner"
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
                     OnInputBlur="HandleAnyInputBlur"
@@ -99,6 +100,7 @@
                 </MudStack>
 
                 <BarcodeScanner
+                    @ref="scanner"
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
                     OnInputBlur="HandleAnyInputBlur"
@@ -163,6 +165,12 @@
 @code {
     private const string StorageKey = "process2_taskId";
 
+    // ==== 新增：编号前缀约束 ====
+    private const string FingerPrefix = "fg";
+    private const string MotorPrefix  = "mot";
+    private const string FingerPrefixError = "手指编号格式错误，应以 fg 开头";
+    private const string MotorPrefixError  = "电机编号格式错误，应以 mot 开头";
+
     [Parameter] public string task_id { get; set; }
     [Parameter] public string finger_id { get; set; }
     private string taskId = string.Empty;
@@ -179,9 +187,47 @@
     private string _motorId2 { get; set; } = string.Empty;
     private string _motorId3 { get; set; } = string.Empty;
     private DotNetObjectReference<ProcessTwo>? dotNetRef;
+    private BarcodeScanner? scanner; // ⬅️ 引用子组件
     private List<BarcodeScanner.InputField> scannerInputs = new();
     private List<string> DuplicateCheckList = new() { "motorId1", "motorId2", "motorId3" };
     private bool isBinding = false;
+
+    private static string Norm(string? s) => (s ?? string.Empty).Trim();
+
+    private void SetFieldError(string fieldId, bool isError, string? errorText = null)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+        input.Error = isError;
+        input.ErrorText = isError ? (errorText ?? "") : "";
+    }
+
+    private void ValidatePrefixForField(string fieldId)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+
+        string val = Norm(input.Value);
+        if (string.IsNullOrEmpty(val))
+        {
+            SetFieldError(fieldId, false);
+            return;
+        }
+
+        if (fieldId == "fingerId")
+        {
+            bool ok = val.StartsWith(FingerPrefix, StringComparison.OrdinalIgnoreCase);
+            SetFieldError(fieldId, !ok, ok ? null : FingerPrefixError);
+            return;
+        }
+
+        if (fieldId == "motorId1" || fieldId == "motorId2" || fieldId == "motorId3")
+        {
+            bool ok = val.StartsWith(MotorPrefix, StringComparison.OrdinalIgnoreCase);
+            SetFieldError(fieldId, !ok, ok ? null : MotorPrefixError);
+            return;
+        }
+    }
 
     private async Task ToggleScanModeAsync()
     {
@@ -246,15 +292,26 @@
 
             _motorId3 = list.Count > 2 ? list[2] : "";
             StateHasChanged();
+
+            if (scanner is not null)
+            {
+                await scanner.RevalidateDuplicates();
+            }
         }
     }
 
-    private void SetFingerType(int t)
+    private async void SetFingerType(int t)
     {
         _fingerDto.type = t; // 0=四指，1=大拇指
         var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
         if (motor3Input != null) motor3Input.Visible = (t == 1);
         StateHasChanged();
+
+        if (scanner is not null)
+        {
+            await scanner.RevalidateDuplicates();
+            ValidatePrefixForField("motorId3"); // 切换后也跑一次前缀校验
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -326,6 +383,11 @@
         if (currentUser != null) _fingerDto.operator_id = currentUser.employee_id;
         await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
+
+        if (scanner is not null)
+        {
+            await scanner.RevalidateDuplicates();
+        }
     }
 
     private async Task LoadTaskDetail()
@@ -434,6 +496,32 @@
             return;
         }
 
+        // 先跑一遍本地前缀校验（防止未触发变更的字段漏检）
+        ValidatePrefixForField("fingerId");
+        ValidatePrefixForField("motorId1");
+        ValidatePrefixForField("motorId2");
+        if (_fingerDto.type == 1) ValidatePrefixForField("motorId3");
+
+        // 若存在前缀错误，拦截
+        bool hasPrefixError = scannerInputs.Any(i =>
+            (i.Id == "fingerId" || i.Id == "motorId1" || i.Id == "motorId2" || i.Id == "motorId3") &&
+            i.Visible && i.Error &&
+            (i.ErrorText == FingerPrefixError || i.ErrorText == MotorPrefixError));
+        if (hasPrefixError)
+        {
+            SnackbarHelper.Show(Snackbar, "存在编号格式错误（前缀不正确），请修正后再绑定", Severity.Warning);
+            return;
+        }
+
+        // 去重拦截
+        if (scannerInputs
+            .Where(i => DuplicateCheckList.Contains(i.Id) && i.Visible)
+            .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
+        {
+            SnackbarHelper.Show(Snackbar, "存在重复的电机编号，请先修改后再绑定", Severity.Warning);
+            return;
+        }
+
         isBinding = true;
         try
         {
@@ -469,6 +557,11 @@
                 motor2Input.Value = "";
                 if (motor3Input != null) motor3Input.Value = "";
                 scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+
+                if (scanner is not null)
+                {
+                    await scanner.RevalidateDuplicates();
+                }
 
                 SnackbarHelper.Show(Snackbar, "绑定成功", Severity.Success);
             }
@@ -562,24 +655,55 @@
             case "remarks":  _fingerDto.remarks = input.Value; break;
         }
 
+        // 新增：即时前缀校验
+        ValidatePrefixForField(input.Id);
+
         await Task.CompletedTask;
     }
 
     private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
     {
-        var fingerInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && string.IsNullOrEmpty(i.Value));
-        if (fingerInput != null) return fingerInput;
+        var code = Norm(barcodeData);
 
-        var motor1Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId1" && string.IsNullOrEmpty(i.Value));
-        if (motor1Input != null) return motor1Input;
+        // 1) 前缀驱动的自动匹配
+        if (code.StartsWith(FingerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var fingerInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
+            if (fingerInput != null) return fingerInput;
+        }
 
-        var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(i.Value));
-        if (motor2Input != null) return motor2Input;
+        if (code.StartsWith(MotorPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var motor1Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId1" && string.IsNullOrEmpty(Norm(i.Value)));
+            if (motor1Input != null) return motor1Input;
+
+            var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(Norm(i.Value)));
+            if (motor2Input != null) return motor2Input;
+
+            if (_fingerDto.type == 1)
+            {
+                var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+                if (motor3Input != null) return motor3Input;
+            }
+
+            // 都已占用：回到 motorId1（也可返回 null 表示忽略）
+            return scannerInputs.FirstOrDefault(i => i.Id == "motorId1");
+        }
+
+        // 2) 兼容原“哪个空填哪个”的顺序
+        var fingerEmpty = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (fingerEmpty != null) return fingerEmpty;
+
+        var m1 = scannerInputs.FirstOrDefault(i => i.Id == "motorId1" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (m1 != null) return m1;
+
+        var m2 = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (m2 != null) return m2;
 
         if (_fingerDto.type == 1)
         {
-            var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && string.IsNullOrEmpty(i.Value));
-            if (motor3Input != null) return motor3Input;
+            var m3 = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+            if (m3 != null) return m3;
         }
 
         return scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
@@ -617,6 +741,11 @@
             await CheckAndShowMotorChange("电机1", originalMotor1, newMotor1);
             await CheckAndShowMotorChange("电机2", originalMotor2, newMotor2);
             if (_fingerDto.type == 1) await CheckAndShowMotorChange("电机3", originalMotor3, newMotor3);
+
+            if (scanner is not null)
+            {
+                await scanner.RevalidateDuplicates();
+            }
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
         }
@@ -665,3 +794,6 @@
         GC.SuppressFinalize(this);
     }
 }
+
+@inject BarcodeScannerService ScannerService
+@inject ISnackbar Snackbar
