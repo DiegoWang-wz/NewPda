@@ -83,6 +83,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cRGV0ZWN0NS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Detection/ThumbDetect.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEZXRlY3Rpb25cVGh1bWJEZXRlY3QucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFcnJvci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
