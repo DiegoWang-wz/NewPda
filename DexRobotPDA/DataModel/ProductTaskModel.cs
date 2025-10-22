@@ -26,9 +26,8 @@ public class ProductTaskModel
     /// <summary>
     /// 任务标题（支持中文，如2024Q3微型舵机生产任务）
     /// </summary>
-    [Required]
     [MaxLength(255)]
-    public string title { get; set; }
+    public string? title { get; set; }
 
     /// <summary>
     /// 任务详细描述（大文本，支持长内容）
@@ -95,14 +94,13 @@ public class ProductTaskModel
     /// </summary>
     [Required]
     public byte process_6 { get; set; } = 0;
-    [Required]
-    public byte process_7 { get; set; } = 0;
+    [Required] public byte process_7 { get; set; } = 0;
     [Required]
     public byte process_8 { get; set; } = 0;
     [Required]
     public int product_num { get; set; } = 1;
     
     [MaxLength(64)]
-    public string sale_order_number { get; set; }
+    public string? sale_order_number { get; set; }
     
 }

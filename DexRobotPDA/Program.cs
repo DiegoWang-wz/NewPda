@@ -11,30 +11,36 @@ using System.Text.Json;
 using RestSharp.Serializers.Json;
 using Blazored.LocalStorage;
 using Microsoft.OpenApi.Models;
+using Serilog.Events;
+using Microsoft.AspNetCore.Mvc;
 
-// 初始化构建器
 var builder = WebApplication.CreateBuilder(args);
 
-// 尽早配置Serilog以捕获更多启动日志
+// 提前接管日志
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
-    .ReadFrom.Services(services));
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+);
 
-// 添加Razor组件支持
+// Razor 组件
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// 配置MudBlazor服务及全局设置
+// MudBlazor
 builder.Services.AddMudServices(config =>
 {
-    // 全局Snackbar配置
     config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomCenter;
     config.SnackbarConfiguration.PreventDuplicates = true;
     config.SnackbarConfiguration.NewestOnTop = false;
 });
 
-// 添加控制器和API文档支持
-builder.Services.AddControllers();
+// Controllers & Swagger
+builder.Services.AddControllers(options =>
+{
+    // ✅ 禁用 API 的防伪验证（Swagger “Try it out” 才能正常使用）
+    options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -44,32 +50,22 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1",
         Description = "DexRobotPDA项目的API接口文档"
     });
-    
-    // 添加对XML注释的支持（可选）
-    // var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    // var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    // if (File.Exists(xmlPath))
-    // {
-    //     c.IncludeXmlComments(xmlPath);
-    // }
 });
 
-// 注入数据库上下文
+// DbContext
 builder.Services.AddDbContext<DailyDbContext>(m =>
     m.UseSqlServer(builder.Configuration.GetConnectionString("ConnStr")));
 
-// 注入AutoMapper
+// AutoMapper
 builder.Services.AddAutoMapper(typeof(AutoMapperSetting));
 
-// 创建全局JSON序列化选项
+// JSON 设置
 var jsonOptions = new JsonSerializerOptions
 {
     PropertyNameCaseInsensitive = true,
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     DictionaryKeyPolicy = JsonNamingPolicy.CamelCase
 };
-
-// 配置全局JSON序列化选项
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNameCaseInsensitive = jsonOptions.PropertyNameCaseInsensitive;
@@ -77,32 +73,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.DictionaryKeyPolicy = jsonOptions.DictionaryKeyPolicy;
 });
 
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = jsonOptions.PropertyNameCaseInsensitive;
-        options.JsonSerializerOptions.PropertyNamingPolicy = jsonOptions.PropertyNamingPolicy;
-        options.JsonSerializerOptions.DictionaryKeyPolicy = jsonOptions.DictionaryKeyPolicy;
-    });
-
-builder.Services.AddControllersWithViews()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = jsonOptions.PropertyNameCaseInsensitive;
-        options.JsonSerializerOptions.PropertyNamingPolicy = jsonOptions.PropertyNamingPolicy;
-    });
-
-// 配置RestClient并使用全局JSON设置
+// RestClient
 builder.Services.AddSingleton(serviceProvider =>
 {
     var baseUrl = builder.Configuration["ApiSettings:BaseUrl"];
     var options = new RestClientOptions(baseUrl);
-    
-    return new RestClient(options, configureSerialization: s => 
-        s.UseSystemTextJson(jsonOptions));
+    return new RestClient(options, configureSerialization: s => s.UseSystemTextJson(jsonOptions));
 });
 
-// 注册服务 - 后续添加新服务只需在这里注册
+// 注册服务
 builder.Services.AddScoped<EmployeeService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<AuthService>();
@@ -113,22 +92,19 @@ builder.Services.AddScoped<BarcodeScannerService>();
 builder.Services.AddScoped<DetectService>();
 builder.Services.AddScoped<LogService>();
 
-// 添加session
-// builder.Services.AddBlazoredSessionStorage();
-
-builder.Services.AddBlazoredLocalStorage(); 
+builder.Services.AddBlazoredLocalStorage();
 
 var app = builder.Build();
 
-// ========== 修改的 Swagger 配置部分 ==========
-// 移除环境判断，让 Swagger 在所有环境都可用
+// Swagger（所有环境可用）
 app.UseSwagger();
-app.UseSwaggerUI(c => 
-{ 
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DexRobotPDA API V1"); 
-    c.RoutePrefix = "swagger"; // 明确指定路由前缀
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DexRobotPDA API V1");
+    c.RoutePrefix = "swagger";
 });
 
+// 异常页
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -141,35 +117,51 @@ else
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// ✅ 必须加上这一句（修复 Missing Antiforgery Middleware 错误）
+// 但放在 Razor 页面映射之前即可，不影响 Swagger
 app.UseAntiforgery();
 
+// Serilog 请求日志
 app.UseSerilogRequestLogging(options =>
 {
-    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-    {
-        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
-        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent);
-        diagnosticContext.Set("RemoteIpAddress", httpContext.Connection.RemoteIpAddress);
-    };
-    
-    options.GetLevel = (httpContext, elapsed, ex) =>
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    options.GetLevel = (httpContext, elapsedMs, ex) =>
     {
         var path = httpContext.Request.Path.Value ?? "";
         if (path.StartsWith("/_blazor") || path.StartsWith("/_framework") ||
-            path.EndsWith(".js") || path.EndsWith(".css") || path.EndsWith(".png") ||
-            path.EndsWith(".jpg") || path.EndsWith(".ico"))
+            path.EndsWith(".js") || path.EndsWith(".css") ||
+            path.EndsWith(".png") || path.EndsWith(".jpg") ||
+            path.EndsWith(".ico") || path.EndsWith(".map"))
         {
-            return Serilog.Events.LogEventLevel.Verbose;
+            return LogEventLevel.Verbose;
         }
-        return Serilog.Events.LogEventLevel.Information;
+        if (ex != null) return LogEventLevel.Error;
+        if (elapsedMs > 500) return LogEventLevel.Warning;
+        return LogEventLevel.Information;
+    };
+    options.EnrichDiagnosticContext = (diag, http) =>
+    {
+        diag.Set("RequestHost", http.Request.Host.Value);
+        diag.Set("RequestScheme", http.Request.Scheme);
+        diag.Set("UserAgent", http.Request.Headers.UserAgent.ToString());
+        diag.Set("RemoteIpAddress", http.Connection.RemoteIpAddress?.ToString() ?? "");
+        diag.Set("RequestPath", http.Request.Path.Value ?? "");
+        diag.Set("RequestMethod", http.Request.Method ?? "");
+        var actionName = http.GetEndpoint()?.DisplayName ?? "";
+        diag.Set("ActionName", actionName);
+
+        var wsMb = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1024d / 1024d;
+        diag.Set("MemoryUsageMB", Math.Round(wsMb, 1));
     };
 });
 
-app.MapStaticAssets();
+// Razor 页面（会自动使用防伪中间件）
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// 静态资源与 API
+app.MapStaticAssets();
 app.MapControllers();
 
 app.Run();

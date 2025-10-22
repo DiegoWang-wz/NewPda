@@ -504,7 +504,7 @@ public class FingerController : ControllerBase
                 created_at = DateTime.Now,
                 updated_at = null
             };
-            
+
             if (existingFinger != null)
             {
                 res.ResultCode = -1;
@@ -545,7 +545,7 @@ public class FingerController : ControllerBase
                     res.Msg = $"电机 {motorId} 已被绑定";
                     return BadRequest(res);
                 }
-                
+
                 if (fingerModel.type != 2 && motor.is_qualified == false)
                 {
                     res.ResultCode = -1;
@@ -553,10 +553,7 @@ public class FingerController : ControllerBase
                     return BadRequest(res);
                 }
             }
-            
-            
 
-            
 
             await db.Fingers.AddAsync(fingerModel);
 

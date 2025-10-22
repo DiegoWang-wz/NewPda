@@ -804,3 +804,10 @@ D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\refint\DexRobotPDA.dll
 D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\DexRobotPDA.pdb
 D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\DexRobotPDA.genruntimeconfig.cache
 D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\ref\DexRobotPDA.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Activity.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Environment.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Process.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Thread.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Filters.Expressions.dll
+D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Superpower.dll
+D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\compressed\5qo7tx1yjy-1lslwf0cp7.gz

@@ -8,9 +8,8 @@ public class GetTaskDetailDto
     [StringLength(64, ErrorMessage = "任务ID长度不能超过64个字符")]
     public string task_id { get; set; }
 
-    [Required(ErrorMessage = "任务标题不能为空")]
     [StringLength(255, ErrorMessage = "标题长度不能超过255个字符")]
-    public string title { get; set; }
+    public string? title { get; set; }
 
     public string? description { get; set; }
 
@@ -19,5 +18,5 @@ public class GetTaskDetailDto
     
     public DateTime created_at { get; set; } = DateTime.Now;
     public DateTime updated_at { get; set; } = DateTime.Now;
-    public string sale_order_number { get; set; }
+    public string? sale_order_number { get; set; }
 }

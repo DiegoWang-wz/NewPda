@@ -110,6 +110,6 @@ public class FingerCalibrateDetectDto
     /// <summary>
     /// 法向力（压力传感器读数）
     /// </summary>
-    public double? normal_force { get; set; }
+    public bool? normal_force { get; set; }
 }
     

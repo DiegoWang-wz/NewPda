@@ -32,23 +32,59 @@ public class ProductTaskController : ControllerBase
         try
         {
             var list = db.ProductTasks.ToList();
-            _logger.LogDebug("从数据库获取到{Count}条记录", list.Count);
+            _logger.LogDebug("从数据库获取到 {Count} 条记录", list.Count);   // Debug，不落盘（默认）
 
-            List<ProductTaskDto> Tasks = mapper.Map<List<ProductTaskDto>>(list);
+            var tasks = mapper.Map<List<ProductTaskDto>>(list);
             response.ResultCode = 1;
             response.Msg = "Success";
-            response.ResultData = Tasks;
+            response.ResultData = tasks;
 
-            // 记录成功信息
-            _logger.LogInformation("成功获取，共{Count}条记录", Tasks.Count);
+            // 这里不再写 Information；由 UseSerilogRequestLogging 统一记一条
+            // _logger.LogInformation("成功获取，共 {Count} 条记录", tasks.Count);
         }
         catch (Exception e)
         {
             response.ResultCode = -1;
             response.Msg = "Error";
+            _logger.LogError(e, "获取列表时发生错误");                 // Error 要保留
+        }
+        return Ok(response);
+    }
 
-            // 记录错误信息，包括异常详情
-            _logger.LogError(e, "获取列表时发生错误");
+    [HttpGet]
+    public IActionResult GetTaskListByDate([FromQuery] string startDate, [FromQuery] string endDate)
+    {
+        ApiResponse response = new ApiResponse();
+        try
+        {
+            if (!DateTime.TryParse(startDate, out var start) || !DateTime.TryParse(endDate, out var end))
+            {
+                response.ResultCode = -1;
+                response.Msg = "日期格式错误，应为 yyyy-MM-dd";
+                return BadRequest(response);
+            }
+
+            // 确保结束日期包含当日的记录
+            end = end.AddDays(1);
+
+            // 查询在指定日期范围内的记录
+            var list = db.ProductTasks
+                .Where(e => e.created_at >= start && e.created_at < end)
+                .OrderByDescending(e => e.created_at)
+                .ToList();
+
+            _logger.LogDebug("在 {Start} 至 {End} 获取到 {Count} 条记录", start, end, list.Count);
+
+            var tasks = mapper.Map<List<ProductTaskDto>>(list);
+            response.ResultCode = 1;
+            response.Msg = "Success";
+            response.ResultData = tasks;
+        }
+        catch (Exception ex)
+        {
+            response.ResultCode = -1;
+            response.Msg = "Error";
+            _logger.LogError(ex, "根据日期范围获取记录时发生错误");
         }
 
         return Ok(response);
@@ -802,5 +838,46 @@ public class ProductTaskController : ControllerBase
         }
 
         return Ok(response);
+    }
+    
+    [HttpPut]
+    public async Task<ActionResult<ApiResponse>> SaleOrderBinding(SaleOrderBindingDto dto)
+    {
+        var res = new ApiResponse();
+
+        try
+        {
+            // 获取指定任务
+            var task = await db.ProductTasks
+                .FirstOrDefaultAsync(t => t.task_id == dto.task_id);
+
+            if (task == null)
+            {
+                res.ResultCode = -1;
+                res.Msg = "任务不存在";
+                return NotFound(res);
+            }
+
+            task.sale_order_number = dto.sale_order_number;
+            task.updated_at = DateTime.Now;
+
+            await db.SaveChangesAsync();
+
+            res.ResultCode = 1;
+            res.Msg = "绑定成功";
+            res.ResultData = new
+            {
+                TaskId = dto.task_id,
+            };
+            
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            res.ResultCode = -1;
+            res.Msg = $"更新失败: {ex.Message}";
+            _logger.LogError(ex, "更新单个任务状态时发生错误，任务ID: {TaskId}",  dto.task_id);
+            return StatusCode(500, res);
+        }
     }
 }

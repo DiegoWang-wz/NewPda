@@ -26,7 +26,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     private bool? _if_qualified;
     private double? _electricity;
     private bool? _proximity_sensing;
-    private double? _normal_force;
+    private bool? _normal_force;
 
     /// <summary>
     /// 电机使用时间（精确到小数点后2位）
@@ -237,7 +237,7 @@ public class FingerCalibrateDetectCreateDto : INotifyPropertyChanged
     /// <summary>
     /// 法向力（压力传感器读数）
     /// </summary>
-    public double? normal_force
+    public bool? normal_force
     {
         get => _normal_force;
         set => SetProperty(ref _normal_force, value);

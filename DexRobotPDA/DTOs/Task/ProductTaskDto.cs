@@ -8,14 +8,12 @@ public class AddTaskDto
     [StringLength(64, ErrorMessage = "任务ID长度不能超过64个字符")]
     public string task_id { get; set; }
 
-    [Required(ErrorMessage = "任务标题不能为空")]
     [StringLength(255, ErrorMessage = "标题长度不能超过255个字符")]
-    public string title { get; set; }
-
-    public string? description { get; set; }
+    public string? title { get; set; } = "";
+    public string? description { get; set; } = "";
 
     [StringLength(64, ErrorMessage = "负责人ID长度不能超过64个字符")]
-    public string? assignee_id { get; set; }
+    public string? assignee_id { get; set; } = "";
 
     public DateTime created_at { get; set; } = DateTime.Now;
     public DateTime updated_at { get; set; } = DateTime.Now;
@@ -33,5 +31,5 @@ public class AddTaskDto
     public byte process_7 { get; set; } = 0;
     public byte process_8 { get; set; } = 0;
     public int product_num { get; set; } = 1;
-    public string sale_order_number { get; set; }
+    public string? sale_order_number { get; set; }
 }

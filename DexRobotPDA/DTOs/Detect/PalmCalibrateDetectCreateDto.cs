@@ -23,7 +23,7 @@ public class PalmCalibrateDetectCreateDto
     /// <summary>
     /// 法向力（压力传感器读数）
     /// </summary>
-    public double? normal_force { get; set; }
+    public bool? normal_force { get; set; }
 
     /// <summary>
     /// 风扇功能状态（如 正常、异常）

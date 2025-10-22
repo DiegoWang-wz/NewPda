@@ -25,11 +25,14 @@
             <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
             <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
         </MudRadioGroup>
+        
+                       
+        <MudText Typo="Typo.subtitle2" Class="m1-3 mb-1">法向力</MudText>
+        <MudRadioGroup T="bool?" @bind-Value="_detectDto.normal_force" Required="true">
+            <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
+            <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
+        </MudRadioGroup>
 
-        <MudTextField Label="法向力"
-                      Class="my-2"
-                      @bind-Value="_detectDto.normal_force"
-                      RequiredError="请输入法向力"/>
 
         <MudTextField Label="风扇功能"
                       Class="my-2"
@@ -198,6 +201,7 @@
             _detectDto.inspector = currentUser?.employee_id;
             _detectDto.if_qualified ??= false;
             _detectDto.proximity_sensing ??= true;
+            _detectDto.normal_force ??= true;
             hasSearched = true;
         }
         catch (Exception ex)

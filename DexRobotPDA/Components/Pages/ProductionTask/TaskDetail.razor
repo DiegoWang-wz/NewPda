@@ -849,9 +849,20 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="接近觉">@context.proximity_sensing</MudTd>
+                                               DataLabel="接近觉">
+                                            <MudChip T="string"
+                                                     Color="@(context.proximity_sensing.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                @(context.proximity_sensing.GetValueOrDefault() ? "正常" : "不正常")
+                                            </MudChip>
+                                        </MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="法向力">@context.normal_force</MudTd>
+                                               DataLabel="法向力">
+                                            <MudChip T="string"
+                                                     Color="@(context.normal_force.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                @(context.normal_force.GetValueOrDefault() ? "正常" : "不正常")
+                                            </MudChip>
+                                        </MudTd>
+
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
                                             <MudChip T="string"
                                                      Color="@(context.if_qualified.GetValueOrDefault() ? Color.Success : Color.Error)">
@@ -1075,9 +1086,20 @@ else
                                         <MudTd Style="@MinColWidthStyle" DataLabel="手掌外壳ID">@context.palm_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="轮指100次">@context.hundred_times</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="接近觉">@context.proximity_sensing</MudTd>
+                                               DataLabel="接近觉">
+                                            <MudChip T="string"
+                                                     Color="@(context.proximity_sensing.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                @(context.proximity_sensing.GetValueOrDefault() ? "正常" : "不正常")
+                                            </MudChip>
+                                        </MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="法向力">@context.normal_force</MudTd>
+                                               DataLabel="法向力">
+                                            <MudChip T="string"
+                                                     Color="@(context.normal_force.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                @(context.normal_force.GetValueOrDefault() ? "正常" : "不正常")
+                                            </MudChip>
+                                        </MudTd>
+
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="风扇功能">@context.fan_function</MudTd>
                                         <MudTd Style="@MinColWidthStyle"

@@ -102,17 +102,22 @@
                                        Adornment="Adornment.End"
                                        AdornmentIcon="@Icons.Material.Filled.Event"
                                        Class="my-2"/>
-                        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">接近觉</MudText>
+                        <MudTextField Class="my-2" T="string?" Label="备注"
+                                      @bind-Value="_detectDto.remarks"/>
+                        
+                        <MudText Typo="Typo.subtitle2" Class="mt-1 mb-1">接近觉</MudText>
                         <MudRadioGroup T="bool?" @bind-Value="_detectDto.proximity_sensing" Required="true">
                             <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
                             <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
                         </MudRadioGroup>
-                        <MudTextField Label="法向力"
-                                      Class="my-2"
-                                      @bind-Value="_detectDto.normal_force"
-                                      RequiredError="法向力"/>
-                        <MudTextField Class="my-2" T="string?" Label="备注"
-                                      @bind-Value="_detectDto.remarks"/>
+                        
+                        <MudText Typo="Typo.subtitle2" Class="m1-3 mb-1">法向力</MudText>
+                        <MudRadioGroup T="bool?" @bind-Value="_detectDto.normal_force" Required="true">
+                            <MudRadio T="bool?" Value="true" Color="Color.Success">正常</MudRadio>
+                            <MudRadio T="bool?" Value="false" Color="Color.Error">不正常</MudRadio>
+                        </MudRadioGroup>
+
+                       
                     </MudPaper>
                 </MudItem>
             </MudGrid>
@@ -259,7 +264,7 @@
         try
         {
             _finger = await DetectService.GetFinger(finger_id);
-            if (_finger.type != 1)
+            if (_finger.type != 0)
             {
                 SnackbarHelper.Show(Snackbar, "请输入正确的单指编号！", Severity.Error);
                 _finger = new();
@@ -272,6 +277,7 @@
             _detectDto.inspector = currentUser?.employee_id;
             _detectDto.if_qualified ??= false;
             _detectDto.proximity_sensing ??= true;
+            _detectDto.normal_force ??= true;
             hasSearched = true;
         }
         catch (Exception ex)

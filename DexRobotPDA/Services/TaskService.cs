@@ -52,6 +52,27 @@ namespace DexRobotPDA.Services
 
             return apiResponse;
         }
+        
+        public async Task<ApiResponse> SaleOrderBinding(SaleOrderBindingDto taskDto)
+        {
+            var request = new RestRequest("api/ProductTask/SaleOrderBinding", Method.Put);
+
+            request.AddJsonBody(taskDto);
+            var apiResponse = await ExecuteCommand(request);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string responseJson = JsonSerializer.Serialize(apiResponse, options);
+
+            if (apiResponse.ResultCode == 1 && apiResponse.ResultData != null)
+            {
+                _logger.LogInformation("生产单号绑定销售单号成功 - 生产单号: {task_id},销售单号：{sale_order_number}", taskDto.task_id, taskDto.sale_order_number);
+            }
+            else
+            {
+                _logger.LogWarning("生产单号绑定销售单号失败 - 生产单号: {task_id}, 错误信息: {Msg}", taskDto.task_id, apiResponse.Msg);
+            }
+
+            return apiResponse;
+        }
 
 
         public async Task<ApiResponse> UpdateTaskProcessStatus(string taskId, string process, byte status)

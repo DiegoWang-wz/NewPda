@@ -1,0 +1,146 @@
+﻿@inject TaskService taskService;
+
+<MudDialog>
+    <DialogContent>
+        <MudPaper Elevation="1" Class="pa-6 ms-4" Style="min-width: 400px;">
+            <MudText Typo="Typo.h6" Class="mb-4" Align="Align.Center">生产单号绑定销售单号</MudText>
+
+            <MudForm @ref="form" Model="@_bindDto" @bind-Errors="@errors">
+                <MudStack Spacing="4">
+
+                    <MudTextField T="string"
+                                  Label="生产单号"
+                                  Required="true"
+                                  AutoFocus="true"
+                                  RequiredError="生产单号未填"
+                                  @bind-Value="_bindDto.task_id"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Title">
+                    </MudTextField>
+                    <MudTextField T="string"
+                                  Label="销售单号"
+                                  RequiredError="销售单号未填"
+                                  @bind-Value="_bindDto.sale_order_number"
+                                  Variant="Variant.Outlined"
+                                  Adornment="@Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Title">
+                    </MudTextField>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+    </DialogContent>
+
+    <DialogActions>
+        <MudItem xs="12" md="5" Class="d-flex justify-end">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="Cancel"
+                       Class="mx-1"
+                       Color="Color.Secondary">
+                <MudIcon Icon="@Icons.Material.Filled.Close" Class="me-1"/>
+                取消
+            </MudButton>
+            <MudButton OnClick="Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Class="mx-1"
+                       Disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2"/>
+                    <MudText>绑定中...</MudText>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Class="me-1"/>
+                    <MudText>绑定</MudText>
+                }
+            </MudButton>
+        </MudItem>
+    </DialogActions>
+
+
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+    string[] errors = { };
+    SaleOrderBindingDto _bindDto = new();
+    MudForm form;
+    private bool isLoading = false;
+    private UserDto? currentUser;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"加载用户信息失败: {ex.Message}");
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task Submit()
+    {
+        // 关键修改：先进行表单验证
+        await form.Validate();
+
+        // 如果验证失败，直接返回，不执行后续提交逻辑
+        if (!form.IsValid)
+        {
+            SnackbarHelper.Show(Snackbar, "请填写必填字段", Severity.Error);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var response = await taskService.SaleOrderBinding(_bindDto);
+
+            if (response != null && response.ResultCode == 1)
+            {
+                SnackbarHelper.Show(Snackbar, "绑定成功！", Severity.Success);
+                await LogService.AddLog("绑定生产单号", currentUser.employee_id,
+                    $"生产单号ID: {_bindDto.task_id}, 销售单号: {_bindDto.sale_order_number}", true);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var errorMessage = response?.Msg ?? "绑定失败";
+                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
+                await LogService.AddLog("绑定生产单号", currentUser.employee_id,
+                    $"生产单号ID: {_bindDto.task_id}, 销售单号: {_bindDto.sale_order_number}", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"绑定失败: {ex.Message}");
+            SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
+            await LogService.AddLog("绑定生产单号", currentUser.employee_id,
+                $"生产单号ID: {_bindDto.task_id}, 销售单号: {_bindDto.sale_order_number}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

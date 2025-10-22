@@ -1428,6 +1428,62 @@
           "Microsoft.AspNetCore.App"
         ]
       },
+      "Serilog.Enrichers.Activity/1.0.0.3": {
+        "type": "package",
+        "dependencies": {
+          "Serilog": "2.10.0"
+        },
+        "compile": {
+          "lib/net5.0/Serilog.Enrichers.Activity.dll": {}
+        },
+        "runtime": {
+          "lib/net5.0/Serilog.Enrichers.Activity.dll": {}
+        }
+      },
+      "Serilog.Enrichers.Environment/3.0.1": {
+        "type": "package",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        },
+        "compile": {
+          "lib/net8.0/Serilog.Enrichers.Environment.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Environment.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Serilog.Enrichers.Process/3.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        },
+        "compile": {
+          "lib/net8.0/Serilog.Enrichers.Process.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Process.dll": {}
+        }
+      },
+      "Serilog.Enrichers.Thread/4.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        },
+        "compile": {
+          "lib/net8.0/Serilog.Enrichers.Thread.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Thread.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Serilog.Extensions.Hosting/9.0.0": {
         "type": "package",
         "dependencies": {
@@ -1461,6 +1517,23 @@
         },
         "runtime": {
           "lib/net9.0/Serilog.Extensions.Logging.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Serilog.Filters.Expressions/2.1.0": {
+        "type": "package",
+        "dependencies": {
+          "Serilog": "2.9.0",
+          "Superpower": "2.3.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/Serilog.Filters.Expressions.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Serilog.Filters.Expressions.dll": {
             "related": ".xml"
           }
         }
@@ -1556,6 +1629,19 @@
         },
         "runtime": {
           "lib/netcoreapp3.1/SixLabors.Fonts.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Superpower/2.3.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Superpower.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Superpower.dll": {
             "related": ".xml"
           }
         }
@@ -4988,6 +5074,85 @@
         "serilog.aspnetcore.nuspec"
       ]
     },
+    "Serilog.Enrichers.Activity/1.0.0.3": {
+      "sha512": "lzh52PSryrPgkRpg72a4uUN64OG9uSO9IwB8nolEHDAf5eWqtU+d1lQa4rodTC9P3N0jxUGbn6C9r5XdJ+4MCQ==",
+      "type": "package",
+      "path": "serilog.enrichers.activity/1.0.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "lib/net5.0/Serilog.Enrichers.Activity.dll",
+        "lib/netcoreapp2.2/Serilog.Enrichers.Activity.dll",
+        "lib/netcoreapp3.1/Serilog.Enrichers.Activity.dll",
+        "serilog.enrichers.activity.1.0.0.3.nupkg.sha512",
+        "serilog.enrichers.activity.nuspec"
+      ]
+    },
+    "Serilog.Enrichers.Environment/3.0.1": {
+      "sha512": "9BqCE4C9FF+/rJb/CsQwe7oVf44xqkOvMwX//CUxvUR25lFL4tSS6iuxE5eW07quby1BAyAEP+vM6TWsnT3iqw==",
+      "type": "package",
+      "path": "serilog.enrichers.environment/3.0.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net462/Serilog.Enrichers.Environment.dll",
+        "lib/net462/Serilog.Enrichers.Environment.xml",
+        "lib/net471/Serilog.Enrichers.Environment.dll",
+        "lib/net471/Serilog.Enrichers.Environment.xml",
+        "lib/net6.0/Serilog.Enrichers.Environment.dll",
+        "lib/net6.0/Serilog.Enrichers.Environment.xml",
+        "lib/net8.0/Serilog.Enrichers.Environment.dll",
+        "lib/net8.0/Serilog.Enrichers.Environment.xml",
+        "lib/netstandard2.0/Serilog.Enrichers.Environment.dll",
+        "lib/netstandard2.0/Serilog.Enrichers.Environment.xml",
+        "serilog-enricher-nuget.png",
+        "serilog.enrichers.environment.3.0.1.nupkg.sha512",
+        "serilog.enrichers.environment.nuspec"
+      ]
+    },
+    "Serilog.Enrichers.Process/3.0.0": {
+      "sha512": "/wPYz2PDCJGSHNI+Z0PAacZvrgZgrGduWqLXeC2wvW6pgGM/Bi45JrKy887MRcRPHIZVU0LAlkmJ7TkByC0boQ==",
+      "type": "package",
+      "path": "serilog.enrichers.process/3.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net462/Serilog.Enrichers.Process.dll",
+        "lib/net471/Serilog.Enrichers.Process.dll",
+        "lib/net6.0/Serilog.Enrichers.Process.dll",
+        "lib/net8.0/Serilog.Enrichers.Process.dll",
+        "lib/netstandard2.0/Serilog.Enrichers.Process.dll",
+        "serilog-enricher-nuget.png",
+        "serilog.enrichers.process.3.0.0.nupkg.sha512",
+        "serilog.enrichers.process.nuspec"
+      ]
+    },
+    "Serilog.Enrichers.Thread/4.0.0": {
+      "sha512": "C7BK25a1rhUyr+Tp+1BYcVlBJq7M2VCHlIgnwoIUVJcicM9jYcvQK18+OeHiXw7uLPSjqWxJIp1EfaZ/RGmEwA==",
+      "type": "package",
+      "path": "serilog.enrichers.thread/4.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net462/Serilog.Enrichers.Thread.dll",
+        "lib/net462/Serilog.Enrichers.Thread.xml",
+        "lib/net471/Serilog.Enrichers.Thread.dll",
+        "lib/net471/Serilog.Enrichers.Thread.xml",
+        "lib/net6.0/Serilog.Enrichers.Thread.dll",
+        "lib/net6.0/Serilog.Enrichers.Thread.xml",
+        "lib/net8.0/Serilog.Enrichers.Thread.dll",
+        "lib/net8.0/Serilog.Enrichers.Thread.xml",
+        "lib/netstandard2.0/Serilog.Enrichers.Thread.dll",
+        "lib/netstandard2.0/Serilog.Enrichers.Thread.xml",
+        "serilog-enricher-nuget.png",
+        "serilog.enrichers.thread.4.0.0.nupkg.sha512",
+        "serilog.enrichers.thread.nuspec"
+      ]
+    },
     "Serilog.Extensions.Hosting/9.0.0": {
       "sha512": "u2TRxuxbjvTAldQn7uaAwePkWxTHIqlgjelekBtilAGL5sYyF3+65NWctN4UrwwGLsDC7c3Vz3HnOlu+PcoxXg==",
       "type": "package",
@@ -5032,6 +5197,23 @@
         "serilog-extension-nuget.png",
         "serilog.extensions.logging.9.0.0.nupkg.sha512",
         "serilog.extensions.logging.nuspec"
+      ]
+    },
+    "Serilog.Filters.Expressions/2.1.0": {
+      "sha512": "e0ZaK+NWx6+j71xB5dRXohdreSeHgMJ9mp4giSp83/4UC8VsJWDH+CAT1YVXsyINAR9IQznXllnJ0e5j+BvwzA==",
+      "type": "package",
+      "path": "serilog.filters.expressions/2.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net45/Serilog.Filters.Expressions.dll",
+        "lib/net45/Serilog.Filters.Expressions.xml",
+        "lib/netstandard1.5/Serilog.Filters.Expressions.dll",
+        "lib/netstandard1.5/Serilog.Filters.Expressions.xml",
+        "lib/netstandard2.0/Serilog.Filters.Expressions.dll",
+        "lib/netstandard2.0/Serilog.Filters.Expressions.xml",
+        "serilog.filters.expressions.2.1.0.nupkg.sha512",
+        "serilog.filters.expressions.nuspec"
       ]
     },
     "Serilog.Formatting.Compact/3.0.0": {
@@ -5165,6 +5347,23 @@
         "sixlabors.fonts.1.0.0.nupkg.sha512",
         "sixlabors.fonts.128.png",
         "sixlabors.fonts.nuspec"
+      ]
+    },
+    "Superpower/2.3.0": {
+      "sha512": "L7ZLWjec5aPWWebsOKM6+8SdobSFMPJFIS8S8TT46oH2iELA70H95spRMeP1yPH9nDL/o+XYP29DPtVwVdzPeA==",
+      "type": "package",
+      "path": "superpower/2.3.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net45/Superpower.dll",
+        "lib/net45/Superpower.xml",
+        "lib/netstandard1.0/Superpower.dll",
+        "lib/netstandard1.0/Superpower.xml",
+        "lib/netstandard2.0/Superpower.dll",
+        "lib/netstandard2.0/Superpower.xml",
+        "superpower.2.3.0.nupkg.sha512",
+        "superpower.nuspec"
       ]
     },
     "Swashbuckle.AspNetCore/9.0.4": {
@@ -6465,6 +6664,11 @@
       "MudBlazor >= 8.12.0",
       "RestSharp >= 111.4.0",
       "Serilog.AspNetCore >= 9.0.0",
+      "Serilog.Enrichers.Activity >= 1.0.0.3",
+      "Serilog.Enrichers.Environment >= 3.0.1",
+      "Serilog.Enrichers.Process >= 3.0.0",
+      "Serilog.Enrichers.Thread >= 4.0.0",
+      "Serilog.Filters.Expressions >= 2.1.0",
       "Serilog.Settings.Configuration >= 9.0.0",
       "Serilog.Sinks.File >= 7.0.0",
       "Swashbuckle.AspNetCore >= 9.0.4"
@@ -6572,6 +6776,26 @@
           "Serilog.AspNetCore": {
             "target": "Package",
             "version": "[9.0.0, )"
+          },
+          "Serilog.Enrichers.Activity": {
+            "target": "Package",
+            "version": "[1.0.0.3, )"
+          },
+          "Serilog.Enrichers.Environment": {
+            "target": "Package",
+            "version": "[3.0.1, )"
+          },
+          "Serilog.Enrichers.Process": {
+            "target": "Package",
+            "version": "[3.0.0, )"
+          },
+          "Serilog.Enrichers.Thread": {
+            "target": "Package",
+            "version": "[4.0.0, )"
+          },
+          "Serilog.Filters.Expressions": {
+            "target": "Package",
+            "version": "[2.1.0, )"
           },
           "Serilog.Settings.Configuration": {
             "target": "Package",
