@@ -66,9 +66,51 @@ public class MotorController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPost]
+    public async Task<IActionResult> DeleteMotor([FromQuery] string motor_id)
+    {
+        var response = new ApiResponse();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(motor_id))
+            {
+                response.ResultCode = -1;
+                response.Msg = "参数 motor_id 不能为空";
+                return Ok(response);
+            }
+
+            var motor = await db.Motors.FirstOrDefaultAsync(m => m.motor_id == motor_id);
+            if (motor == null)
+            {
+                response.ResultCode = -1;
+                response.Msg = "电机不存在";
+                return Ok(response);
+            }
+
+            db.Motors.Remove(motor);
+            await db.SaveChangesAsync();
+
+            response.ResultCode = 1;
+            response.Msg = "删除成功";
+            response.ResultData = new { motor_id };
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "删除电机 {MotorId} 失败（数据库约束）", motor_id);
+            response.ResultCode = -1;
+            response.Msg = "删除失败：该电机可能已绑定或被其他记录引用";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "删除电机 {MotorId} 失败（未知错误）", motor_id);
+            response.ResultCode = -1;
+            response.Msg = "删除失败：服务器内部错误";
+        }
+
+        return Ok(response);
+    }
+
     
-
-
     [HttpGet]
     public async Task<IActionResult> GetMotorByFinger(string finger_id)
     {

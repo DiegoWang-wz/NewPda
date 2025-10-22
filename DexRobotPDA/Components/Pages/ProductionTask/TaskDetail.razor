@@ -166,6 +166,7 @@ else
                                         <MudTd Style="@MinColWidthStyle" DataLabel="手指ID">@context.finger_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="操作">
                                             <MudButton Variant="Variant.Filled"
+                                                       OnClick="@(() => DeleteMotor(context.motor_id))"
                                                        StartIcon="@Icons.Material.Filled.Delete"
                                                        Color="Color.Error">删除
                                             </MudButton>
@@ -441,7 +442,8 @@ else
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitCalibrateDetectDto x) => x.finger_id">手指外壳ID
+                                            <MudTableSortLabel SortBy="(SplitCalibrateDetectDto x) => x.finger_id">
+                                                手指外壳ID
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
@@ -1037,7 +1039,8 @@ else
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.hundred_times">轮指100次
+                                            <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.hundred_times">
+                                                轮指100次
                                             </MudTableSortLabel>
                                         </MudTh>
                                         <MudTh Style="@MinColWidthStyle">
@@ -1084,7 +1087,8 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="序号">@(Detect5List.IndexOf(context) + 1)</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="手掌外壳ID">@context.palm_id</MudTd>
-                                        <MudTd Style="@MinColWidthStyle" DataLabel="轮指100次">@context.hundred_times</MudTd>
+                                        <MudTd Style="@MinColWidthStyle"
+                                               DataLabel="轮指100次">@context.hundred_times</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="接近觉">
                                             <MudChip T="string"
@@ -1611,7 +1615,7 @@ else
 
     private async Task CheckProcess1()
     {
-        if (finishedMotors.Count == task.product_num*12)
+        if (finishedMotors.Count == task.product_num * 12)
         {
             await TaskService.UpdateTaskProcessStatus(taskId, "process1", 1);
         }
@@ -1623,7 +1627,7 @@ else
 
     private async Task CheckProcess2()
     {
-        if (finishedFingers.Count == task.product_num*6)
+        if (finishedFingers.Count == task.product_num * 6)
         {
             await TaskService.UpdateTaskProcessStatus(taskId, "process5", 1);
         }
@@ -1645,6 +1649,60 @@ else
         }
     }
 
+    private async Task DeleteMotor(string motor_id)
+    {
+        var confirmed = await ConfirmDeleteAsync($"确定要删除电机：{motor_id} 吗？此操作不可撤销。");
+        if (!confirmed)
+        {
+            SnackbarHelper.Show(Snackbar, "已取消删除", Severity.Info);
+            return;
+        }
+        try
+        {
+            var res = await ProcessOneService.DeleteMotor(motor_id);
+            if (res.ResultCode == 1)
+            {
+                SnackbarHelper.Show(Snackbar, $"电机 {motor_id} 删除成功", Severity.Success);
+            }
+            else
+            {
+                SnackbarHelper.Show(Snackbar, $"电机 {motor_id} 删除失败：{res.Msg}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"电机 {motor_id} 删除异常：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            await LoadStepData(currentStepIndex);
+        }
+    }
+
+
+    private async Task<bool> ConfirmDeleteAsync(string content, string? title = null, string okText = "删除")
+    {
+        var parameters = new DialogParameters<DeleteConfirmDialog>
+        {
+            { x => x.ContentText, content },
+            { x => x.ButtonText, okText },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.ExtraSmall
+        };
+
+        var dialogRef = await DialogService.ShowAsync<DeleteConfirmDialog>(title ?? "删除确认", parameters, options);
+        var result = await dialogRef.Result;
+
+        return !result.Canceled && result.Data is bool ok && ok;
+    }
+
+    
 }
 
 <style>

@@ -59,6 +59,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXEN1c3RvbURhdGVUaW1lUGlja2VyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Components/DeleteConfirmDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXERlbGV0ZUNvbmZpcm1EaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Components/MyDialog.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wb25lbnRzXE15RGlhbG9nLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 

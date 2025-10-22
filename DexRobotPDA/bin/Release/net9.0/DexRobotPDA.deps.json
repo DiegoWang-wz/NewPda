@@ -20,6 +20,11 @@
           "MudBlazor": "8.12.0",
           "RestSharp": "111.4.0",
           "Serilog.AspNetCore": "9.0.0",
+          "Serilog.Enrichers.Activity": "1.0.0.3",
+          "Serilog.Enrichers.Environment": "3.0.1",
+          "Serilog.Enrichers.Process": "3.0.0",
+          "Serilog.Enrichers.Thread": "4.0.0",
+          "Serilog.Filters.Expressions": "2.1.0",
           "Serilog.Settings.Configuration": "9.0.0",
           "Serilog.Sinks.File": "7.0.0",
           "Swashbuckle.AspNetCore": "9.0.4"
@@ -1014,6 +1019,50 @@
           }
         }
       },
+      "Serilog.Enrichers.Activity/1.0.0.3": {
+        "dependencies": {
+          "Serilog": "4.2.0"
+        },
+        "runtime": {
+          "lib/net5.0/Serilog.Enrichers.Activity.dll": {
+            "assemblyVersion": "1.0.0.3",
+            "fileVersion": "1.0.0.3"
+          }
+        }
+      },
+      "Serilog.Enrichers.Environment/3.0.1": {
+        "dependencies": {
+          "Serilog": "4.2.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Environment.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.0.0.0"
+          }
+        }
+      },
+      "Serilog.Enrichers.Process/3.0.0": {
+        "dependencies": {
+          "Serilog": "4.2.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Process.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.0.0.0"
+          }
+        }
+      },
+      "Serilog.Enrichers.Thread/4.0.0": {
+        "dependencies": {
+          "Serilog": "4.2.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.Enrichers.Thread.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.0.0"
+          }
+        }
+      },
       "Serilog.Extensions.Hosting/9.0.0": {
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.8",
@@ -1038,6 +1087,18 @@
           "lib/net9.0/Serilog.Extensions.Logging.dll": {
             "assemblyVersion": "9.0.0.0",
             "fileVersion": "9.0.0.0"
+          }
+        }
+      },
+      "Serilog.Filters.Expressions/2.1.0": {
+        "dependencies": {
+          "Serilog": "4.2.0",
+          "Superpower": "2.3.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Serilog.Filters.Expressions.dll": {
+            "assemblyVersion": "2.1.0.0",
+            "fileVersion": "2.1.0.0"
           }
         }
       },
@@ -1103,6 +1164,14 @@
           "lib/netcoreapp3.1/SixLabors.Fonts.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Superpower/2.3.0": {
+        "runtime": {
+          "lib/netstandard2.0/Superpower.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "2.3.0.0"
           }
         }
       },
@@ -1941,6 +2010,34 @@
       "path": "serilog.aspnetcore/9.0.0",
       "hashPath": "serilog.aspnetcore.9.0.0.nupkg.sha512"
     },
+    "Serilog.Enrichers.Activity/1.0.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-lzh52PSryrPgkRpg72a4uUN64OG9uSO9IwB8nolEHDAf5eWqtU+d1lQa4rodTC9P3N0jxUGbn6C9r5XdJ+4MCQ==",
+      "path": "serilog.enrichers.activity/1.0.0.3",
+      "hashPath": "serilog.enrichers.activity.1.0.0.3.nupkg.sha512"
+    },
+    "Serilog.Enrichers.Environment/3.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9BqCE4C9FF+/rJb/CsQwe7oVf44xqkOvMwX//CUxvUR25lFL4tSS6iuxE5eW07quby1BAyAEP+vM6TWsnT3iqw==",
+      "path": "serilog.enrichers.environment/3.0.1",
+      "hashPath": "serilog.enrichers.environment.3.0.1.nupkg.sha512"
+    },
+    "Serilog.Enrichers.Process/3.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/wPYz2PDCJGSHNI+Z0PAacZvrgZgrGduWqLXeC2wvW6pgGM/Bi45JrKy887MRcRPHIZVU0LAlkmJ7TkByC0boQ==",
+      "path": "serilog.enrichers.process/3.0.0",
+      "hashPath": "serilog.enrichers.process.3.0.0.nupkg.sha512"
+    },
+    "Serilog.Enrichers.Thread/4.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-C7BK25a1rhUyr+Tp+1BYcVlBJq7M2VCHlIgnwoIUVJcicM9jYcvQK18+OeHiXw7uLPSjqWxJIp1EfaZ/RGmEwA==",
+      "path": "serilog.enrichers.thread/4.0.0",
+      "hashPath": "serilog.enrichers.thread.4.0.0.nupkg.sha512"
+    },
     "Serilog.Extensions.Hosting/9.0.0": {
       "type": "package",
       "serviceable": true,
@@ -1954,6 +2051,13 @@
       "sha512": "sha512-NwSSYqPJeKNzl5AuXVHpGbr6PkZJFlNa14CdIebVjK3k/76kYj/mz5kiTRNVSsSaxM8kAIa1kpy/qyT9E4npRQ==",
       "path": "serilog.extensions.logging/9.0.0",
       "hashPath": "serilog.extensions.logging.9.0.0.nupkg.sha512"
+    },
+    "Serilog.Filters.Expressions/2.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-e0ZaK+NWx6+j71xB5dRXohdreSeHgMJ9mp4giSp83/4UC8VsJWDH+CAT1YVXsyINAR9IQznXllnJ0e5j+BvwzA==",
+      "path": "serilog.filters.expressions/2.1.0",
+      "hashPath": "serilog.filters.expressions.2.1.0.nupkg.sha512"
     },
     "Serilog.Formatting.Compact/3.0.0": {
       "type": "package",
@@ -1996,6 +2100,13 @@
       "sha512": "sha512-LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg==",
       "path": "sixlabors.fonts/1.0.0",
       "hashPath": "sixlabors.fonts.1.0.0.nupkg.sha512"
+    },
+    "Superpower/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-L7ZLWjec5aPWWebsOKM6+8SdobSFMPJFIS8S8TT46oH2iELA70H95spRMeP1yPH9nDL/o+XYP29DPtVwVdzPeA==",
+      "path": "superpower/2.3.0",
+      "hashPath": "superpower.2.3.0.nupkg.sha512"
     },
     "Swashbuckle.AspNetCore/9.0.4": {
       "type": "package",

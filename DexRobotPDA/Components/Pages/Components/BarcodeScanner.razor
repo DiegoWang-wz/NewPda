@@ -8,7 +8,7 @@
         @if (input.Visible)
         {
             <MudItem xs="12">
-                <MudTextField T="string" 
+                <MudTextField T="string"
                               @ref="input.FieldRef"
                               @bind-Value="input.Value"
                               Label="@input.Label"
@@ -46,7 +46,7 @@
 
     // 重复校验的错误提示文本
     [Parameter] public string DuplicateErrorMessage { get; set; } = "输入内容重复";
-    
+
     private ElementReference _barcodeInput;
     private bool _isProcessing = false; // 防止并发处理
 
@@ -62,7 +62,7 @@
     private void HandleInputFocus(InputField input)
     {
         ScannerService.SetCurrentFocusedInputId(input.Id);
-        
+
         if (input.IsSpecialInput)
         {
             _ = ScannerService.ExitAutoFocusModeAsync();
@@ -79,6 +79,7 @@
         {
             await ScannerService.EnterAutoFocusModeAsync();
         }
+
         await ScannerService.HandleInputBlurAsync();
 
         // 通知父级
@@ -105,7 +106,7 @@
         try
         {
             _isProcessing = true;
-            
+
             if (ScannerService.IsAutoMode && DetermineTargetInput != null)
             {
                 var targetInput = DetermineTargetInput(barcodeData);
@@ -129,15 +130,15 @@
                         await Task.Delay(80);
                         await targetInput.FieldRef.FocusAsync();
                     }
-                
+
                     await ScannerService.EnsureAutoFocusAsync();
                 }
             }
             else
             {
-                var currentInput = Inputs.FirstOrDefault(i => 
+                var currentInput = Inputs.FirstOrDefault(i =>
                     i.Index == ScannerService.GetManualFocusIndex() && i.Visible);
-            
+
                 if (currentInput != null)
                 {
                     if (currentInput.Value != barcodeData)
@@ -173,17 +174,17 @@
 
         // ⬅️ 键入后统一重算重复
         await RevalidateDuplicates();
-    
+
         if (e.Key == "Enter" && !input.IsSpecialInput)
         {
             var nextIndex = input.Index + 1;
-            var nextInput = Inputs.FirstOrDefault(i => 
+            var nextInput = Inputs.FirstOrDefault(i =>
                 i.Index == nextIndex && i.Visible && !i.IsSpecialInput);
             if (nextInput?.FieldRef != null)
             {
                 await Task.Delay(50);
                 await nextInput.FieldRef.FocusAsync();
-                
+
                 if (!ScannerService.IsAutoMode)
                 {
                     ScannerService.SetManualFocusIndex(nextIndex);
@@ -244,6 +245,22 @@
         await ScannerService.DisposeAsync();
     }
 
+    public async Task FocusByIdAsync(string id, bool selectAll = false)
+    {
+        var input = Inputs.FirstOrDefault(i => i.Id == id && i.Visible && !i.Disable);
+        if (input?.FieldRef is not null)
+        {
+            await input.FieldRef.FocusAsync();
+            if (selectAll)
+                await input.FieldRef.SelectAsync();
+
+            ScannerService.SetCurrentFocusedInputId(input.Id);
+
+            if (!ScannerService.IsAutoMode)
+                ScannerService.SetManualFocusIndex(input.Index);
+        }
+    }
+
     // 输入框信息模型
     public class InputField
     {
@@ -258,4 +275,5 @@
         public bool Error { get; set; } = false;
         public string ErrorText { get; set; } = string.Empty;
     }
+
 }

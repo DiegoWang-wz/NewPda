@@ -11,7 +11,6 @@
                     <MudTextField T="string"
                                   Label="生产单号"
                                   Required="true"
-                                  AutoFocus="true"
                                   RequiredError="生产单号未填"
                                   @bind-Value="_bindDto.task_id"
                                   Variant="Variant.Outlined"
@@ -20,6 +19,7 @@
                     </MudTextField>
                     <MudTextField T="string"
                                   Label="销售单号"
+                                  Required="true"
                                   RequiredError="销售单号未填"
                                   @bind-Value="_bindDto.sale_order_number"
                                   Variant="Variant.Outlined"

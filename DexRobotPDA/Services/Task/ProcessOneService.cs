@@ -75,6 +75,27 @@ public class ProcessOneService : BaseService
         return apiResponse;
     }
     
+    public async Task<ApiResponse> DeleteMotor(string motor_id)
+    {
+        var request = new RestRequest($"api/Motor/DeleteMotor?motor_id={motor_id}", Method.Post);
+
+        _logger.LogInformation("尝试删除电机 - 电机ID: {MotorId}", motor_id);
+        var apiResponse = await ExecuteCommand(request);
+
+        if (apiResponse.ResultCode == 1)
+        {
+            _logger.LogInformation("电机删除成功 - 电机ID: {MotorId}", motor_id);
+        }
+        else
+        {
+            _logger.LogWarning("电机删除失败 - 电机ID: {MotorId}, 错误信息: {Msg}", motor_id, apiResponse.Msg);
+        }
+
+        return apiResponse;
+    }
+
+
+    
     public async Task<ApiResponse> ReBindMotor(string motor_id, string task_id, string finger_id)
     {
         var request = new RestRequest("api/Motor/ReBindMotor", Method.Put); // 修改端点
