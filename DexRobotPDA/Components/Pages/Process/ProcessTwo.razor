@@ -2,6 +2,7 @@
 @page "/process_2/{task_id}/{finger_id}"
 
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @implements IAsyncDisposable
 
 <MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
@@ -165,11 +166,9 @@
 @code {
     private const string StorageKey = "process2_taskId";
 
-    // ==== 新增：编号前缀约束 ====
-    private const string FingerPrefix = "fg";
-    private const string MotorPrefix  = "mot";
-    private const string FingerPrefixError = "手指编号格式错误，应以 fg 开头";
-    private const string MotorPrefixError  = "电机编号格式错误，应以 mot 开头";
+    // ===== 电机前缀校验（保留） =====
+    private const string MotorPrefix  = "M11021G27W";
+    private const string MotorPrefixError  = "电机编号格式错误，应以 M11021G27W 开头";
 
     [Parameter] public string task_id { get; set; }
     [Parameter] public string finger_id { get; set; }
@@ -182,15 +181,59 @@
     private List<FingerDto> finishedFingers = new List<FingerDto>();
     private MudForm form;
     private bool validation = true;
-    private AddFingerDto _fingerDto = new AddFingerDto(); // 需要有 int type {get;set;} = 0;
+    private AddFingerDto _fingerDto = new AddFingerDto(); // 0=四指(D), 1=拇指(M)
     private string _motorId1 { get; set; } = string.Empty;
     private string _motorId2 { get; set; } = string.Empty;
     private string _motorId3 { get; set; } = string.Empty;
     private DotNetObjectReference<ProcessTwo>? dotNetRef;
-    private BarcodeScanner? scanner; // ⬅️ 引用子组件
+    private BarcodeScanner? scanner;
     private List<BarcodeScanner.InputField> scannerInputs = new();
     private List<string> DuplicateCheckList = new() { "motorId1", "motorId2", "motorId3" };
     private bool isBinding = false;
+
+    private string? _pendingFocusId;
+
+    // ===== 手指编号校验：按模式动态选择（本页不接受 F） =====
+    private static readonly Regex FingerCodeRegexForFour =
+        new(@"^MO-\d{8}-\d{3}-D[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex FingerCodeRegexForThumb =
+        new(@"^MO-\d{8}-\d{3}-M[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private Regex CurrentFingerRegex => _fingerDto?.type == 1
+        ? FingerCodeRegexForThumb   // 拇指 → M
+        : FingerCodeRegexForFour;   // 四指 → D
+
+    private string CurrentFingerModeLetter => _fingerDto?.type == 1 ? "M(拇指)" : "D(四指)";
+
+    // === 工具方法：第一个可编辑输入框 Id（按 Index 的可见顺序） ===
+    private string GetFirstEditableInputId()
+        => scannerInputs
+           .Where(i => i.Visible && !i.Disable)
+           .OrderBy(i => i.Index)
+           .Select(i => i.Id)
+           .FirstOrDefault() ?? "fingerId";
+
+    private void RequestFocusToFirstInput()
+    {
+        _pendingFocusId = GetFirstEditableInputId();
+        StateHasChanged();
+    }
+
+    private async Task FocusInputById(string id, bool selectAll = true)
+    {
+        if (scanner is null) return;
+
+        await ScannerService.ExitAutoFocusModeAsync();
+        await Task.Yield();
+        await Task.Delay(50);
+
+        await scanner.FocusByIdAsync(id, selectAll);
+        ScannerService.SetCurrentFocusedInputId(id);
+
+        if (ScannerService.IsAutoMode)
+            await ScannerService.EnterAutoFocusModeAsync();
+    }
 
     private static string Norm(string? s) => (s ?? string.Empty).Trim();
 
@@ -216,8 +259,10 @@
 
         if (fieldId == "fingerId")
         {
-            bool ok = val.StartsWith(FingerPrefix, StringComparison.OrdinalIgnoreCase);
-            SetFieldError(fieldId, !ok, ok ? null : FingerPrefixError);
+            // 使用当前模式对应的手指编码规则（四指=D* / 拇指=M*），本页不接受 F
+            bool ok = CurrentFingerRegex.IsMatch(val);
+            var err = ok ? null : $"手指编号格式错误，应为 MO-YYYYMMDD-XXX-{CurrentFingerModeLetter}[0/L/R]-NNNN";
+            SetFieldError(fieldId, !ok, err);
             return;
         }
 
@@ -297,6 +342,9 @@
             {
                 await scanner.RevalidateDuplicates();
             }
+
+            // 参数加载后，聚焦第一个输入框
+            RequestFocusToFirstInput();
         }
     }
 
@@ -310,8 +358,13 @@
         if (scanner is not null)
         {
             await scanner.RevalidateDuplicates();
-            ValidatePrefixForField("motorId3"); // 切换后也跑一次前缀校验
         }
+
+        // 切换模式后，重新校验 fingerId
+        ValidatePrefixForField("fingerId");
+
+        // 切换后回到第一个输入框
+        RequestFocusToFirstInput();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -353,6 +406,13 @@
                 isLoading = false;
                 StateHasChanged();
             }
+        }
+
+        if (!firstRender && _pendingFocusId is not null)
+        {
+            var id = _pendingFocusId;
+            _pendingFocusId = null;
+            await FocusInputById(id, selectAll: true);
         }
     }
 
@@ -412,6 +472,8 @@
             _fingerDto.task_id = taskId;
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
             await GetFinishedList();
+
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
@@ -469,6 +531,7 @@
         {
             await LogService.AddLog("手指绑定", _fingerDto.operator_id, "手指绑定失败 - 手指编号为空", false);
             SnackbarHelper.Show(Snackbar, "请输入手指外壳编号", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -477,6 +540,7 @@
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机1编号为空", false);
             SnackbarHelper.Show(Snackbar, "请输入电机1编号", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -485,6 +549,7 @@
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机2编号为空", false);
             SnackbarHelper.Show(Snackbar, "请输入电机2编号", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -493,23 +558,22 @@
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机3编号为空(大拇指)", false);
             SnackbarHelper.Show(Snackbar, "请输入电机3编号", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
-        // 先跑一遍本地前缀校验（防止未触发变更的字段漏检）
+        // 先跑一遍本地校验
         ValidatePrefixForField("fingerId");
         ValidatePrefixForField("motorId1");
         ValidatePrefixForField("motorId2");
         if (_fingerDto.type == 1) ValidatePrefixForField("motorId3");
 
-        // 若存在前缀错误，拦截
-        bool hasPrefixError = scannerInputs.Any(i =>
-            (i.Id == "fingerId" || i.Id == "motorId1" || i.Id == "motorId2" || i.Id == "motorId3") &&
-            i.Visible && i.Error &&
-            (i.ErrorText == FingerPrefixError || i.ErrorText == MotorPrefixError));
-        if (hasPrefixError)
+        // 若存在错误，拦截
+        bool hasError = scannerInputs.Any(i => i.Visible && i.Error);
+        if (hasError)
         {
-            SnackbarHelper.Show(Snackbar, "存在编号格式错误（前缀不正确），请修正后再绑定", Severity.Warning);
+            SnackbarHelper.Show(Snackbar, "存在编号格式错误，请修正后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -519,6 +583,7 @@
             .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
         {
             SnackbarHelper.Show(Snackbar, "存在重复的电机编号，请先修改后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -556,7 +621,8 @@
                 motor1Input.Value = "";
                 motor2Input.Value = "";
                 if (motor3Input != null) motor3Input.Value = "";
-                scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+                var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+                if (remarksInput != null) remarksInput.Value = "";
 
                 if (scanner is not null)
                 {
@@ -564,12 +630,15 @@
                 }
 
                 SnackbarHelper.Show(Snackbar, "绑定成功", Severity.Success);
+
+                RequestFocusToFirstInput();
             }
             else
             {
                 await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                     $"手指绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {response.Msg}", false);
                 SnackbarHelper.Show(Snackbar, response.Msg, Severity.Error);
+                RequestFocusToFirstInput();
             }
         }
         catch (JsonException jsonEx)
@@ -577,12 +646,14 @@
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定JSON解析失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {jsonEx.Message}", false);
             SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
             await LogService.AddLog("手指绑定", _fingerDto.operator_id,
                 $"手指绑定异常 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 异常信息: {ex.Message}", false);
             SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
+            RequestFocusToFirstInput();
         }
         finally
         {
@@ -655,7 +726,7 @@
             case "remarks":  _fingerDto.remarks = input.Value; break;
         }
 
-        // 新增：即时前缀校验
+        // 即时校验
         ValidatePrefixForField(input.Id);
 
         await Task.CompletedTask;
@@ -665,8 +736,8 @@
     {
         var code = Norm(barcodeData);
 
-        // 1) 前缀驱动的自动匹配
-        if (code.StartsWith(FingerPrefix, StringComparison.OrdinalIgnoreCase))
+        // 1) 按“当前模式”的指令码正则匹配（四指=D* / 拇指=M*）
+        if (CurrentFingerRegex.IsMatch(code))
         {
             var fingerInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
             if (fingerInput != null) return fingerInput;
@@ -686,11 +757,11 @@
                 if (motor3Input != null) return motor3Input;
             }
 
-            // 都已占用：回到 motorId1（也可返回 null 表示忽略）
+            // 都已占用：回到 motorId1
             return scannerInputs.FirstOrDefault(i => i.Id == "motorId1");
         }
 
-        // 2) 兼容原“哪个空填哪个”的顺序
+        // 2) 兼容“哪个空填哪个”的顺序
         var fingerEmpty = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && string.IsNullOrEmpty(Norm(i.Value)));
         if (fingerEmpty != null) return fingerEmpty;
 
@@ -720,6 +791,7 @@
         if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
         {
             SnackbarHelper.Show(Snackbar, "手指外壳编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -748,10 +820,13 @@
             }
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
+
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
             SnackbarHelper.Show(Snackbar, $"检查异常：{ex.Message}", Severity.Error);
+            RequestFocusToFirstInput();
         }
     }
 

@@ -75,12 +75,15 @@
                     </MudButton>
                 </MudStack>
 
-                <!-- ✅ 增加 @ref 以便页面控制聚焦 -->
+                <!-- 带校验的条码输入区 -->
                 <BarcodeScanner
                     @ref="_scannerComp"
                     Inputs="scannerInputs"
                     DetermineTargetInput="DetermineTargetInput"
-                    OnInputValueChanged="HandleInputValueChanged" />
+                    OnInputValueChanged="HandleInputValueChanged"
+                    OnInputBlur="HandleAnyInputBlur"
+                    DuplicateCheckInputIds="DuplicateCheckList"
+                    DuplicateErrorMessage="编号重复"/>
 
                 <MudDivider Class="my-4"/>
                 <MudButton OnClick="HandleBindingUnified" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
@@ -141,21 +144,36 @@
 @code {
     private const string StorageKey = "process1_taskId";
 
+    // ====== 本地校验常量（电机 + 分指）======
+    // 电机条码：总长35，固定前缀“M11021G27W”
+    private const int  MotorTotalLength  = 35;
+    private const string MotorFixedPrefix  = "M11021G27W";
+    private const string MotorFormatError  = "电机条码格式错误：必须以 M11021G27W 开头";
+
+    // 分指条码：MO-YYYYMMDD-XXX-FX-NNNN（MO 固定开头，F 为标志，X 为字母，日期/序号/尾号为数字）
+    private const string FingerPattern     = @"^MO-\d{8}-\d{3}-F[a-zA-Z]-\d{4}$";
+    private const string FingerFormatError = "分指编号格式错误：应为 MO-YYYYMMDD-XXX-FX-NNNN（如：MO-20250411-001-FL-0001）";
+
+    private static string Norm(string? s) => (s ?? string.Empty).Trim();
+
     private string taskId = string.Empty;
     private ProductTaskDto? task = null;
     private bool isLoading = false;
     private bool hasSearched = false;
     private bool hasInputError = false;
     private UserDto? currentUser;
-    private List<MotorDto> finishedMotors = new List<MotorDto>();
+    private List<MotorDto> finishedMotors = new();
     private MudForm form;
     private bool validation = true;
-    private AddMotorDto _motorDto = new AddMotorDto();
-    private AddFingerDto _fingerDto = new AddFingerDto();
+    private AddMotorDto _motorDto = new();
+    private AddFingerDto _fingerDto = new();
     private DotNetObjectReference<ProcessOne>? dotNetRef;
     private List<BarcodeScanner.InputField> scannerInputs = new();
     private bool isBinding = false;
     private bool if_motor = true;
+
+    // 重复检测集合（保持结构，便于扩展）
+    private List<string> DuplicateCheckList = new() { "motorId", "fingerId" };
 
     // ✅ 子组件引用 + 渲染后延迟聚焦标记
     private BarcodeScanner? _scannerComp;
@@ -187,6 +205,51 @@
 
         if (ScannerService.IsAutoMode)
             await ScannerService.EnterAutoFocusModeAsync();
+    }
+
+    // ====== 校验帮助方法 ======
+    private void SetFieldError(string fieldId, bool isError, string? errorText = null)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+        input.Error = isError;
+        input.ErrorText = isError ? (errorText ?? "") : "";
+    }
+
+    // 电机格式校验
+    private void ValidateMotorFormat(string fieldId)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+
+        var raw = input.Value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            SetFieldError(fieldId, false);
+            return;
+        }
+        
+        bool ok = raw.StartsWith(MotorFixedPrefix, StringComparison.Ordinal);
+
+        SetFieldError(fieldId, !ok, ok ? null : MotorFormatError);
+    }
+
+
+    // 分指格式校验（MO-YYYYMMDD-XXX-FX-NNNN）
+    private void ValidateFingerFormat(string fieldId)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+
+        var val = input.Value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(val))
+        {
+            SetFieldError(fieldId, false);
+            return;
+        }
+
+        var ok = System.Text.RegularExpressions.Regex.IsMatch(val, FingerPattern);
+        SetFieldError(fieldId, !ok, ok ? null : FingerFormatError);
     }
 
     protected override async Task OnInitializedAsync()
@@ -267,6 +330,9 @@
         if (input is not null) input.Visible = !isTrue;
         StateHasChanged();
 
+        // 切换时做一次校验刷新
+        if (!if_motor) ValidateFingerFormat("fingerId");
+
         // ✅ 切换模式后，按当前模式申请聚焦
         RequestFocusToCurrentMode();
     }
@@ -290,7 +356,12 @@
         finishedMotors.Clear();
         _motorDto = new AddMotorDto();
         _fingerDto = new AddFingerDto();
-        foreach (var input in scannerInputs) input.Value = string.Empty;
+        foreach (var input in scannerInputs)
+        {
+            input.Value = string.Empty;
+            input.Error = false;
+            input.ErrorText = string.Empty;
+        }
         if (currentUser != null)
         {
             _motorDto.operator_id = currentUser.employee_id;
@@ -373,13 +444,16 @@
         NavManager.NavigateTo($"/TaskDetail/{taskId}/{0}");
     }
 
+    // 输入框失焦回调（可按需扩展）
+    private async Task HandleAnyInputBlur(string inputId) => await Task.CompletedTask;
+
     private async Task HandleBindingUnified()
     {
-        var motorIdInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId");
+        var motorIdInput  = scannerInputs.FirstOrDefault(i => i.Id == "motorId");
         var fingerIdInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
-        var remarkInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+        var remarkInput   = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
-        // 基础校验
+        // ==== 基础必填校验 ====
         if (motorIdInput == null || string.IsNullOrWhiteSpace(motorIdInput.Value))
         {
             if (!if_motor)
@@ -388,7 +462,6 @@
             RequestFocusToCurrentMode();
             return;
         }
-
         if (!if_motor)
         {
             if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
@@ -400,6 +473,32 @@
             }
         }
 
+        // ==== 本地格式校验 ====
+        ValidateMotorFormat("motorId");
+        if (!if_motor) ValidateFingerFormat("fingerId");
+
+        // 若存在格式错误，拦截
+        bool hasFormatError = scannerInputs.Any(i =>
+            (i.Id == "motorId" || i.Id == "fingerId") &&
+            i.Visible && i.Error &&
+            (i.ErrorText == MotorFormatError || i.ErrorText == FingerFormatError));
+        if (hasFormatError)
+        {
+            SnackbarHelper.Show(Snackbar, "存在编号格式错误，请修正后再绑定", Severity.Warning);
+            RequestFocusToCurrentMode();
+            return;
+        }
+
+        // 去重拦截（如果未来扩展多个同类输入，可直接复用）
+        if (scannerInputs
+            .Where(i => DuplicateCheckList.Contains(i.Id) && i.Visible)
+            .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
+        {
+            SnackbarHelper.Show(Snackbar, "存在重复的编号，请先修改后再绑定", Severity.Warning);
+            RequestFocusToCurrentMode();
+            return;
+        }
+
         isBinding = true;
         try
         {
@@ -407,8 +506,8 @@
             var remarks = remarkInput?.Value ?? string.Empty;
 
             // 1) 先添加电机（两种模式都需要）
-            _motorDto.motor_id = motorIdInput.Value;
-            _motorDto.remarks = remarks;
+            _motorDto.motor_id   = motorIdInput.Value;
+            _motorDto.remarks    = remarks;
             _motorDto.created_at = DateTime.Now;
             var addMotorResp = await ProcessOneService.AddMotor(_motorDto);
             if (addMotorResp == null || addMotorResp.ResultCode != 1)
@@ -442,17 +541,17 @@
 
             // 2) 分指模式：电机成功后继续添加分指并绑定该电机
             _fingerDto.finger_id = fingerIdInput!.Value;
-            _fingerDto.remarks = remarks;
-            _fingerDto.task_id = taskId;
+            _fingerDto.remarks   = remarks;
+            _fingerDto.task_id   = taskId;
 
             var dto = new AddFingerWithMotorsDto
             {
-                finger_id = _fingerDto.finger_id,
-                task_id = _fingerDto.task_id,
+                finger_id   = _fingerDto.finger_id,
+                task_id     = _fingerDto.task_id,
                 operator_id = _fingerDto.operator_id,
-                remarks = _fingerDto.remarks,
-                type = 2,
-                motor_ids = new List<string> { motorIdInput.Value }
+                remarks     = _fingerDto.remarks,
+                type        = 2,
+                motor_ids   = new List<string> { motorIdInput.Value }
             };
 
             var addFingerResp = await ProcessTwoService.AddFingerWithMotors(dto);
@@ -462,7 +561,7 @@
                     $"分指绑定成功 - 分指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 电机: {motorIdInput.Value}", true);
 
                 fingerIdInput.Value = string.Empty;
-                motorIdInput.Value = string.Empty;
+                motorIdInput.Value  = string.Empty;
                 if (remarkInput != null) remarkInput.Value = string.Empty;
 
                 SnackbarHelper.Show(Snackbar, "分指绑定成功！", Severity.Success);
@@ -507,10 +606,33 @@
 
     private Task HandleInputValueChanged(BarcodeScanner.InputField input)
     {
+        // 同步 DTO，并即时校验
         switch (input.Id)
         {
             case "motorId":
                 _motorDto.motor_id = input.Value;
+                ValidateMotorFormat("motorId");   // 即时校验电机结构
+                break;
+
+            case "fingerId":
+                if (!if_motor)
+                {
+                    // 可选：统一 F 后字母为大写（保持其它部分不变）
+                    if (!string.IsNullOrEmpty(input.Value))
+                    {
+                        var parts = input.Value.Split('-', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 5 && parts[3].Length == 2 && parts[3][0] == 'F')
+                        {
+                            parts[3] = "F" + char.ToUpperInvariant(parts[3][1]);
+                            input.Value = string.Join('-', parts);
+                        }
+                    }
+                    ValidateFingerFormat("fingerId");  // 即时校验分指结构
+                }
+                break;
+
+            case "remarks":
+                // 无需校验
                 break;
         }
 
@@ -519,9 +641,35 @@
 
     private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
     {
-        var motorInput = scannerInputs.FirstOrDefault(i => i.Id == "motorId" && string.IsNullOrEmpty(i.Value));
-        if (motorInput != null) return motorInput;
-        return scannerInputs.FirstOrDefault(i => i.Id == "motorId");
+        var code = barcodeData ?? string.Empty;
+
+        // —— 电机：仅要求固定前缀 —— //
+        if (!string.IsNullOrEmpty(code) &&
+            code.StartsWith(MotorFixedPrefix, StringComparison.Ordinal))
+        {
+            var motorEmpty = scannerInputs.FirstOrDefault(i => i.Id == "motorId" && string.IsNullOrEmpty(Norm(i.Value)));
+            return motorEmpty ?? scannerInputs.FirstOrDefault(i => i.Id == "motorId");
+        }
+
+        // —— 分指：MO-YYYYMMDD-XXX-FX-NNNN —— //
+        if (System.Text.RegularExpressions.Regex.IsMatch(code, FingerPattern))
+        {
+            var fingerEmpty = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+            return fingerEmpty ?? scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
+        }
+
+        // 兼容“哪个空填哪个”的顺序
+        var m = scannerInputs.FirstOrDefault(i => i.Id == "motorId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (m != null) return m;
+
+        if (!if_motor)
+        {
+            var f = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+            if (f != null) return f;
+        }
+
+        // 回退到当前模式对应的输入框
+        return scannerInputs.FirstOrDefault(i => i.Id == CurrentScanInputId);
     }
 
     public async ValueTask DisposeAsync()

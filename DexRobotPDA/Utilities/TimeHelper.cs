@@ -85,4 +85,19 @@ public class TimeHelper
             return $"{(int)(span.TotalDays / 30)} 个月前";
         return $"{(int)(span.TotalDays / 365)} 年前";
     }
+    
+    /// <summary>
+    /// 判断指定时间与当前时间的差值是否超过指定小时数
+    /// </summary>
+    /// <param name="inputTime">要比较的时间</param>
+    /// <param name="hours">指定小时数</param>
+    /// <returns>超过则返回 true，否则返回 false</returns>
+    public static bool HasExceededHours(DateTime inputTime, double hours)
+    {
+        // 计算当前时间与输入时间的差（取绝对值，避免前后顺序问题）
+        double diffHours = Math.Abs((DateTime.Now - inputTime).TotalHours);
+
+        // 判断是否超过指定小时数
+        return diffHours > hours;
+    }
 }

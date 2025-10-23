@@ -155,9 +155,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="操作员ID">@context.operator_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
                                             <MudChip T="string"
                                                      Color="@(context.is_qualified ? Color.Success : Color.Error)">@(context.is_qualified ? "是" : "否")</MudChip>
@@ -278,9 +278,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="结果">@context.distance_result</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="创建时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="创建时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="更新时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="更新时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="操作员ID">@context.inspector_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
@@ -305,104 +305,104 @@ else
                     }
                 </MudStep>
 
-                <MudStep Completed="task.process_3" Title="3.分指机构粘接检测">
-                    @if (isMotorTableLoading)
-                    {
-                        <div class="d-flex justify-content-center align-items-center py-10">
-                            <MudText Typo="Typo.body1" Color="Color.Secondary">加载中...</MudText>
-                        </div>
-                    }
-                    else if (Detect2List.Count == 0)
-                    {
-                        <div class="d-flex justify-content-center align-items-center py-10">
-                            <MudText Typo="Typo.body1" Color="Color.Secondary">暂无数据</MudText>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="table-scroll-container">
-                            <div class="horiz-scroll">
-                                <MudTable Items="Detect2List" Hover="true" FixedHeader="true"
-                                          Height="@TableBodyMaxHeight" Breakpoint="Breakpoint.Xs"
-                                          Filter="@(element => FilterFunc(element, currentSearchString, GetDetect2Properties))"
-                                          SortLabel="Sort By" Elevation="3" Bordered="true" Striped="true"
-                                          Dense="true">
-                                    <ToolBarContent>
-                                        <MudTextField T="string"
-                                                      @bind-Value="currentSearchString"
-                                                      Placeholder="@GetSearchPlaceholder(currentStepIndex)"
-                                                      Adornment="Adornment.Start"
-                                                      AdornmentIcon="@Icons.Material.Filled.Search"
-                                                      IconSize="Size.Medium"
-                                                      Style="width: 300px;">
-                                        </MudTextField>
-                                    </ToolBarContent>
-                                    <HeaderContent>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel T="SplitWormDetectDto"
-                                                               SortBy="@(context => Detect2List.IndexOf(context) + 1)">
-                                                序号
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.finger_id">分指机构ID
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.combine_time">粘接时间
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.using_time">使用时间
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.inspector">检测员
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.if_qualified">是否合格
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">
-                                            <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.remarks">备注
-                                            </MudTableSortLabel>
-                                        </MudTh>
-                                        <MudTh Style="@MinColWidthStyle">操作</MudTh>
-                                    </HeaderContent>
-                                    <RowTemplate>
-                                        <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="序号">@(Detect2List.IndexOf(context) + 1)</MudTd>
-                                        <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="分指机构ID">@context.finger_id</MudTd>
-                                        <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="粘合时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
-                                        <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="使用时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
-                                        <MudTd Style="@MinColWidthStyle" DataLabel="检测人员">@context.inspector</MudTd>
-                                        <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
-                                            <MudChip T="string"
-                                                     Color="@(context.if_qualified ? Color.Success : Color.Error)">@(context.if_qualified ? "是" : "否")</MudChip>
-                                        </MudTd>
-                                        <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
-                                        <MudTd Style="@MinColWidthStyle" DataLabel="操作">
-                                            <MudButton Variant="Variant.Filled"
-                                                       StartIcon="@Icons.Material.Filled.Delete"
-                                                       Color="Color.Error">删除
-                                            </MudButton>
-                                        </MudTd>
-                                    </RowTemplate>
-                                    <PagerContent>
-                                        <MudTablePager RowsPerPageString="显示数量"
-                                                       PageSizeOptions="new int[] { 10, 20, 50, 100 }"/>
-                                    </PagerContent>
-                                </MudTable>
-                            </div>
-                        </div>
-                    }
-                </MudStep>
+                @* <MudStep Completed="task.process_3" Title="3.分指机构粘接检测"> *@
+                @*     @if (isMotorTableLoading) *@
+                @*     { *@
+                @*         <div class="d-flex justify-content-center align-items-center py-10"> *@
+                @*             <MudText Typo="Typo.body1" Color="Color.Secondary">加载中...</MudText> *@
+                @*         </div> *@
+                @*     } *@
+                @*     else if (Detect2List.Count == 0) *@
+                @*     { *@
+                @*         <div class="d-flex justify-content-center align-items-center py-10"> *@
+                @*             <MudText Typo="Typo.body1" Color="Color.Secondary">暂无数据</MudText> *@
+                @*         </div> *@
+                @*     } *@
+                @*     else *@
+                @*     { *@
+                @*         <div class="table-scroll-container"> *@
+                @*             <div class="horiz-scroll"> *@
+                @*                 <MudTable Items="Detect2List" Hover="true" FixedHeader="true" *@
+                @*                           Height="@TableBodyMaxHeight" Breakpoint="Breakpoint.Xs" *@
+                @*                           Filter="@(element => FilterFunc(element, currentSearchString, GetDetect2Properties))" *@
+                @*                           SortLabel="Sort By" Elevation="3" Bordered="true" Striped="true" *@
+                @*                           Dense="true"> *@
+                @*                     <ToolBarContent> *@
+                @*                         <MudTextField T="string" *@
+                @*                                       @bind-Value="currentSearchString" *@
+                @*                                       Placeholder="@GetSearchPlaceholder(currentStepIndex)" *@
+                @*                                       Adornment="Adornment.Start" *@
+                @*                                       AdornmentIcon="@Icons.Material.Filled.Search" *@
+                @*                                       IconSize="Size.Medium" *@
+                @*                                       Style="width: 300px;"> *@
+                @*                         </MudTextField> *@
+                @*                     </ToolBarContent> *@
+                @*                     <HeaderContent> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel T="SplitWormDetectDto" *@
+                @*                                                SortBy="@(context => Detect2List.IndexOf(context) + 1)"> *@
+                @*                                 序号 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.finger_id">分指机构ID *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.combine_time">粘接时间 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.using_time">使用时间 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.inspector">检测员 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.if_qualified">是否合格 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle"> *@
+                @*                             <MudTableSortLabel SortBy="(SplitWormDetectDto x) => x.remarks">备注 *@
+                @*                             </MudTableSortLabel> *@
+                @*                         </MudTh> *@
+                @*                         <MudTh Style="@MinColWidthStyle">操作</MudTh> *@
+                @*                     </HeaderContent> *@
+                @*                     <RowTemplate> *@
+                @*                         <MudTd Style="@MinColWidthStyle" *@
+                @*                                DataLabel="序号">@(Detect2List.IndexOf(context) + 1)</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" *@
+                @*                                DataLabel="分指机构ID">@context.finger_id</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" *@
+                @*                                DataLabel="粘合时间">@context.combine_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" *@
+                @*                                DataLabel="使用时间">@context.using_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" DataLabel="检测人员">@context.inspector</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格"> *@
+                @*                             <MudChip T="string" *@
+                @*                                      Color="@(context.if_qualified ? Color.Success : Color.Error)">@(context.if_qualified ? "是" : "否")</MudChip> *@
+                @*                         </MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd> *@
+                @*                         <MudTd Style="@MinColWidthStyle" DataLabel="操作"> *@
+                @*                             <MudButton Variant="Variant.Filled" *@
+                @*                                        StartIcon="@Icons.Material.Filled.Delete" *@
+                @*                                        Color="Color.Error">删除 *@
+                @*                             </MudButton> *@
+                @*                         </MudTd> *@
+                @*                     </RowTemplate> *@
+                @*                     <PagerContent> *@
+                @*                         <MudTablePager RowsPerPageString="显示数量" *@
+                @*                                        PageSizeOptions="new int[] { 10, 20, 50, 100 }"/> *@
+                @*                     </PagerContent> *@
+                @*                 </MudTable> *@
+                @*             </div> *@
+                @*         </div> *@
+                @*     } *@
+                @* </MudStep> *@
 
-                <MudStep Completed="task.process_4" Title="4.分指机构标定检测">
+                <MudStep Completed="task.process_4" Title="3.分指机构标定检测">
                     @if (isFingerTableLoading)
                     {
                         <div class="d-flex justify-content-center align-items-center py-10">
@@ -521,9 +521,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="测试动作">@context.test_action</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="耗时（秒）">@context.consume_time</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
@@ -536,7 +536,7 @@ else
                                                DataLabel="电机2电流峰值">@context.motor_2_max</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="检测人员">@context.inspector</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
                                             <MudChip T="string"
                                                      Color="@(context.if_qualified.GetValueOrDefault() ? Color.Success : Color.Error)">
@@ -561,7 +561,7 @@ else
                     }
                 </MudStep>
 
-                <MudStep Completed="task.process_5" Title="5.手指组装">
+                <MudStep Completed="task.process_5" Title="4.手指组装">
                     @if (isFingerTableLoading)
                     {
                         <div class="d-flex justify-content-center align-items-center py-10">
@@ -647,9 +647,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="操作员ID">@context.operator_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="手指类型">@(context.type == 1 ? "拇指" : context.type == 0 ? "单指" : "分指")</MudTd>
 
@@ -680,7 +680,7 @@ else
                     }
                 </MudStep>
 
-                <MudStep Completed="task.process_6" Title="6.单指标定检测">
+                <MudStep Completed="task.process_6" Title="5.五指标定检测">
                     @if (isFingerTableLoading)
                     {
                         <div class="d-flex justify-content-center align-items-center py-10">
@@ -821,9 +821,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="手指外壳ID">@context.finger_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="电机使用时间">@context.motor_using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="电机使用时间">@context.motor_using_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="手指使用时间">@context.finger_using_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="手指使用时间">@context.finger_using_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="安装时间判定">
                                             <MudChip T="bool?"
                                                      Color="@(context.if_time_qualified.GetValueOrDefault() ? Color.Success : Color.Error)">
@@ -835,9 +835,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="测试动作">@context.test_action</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="动作发起时间">@context.begin_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="动作结束时间">@context.finish_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="耗时（秒）">@context.consume_time</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
@@ -849,7 +849,7 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="电机2电流峰值">@context.motor_2_max</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="标记日期">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="接近觉">
                                             <MudChip T="string"
@@ -889,7 +889,7 @@ else
                     }
                 </MudStep>
 
-                <MudStep Completed="task.process_7" Title="7.手掌组装">
+                <MudStep Completed="task.process_7" Title="6.手掌组装">
                     @if (isPalmTableLoading)
                     {
                         <div class="d-flex justify-content-center align-items-center py-10">
@@ -966,9 +966,9 @@ else
                                         <MudTd Style="@MinColWidthStyle"
                                                DataLabel="操作员ID">@context.operator_id</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle"
-                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                               DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
                                         <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
                                             <MudChip T="string"
                                                      Color="@(context.is_qualified ? Color.Success : Color.Error)">@(context.is_qualified ? "是" : "否")</MudChip>
@@ -995,7 +995,7 @@ else
                     }
                 </MudStep>
 
-                <MudStep Completed="task.process_8" Title="8.整手标定检测">
+                <MudStep Completed="task.process_8" Title="7.整手标定检测">
                     @if (isPalmTableLoading)
                     {
                         <div class="d-flex justify-content-center align-items-center py-10">
@@ -1214,27 +1214,27 @@ else
                 await GetMotorWormDetectList();
                 await DetectService.UpdateDetect1StatusAsync(taskId);
                 break;
+            // case 2:
+            //     await GetSplitWormDetectList();
+            //     await DetectService.UpdateDetect2StatusAsync(taskId);
+            //     break;
             case 2:
-                await GetSplitWormDetectList();
-                await DetectService.UpdateDetect2StatusAsync(taskId);
-                break;
-            case 3:
                 await GetSplitCalibrateDetectList();
                 await DetectService.UpdateDetect3StatusAsync(taskId);
                 break;
-            case 4:
+            case 3:
                 await GetFinishedFingers();
                 await CheckProcess2();
                 break;
-            case 5:
+            case 4:
                 await GetFingerCalibrateDetectList();
                 await DetectService.UpdateDetect4StatusAsync(taskId);
                 break;
-            case 6:
+            case 5:
                 await GetFinishedPalms();
                 await CheckProcess3();
                 break;
-            case 7:
+            case 6:
                 await GetPalmCalibrateDetectList();
                 await DetectService.UpdateDetect5StatusAsync(taskId);
                 break;
@@ -1269,12 +1269,12 @@ else
         {
             0 => "搜索电机数据...",
             1 => "搜索蜗杆粘接检测数据...",
-            2 => "搜索分指机构粘接检测数据...",
-            3 => "搜索分指机构标定检测数据...",
-            4 => "搜索手指数据...",
-            5 => "搜索单指标定检测数据...",
-            6 => "搜索手掌数据...",
-            7 => "搜索整手标定检测数据...",
+            // 2 => "搜索分指机构粘接检测数据...",
+            2 => "搜索分指机构标定检测数据...",
+            3 => "搜索手指数据...",
+            4 => "搜索五指标定检测数据...",
+            5 => "搜索手掌数据...",
+            6 => "搜索整手标定检测数据...",
             _ => "搜索数据..."
         };
     }
@@ -1657,6 +1657,7 @@ else
             SnackbarHelper.Show(Snackbar, "已取消删除", Severity.Info);
             return;
         }
+
         try
         {
             var res = await ProcessOneService.DeleteMotor(motor_id);
@@ -1702,7 +1703,7 @@ else
         return !result.Canceled && result.Data is bool ok && ok;
     }
 
-    
+
 }
 
 <style>

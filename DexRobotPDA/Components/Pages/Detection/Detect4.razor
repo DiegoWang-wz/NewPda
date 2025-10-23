@@ -270,6 +270,12 @@
                 _finger = new();
                 return;
             }
+            if (TimeHelper.GetHoursDifference(_finger.created_at,DateTime.Now) < 48)
+            {
+                SnackbarHelper.Show(Snackbar, "手指安装时间不足48小时，请重新输入！", Severity.Error);
+                _finger = new();
+                return;
+            }
             _detectDto.motor_using_time = _finger.created_at;
             _detectDto.finger_using_time = DateTime.Now;
             _detectDto.calibrate_time = DateTime.Now;
@@ -325,6 +331,7 @@
                     SnackbarHelper.Show(Snackbar, "检测员信息缺失，请重新登录", Severity.Error);
                     return;
                 }
+                
 
                 var response = await DetectService.AddDetect4(_detectDto);
 

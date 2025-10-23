@@ -152,7 +152,6 @@
     private const string StorageKey = "process3_taskId";
 
     // ====== 统一编码正则（忽略左右手位 0/L/R）======
-    // 形如：MO-20250411-001-ML-0001 / MO-...-DO-... / MO-...-FL-...
     private static readonly Regex FingerCodeRegex =
         new(@"^MO-\d{8}-\d{3}-(D|M|F)[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -200,6 +199,40 @@
     private readonly List<string> DuplicateCheckList = new() { "splitId", "finger1", "finger2", "finger3", "finger4", "finger5" };
 
     private bool isBinding = false;
+
+    // ✅ 聚焦：等待渲染完成后执行
+    private string? _pendingFocusId;
+
+    // === 工具：第一个可编辑输入框（按 Index 顺序） ===
+    private string GetFirstEditableInputId()
+        => scannerInputs
+            .Where(i => i.Visible && !i.Disable)
+            .OrderBy(i => i.Index)
+            .Select(i => i.Id)
+            .FirstOrDefault() ?? "palmId";
+
+    // 申请在下一轮渲染完成后聚焦
+    private void RequestFocusToFirstInput()
+    {
+        _pendingFocusId = GetFirstEditableInputId();
+        StateHasChanged();
+    }
+
+    // 实际聚焦（保证 DOM 就绪；避免隐藏扫描输入抢焦点）
+    private async Task FocusInputById(string id, bool selectAll = true)
+    {
+        if (scanner is null) return;
+
+        await ScannerService.ExitAutoFocusModeAsync();
+        await Task.Yield();
+        await Task.Delay(50);
+
+        await scanner.FocusByIdAsync(id, selectAll);
+        ScannerService.SetCurrentFocusedInputId(id);
+
+        if (ScannerService.IsAutoMode)
+            await ScannerService.EnterAutoFocusModeAsync();
+    }
 
     private static string Norm(string? s) => (s ?? string.Empty).Trim();
 
@@ -249,13 +282,11 @@
                 bool ok = val.StartsWith(PalmPrefix, StringComparison.OrdinalIgnoreCase);
                 SetFieldError(fieldId, !ok, ok ? null : PalmPrefixError);
             }
-
             return;
         }
 
         if (fieldId == "splitId")
         {
-            // 分指机构 == 分指(F)；只认 F 型编码
             bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Split_F;
             SetFieldError(fieldId, !ok, ok ? null : "分指机构必须为 F 型编码");
             return;
@@ -310,7 +341,6 @@
                 if (input != null) input.Value = kv.Key == "palmId" ? palm_id : (list.Count > kv.Value && kv.Value >= 0 ? list[kv.Value] : "");
             }
 
-            // 回填后：统一重算重复 + 校验
             if (scanner is not null) await scanner.RevalidateDuplicates();
             ValidateField("palmId");
             ValidateField("splitId");
@@ -319,6 +349,9 @@
             ValidateField("finger3");
             ValidateField("finger4");
             ValidateField("finger5");
+
+            // ✅ 参数回填后，申请聚焦到第一个输入框
+            RequestFocusToFirstInput();
         }
     }
 
@@ -377,6 +410,14 @@
                 StateHasChanged();
             }
         }
+
+        // ✅ 非首次渲染：如有待聚焦 Id，此时安全聚焦
+        if (!firstRender && _pendingFocusId is not null)
+        {
+            var id = _pendingFocusId;
+            _pendingFocusId = null;
+            await FocusInputById(id, selectAll: true);
+        }
     }
 
     private void HandleSpecialInputFocus()
@@ -407,7 +448,6 @@
 
         if (scanner is not null) await scanner.RevalidateDuplicates();
 
-        // 清除提示
         ValidateField("palmId");
         ValidateField("splitId");
         ValidateField("finger1");
@@ -439,6 +479,9 @@
             _PalmDto.task_id = taskId;
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
             await GetFinishedList();
+
+            // ✅ 任务已加载：申请聚焦到第一个输入框
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
@@ -482,53 +525,54 @@
 
     private async Task HandleBinding()
     {
-        var palmInput = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
-        var splitInput = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
-        var finger1Input = scannerInputs.FirstOrDefault(i => i.Id == "finger1");
-        var finger2Input = scannerInputs.FirstOrDefault(i => i.Id == "finger2");
-        var finger3Input = scannerInputs.FirstOrDefault(i => i.Id == "finger3");
-        var finger4Input = scannerInputs.FirstOrDefault(i => i.Id == "finger4");
-        var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
+        var palmInput   = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
+        var splitInput  = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+        var finger1Input= scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+        var finger2Input= scannerInputs.FirstOrDefault(i => i.Id == "finger2");
+        var finger3Input= scannerInputs.FirstOrDefault(i => i.Id == "finger3");
+        var finger4Input= scannerInputs.FirstOrDefault(i => i.Id == "finger4");
+        var finger5Input= scannerInputs.FirstOrDefault(i => i.Id == "finger5");
 
         if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
         {
             SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value))
         {
             SnackbarHelper.Show(Snackbar, "分指机构（F 型）不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value))
         {
             SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value))
         {
             SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value))
         {
             SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value))
         {
             SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
-
         if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value))
         {
             SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -547,14 +591,16 @@
         if (hasFormatError)
         {
             SnackbarHelper.Show(Snackbar, "存在编号格式错误，请修正后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
-        // 重复检测拦截
+        // 去重拦截
         if (scannerInputs.Where(i => DuplicateCheckList.Contains(i.Id))
             .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
         {
             SnackbarHelper.Show(Snackbar, "存在重复编号（分指/五指），请先修改后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -576,10 +622,10 @@
 
             var palmWithComponentsDto = new AddPalmWithComponentsDto
             {
-                palm_id = _PalmDto.palm_id,
-                task_id = _PalmDto.task_id,
+                palm_id     = _PalmDto.palm_id,
+                task_id     = _PalmDto.task_id,
                 operator_id = _PalmDto.operator_id,
-                remarks = _PalmDto.remarks,
+                remarks     = _PalmDto.remarks,
                 component_ids = componentIds
             };
 
@@ -591,26 +637,33 @@
                 palmInput.Value = splitInput.Value =
                     finger1Input.Value = finger2Input.Value = finger3Input.Value =
                         finger4Input.Value = finger5Input.Value = "";
-                scannerInputs.FirstOrDefault(i => i.Id == "remarks").Value = "";
+                var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+                if (remarksInput != null) remarksInput.Value = "";
 
                 if (scanner is not null) await scanner.RevalidateDuplicates();
 
                 await LoadTaskDetail();
                 await TaskService.UpdateSingleTaskStatus(taskId);
                 SnackbarHelper.Show(Snackbar, "手掌与分指机构、手指绑定成功", Severity.Success);
+
+                // ✅ 成功后继续作业：回到第一个输入框
+                RequestFocusToFirstInput();
             }
             else
             {
                 SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{palmResponse?.Msg ?? "未知错误"}", Severity.Error);
+                RequestFocusToFirstInput();
             }
         }
         catch (JsonException jsonEx)
         {
             SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
             SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
+            RequestFocusToFirstInput();
         }
         finally
         {
@@ -645,18 +698,19 @@
 
     private async Task HandleUpdateDemo()
     {
-        var palmInput = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
-        var splitInput = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
-        var finger1Input = scannerInputs.FirstOrDefault(i => i.Id == "finger1");
-        var finger2Input = scannerInputs.FirstOrDefault(i => i.Id == "finger2");
-        var finger3Input = scannerInputs.FirstOrDefault(i => i.Id == "finger3");
-        var finger4Input = scannerInputs.FirstOrDefault(i => i.Id == "finger4");
-        var finger5Input = scannerInputs.FirstOrDefault(i => i.Id == "finger5");
-        var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+        var palmInput   = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
+        var splitInput  = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+        var finger1Input= scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+        var finger2Input= scannerInputs.FirstOrDefault(i => i.Id == "finger2");
+        var finger3Input= scannerInputs.FirstOrDefault(i => i.Id == "finger3");
+        var finger4Input= scannerInputs.FirstOrDefault(i => i.Id == "finger4");
+        var finger5Input= scannerInputs.FirstOrDefault(i => i.Id == "finger5");
+        var remarksInput= scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
         if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
         {
             SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
             return;
         }
 
@@ -664,7 +718,7 @@
         {
             var originalData = await ProcessThreeService.GetPalmDetail(palmInput.Value);
 
-            var newSplit = splitInput?.Value ?? "";
+            var newSplit   = splitInput?.Value ?? "";
             var newFinger1 = finger1Input?.Value ?? "";
             var newFinger2 = finger2Input?.Value ?? "";
             var newFinger3 = finger3Input?.Value ?? "";
@@ -672,7 +726,7 @@
             var newFinger5 = finger5Input?.Value ?? "";
             var newRemarks = remarksInput?.Value ?? "";
 
-            var originalSplit = originalData.Count > 0 ? originalData[0] : "";
+            var originalSplit   = originalData.Count > 0 ? originalData[0] : "";
             var originalFinger1 = originalData.Count > 1 ? originalData[1] : "";
             var originalFinger2 = originalData.Count > 2 ? originalData[2] : "";
             var originalFinger3 = originalData.Count > 3 ? originalData[3] : "";
@@ -680,10 +734,10 @@
             var originalFinger5 = originalData.Count > 5 ? originalData[5] : "";
             var originalRemarks = originalData.Count > 6 ? originalData[6] : "";
 
-            await CheckAndShowFingerChange("分指", originalSplit, newSplit);
+            await CheckAndShowFingerChange("分指",   originalSplit,   newSplit);
             await CheckAndShowFingerChange("大拇指", originalFinger1, newFinger1);
-            await CheckAndShowFingerChange("食指", originalFinger2, newFinger2);
-            await CheckAndShowFingerChange("中指", originalFinger3, newFinger3);
+            await CheckAndShowFingerChange("食指",   originalFinger2, newFinger2);
+            await CheckAndShowFingerChange("中指",   originalFinger3, newFinger3);
             await CheckAndShowFingerChange("无名指", originalFinger4, newFinger4);
             await CheckAndShowFingerChange("小拇指", originalFinger5, newFinger5);
 
@@ -697,10 +751,14 @@
             ValidateField("finger5");
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
+
+            // ✅ 检查结束，回到第一个输入框
+            RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
             SnackbarHelper.Show(Snackbar, $"检查异常：{ex.Message}", Severity.Error);
+            RequestFocusToFirstInput();
         }
     }
 
@@ -756,7 +814,7 @@
                     if (f4 != null) return f4;
                     var f5 = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(Norm(i.Value)));
                     if (f5 != null) return f5;
-                    return scannerInputs.FirstOrDefault(i => i.Id == "finger2"); // 都有值时回到 finger2
+                    return scannerInputs.FirstOrDefault(i => i.Id == "finger2");
                 }
             }
         }
