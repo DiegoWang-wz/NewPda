@@ -26,13 +26,13 @@ public class ProductTaskController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetTaskList()
+    public IActionResult GetTaskList(String type)
     {
         ApiResponse response = new ApiResponse();
         try
         {
-            var list = db.ProductTasks.ToList();
-            _logger.LogDebug("从数据库获取到 {Count} 条记录", list.Count);   // Debug，不落盘（默认）
+            var list = db.ProductTasks.Where(t=>t.production_type == type).ToList();
+            _logger.LogDebug("从数据库获取到 {Count} 条记录", list.Count); // Debug，不落盘（默认）
 
             var tasks = mapper.Map<List<ProductTaskDto>>(list);
             response.ResultCode = 1;
@@ -46,8 +46,9 @@ public class ProductTaskController : ControllerBase
         {
             response.ResultCode = -1;
             response.Msg = "Error";
-            _logger.LogError(e, "获取列表时发生错误");                 // Error 要保留
+            _logger.LogError(e, "获取列表时发生错误"); // Error 要保留
         }
+
         return Ok(response);
     }
 
@@ -589,15 +590,15 @@ public class ProductTaskController : ControllerBase
                 int oldStatus = task.status;
 
                 // 根据SQL逻辑计算status值
-                bool allZero = task.process_1 == 0 && task.process_2 == 0 && task.process_3 == 0 &&
+                bool allZero = task.process_1 == 0 && task.process_2 == 0 &&
                                task.process_4 == 0 && task.process_5 == 0 && task.process_6 == 0 &&
                                task.process_7 == 0 && task.process_8 == 0;
 
-                bool allOne = task.process_1 == 1 && task.process_2 == 1 && task.process_3 == 1 &&
+                bool allOne = task.process_1 == 1 && task.process_2 == 1 &&
                               task.process_4 == 1 && task.process_5 == 1 && task.process_6 == 1 &&
                               task.process_7 == 1 && task.process_8 == 1;
 
-                bool anyOne = task.process_1 == 1 || task.process_2 == 1 || task.process_3 == 1 ||
+                bool anyOne = task.process_1 == 1 || task.process_2 == 1 ||
                               task.process_4 == 1 || task.process_5 == 1 || task.process_6 == 1 ||
                               task.process_7 == 1 || task.process_8 == 1;
 
@@ -839,7 +840,7 @@ public class ProductTaskController : ControllerBase
 
         return Ok(response);
     }
-    
+
     [HttpPut]
     public async Task<ActionResult<ApiResponse>> SaleOrderBinding(SaleOrderBindingDto dto)
     {
@@ -869,14 +870,14 @@ public class ProductTaskController : ControllerBase
             {
                 TaskId = dto.task_id,
             };
-            
+
             return Ok(res);
         }
         catch (Exception ex)
         {
             res.ResultCode = -1;
             res.Msg = $"更新失败: {ex.Message}";
-            _logger.LogError(ex, "更新单个任务状态时发生错误，任务ID: {TaskId}",  dto.task_id);
+            _logger.LogError(ex, "更新单个任务状态时发生错误，任务ID: {TaskId}", dto.task_id);
             return StatusCode(500, res);
         }
     }

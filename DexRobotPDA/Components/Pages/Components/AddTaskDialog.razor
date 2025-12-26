@@ -1,5 +1,5 @@
 ﻿@inject TaskService taskService;
-
+@inject IConfiguration Config
 <MudDialog>
     <DialogContent>
         <MudPaper Elevation="1" Class="pa-6 ms-4" Style="min-width: 400px;">
@@ -33,15 +33,18 @@
                                   Adornment="@Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Title">
                     </MudTextField>
+                    
+                    <MudSelect T="string"
+                               Label="产品类型"
+                               Variant="Variant.Outlined"
+                               Dense="true"
+                               @bind-Value="_addTaskDto.production_type">
+                        @foreach (var type in Types)
+                        {
+                            <MudSelectItem Value="type">@type</MudSelectItem>
+                        }
+                    </MudSelect>
 
-                    <MudTextField T="string"
-                                  Label="任务描述"
-                                  @bind-Value="_addTaskDto.description"
-                                  Variant="Variant.Outlined"
-                                  Adornment="@Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Description"
-                                  Lines="2">
-                    </MudTextField>
                     <MudNumericField T="int"
                                      @bind-Value="_addTaskDto.product_num"
                                      Label="生产数量"
@@ -103,7 +106,8 @@
     MudForm form;
     private bool isLoading = false;
     private UserDto? currentUser;
-
+    private List<string> Types =>
+        Config.GetSection("ProductionTypes").Get<List<string>>() ?? new();
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)

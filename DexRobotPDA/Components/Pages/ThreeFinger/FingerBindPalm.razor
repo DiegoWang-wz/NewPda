@@ -1,0 +1,877 @@
+﻿@page "/ThreeFinger/FingerBindPalm"
+@page "/ThreeFinger/FingerBindPalm/{task_id}/{palm_id}"
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@implements IAsyncDisposable
+
+<MudPaper Elevation="3" MaxWidth="1000px" Class="pa-4 ma-2 mx-auto">
+    <div class="min-vh-40 d-flex flex-column justify-center">
+        @if (!hasSearched)
+        {
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="text-center">
+                请输入生产单号并点击查询，加载任务详情
+            </MudText>
+        }
+        else if (isLoading)
+        {
+            <div class="d-flex justify-content-center align-items-center">
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7"/>
+            </div>
+        }
+        else if (task == null)
+        {
+            <div class="d-flex justify-content-center align-items-center text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Medium" Class="mr-3"/>
+                <MudText Typo="Typo.body1" Color="Color.Error">
+                    无法加载任务数据，请检查生产单号是否正确
+                </MudText>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(palm_id))
+            {
+                <BarcodeScanner
+                    @ref="scanner"
+                    Inputs="scannerInputs"
+                    DetermineTargetInput="DetermineTargetInput"
+                    OnInputValueChanged="HandleInputValueChanged"
+                    DuplicateCheckInputIds="DuplicateCheckList"
+                    DuplicateErrorMessage="编号重复"/>
+                <MudDivider Class="my-4"/>
+                <MudButton OnClick="HandleUpdateDemo" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
+                           FullWidth="true" Disabled="@isBinding">
+                    @if (isBinding)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+                        <MudText Class="ml-2">更新中...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>更新</MudText>
+                    }
+                </MudButton>
+            }
+            else if (finishedPalms.Count == task.product_num)
+            {
+                <div class="d-flex flex-row align-center my-6">
+                    <MudText Typo="Typo.h6" Class="text-primary mr-4">该任务已完成</MudText>
+                    <MudSpacer/>
+                    <MudButton Variant="Variant.Filled"
+                               OnClick="NavigateToDetail"
+                               Color="Color.Primary">
+                        查看明细
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+                    <MudButton
+                        Variant="Variant.Outlined"
+                        Color="@(ScannerService.IsAutoMode ? Color.Success : Color.Primary)"
+                        OnClick="ToggleScanModeAsync"
+                        Size="Size.Medium">
+                        @(ScannerService.IsAutoMode ? "自动匹配模式" : "手动聚焦模式")
+                        <MudIcon
+                            Icon="@(ScannerService.IsAutoMode ? Icons.Material.Filled.AutoAwesome : Icons.Material.Filled.Man)"
+                            Class="ml-2"/>
+                    </MudButton>
+                    <MudSpacer/>
+                    <MudButton Variant="Variant.Filled"
+                               OnClick="NavigateToDetail"
+                               Color="Color.Primary">
+                        已完成数量@(finishedPalms.Count)/@task.product_num
+                    </MudButton>
+                </MudStack>
+
+                <BarcodeScanner
+                    @ref="scanner"
+                    Inputs="scannerInputs"
+                    DetermineTargetInput="DetermineTargetInput"
+                    OnInputValueChanged="HandleInputValueChanged"
+                    DuplicateCheckInputIds="DuplicateCheckList"
+                    DuplicateErrorMessage="编号重复"/>
+                <MudDivider Class="my-4"/>
+                <MudButton OnClick="HandleBinding" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
+                           FullWidth="true" Disabled="@isBinding">
+                    @if (isBinding)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+                        <MudText Class="ml-2">绑定中...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>绑定</MudText>
+                    }
+                </MudButton>
+            }
+        }
+    </div>
+    <MudDivider Class="my-4"/>
+
+    <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
+        <MudTextField
+            @bind-Value="taskId"
+            Label="生产单号"
+            Variant="Variant.Outlined"
+            Required="true"
+            Disabled="!string.IsNullOrEmpty(palm_id)"
+            Clearable="true"
+            Error="@hasInputError"
+            ErrorText="请输入生产单号"
+            AutoFocus="true"
+            Id="taskId"
+            @onfocus="() => HandleSpecialInputFocus()"
+            @onblur="() => HandleSpecialInputBlur()"
+            Class="flex-1"/>
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Error"
+            Disabled="!string.IsNullOrEmpty(palm_id)"
+            StartIcon="@Icons.Material.Filled.DeleteForever"
+            OnClick="ClearTaskId"
+            Size="Size.Large"
+            Class="w-full md:w-auto">
+            清除
+        </MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Search"
+            OnClick="LoadTaskDetail"
+            Size="Size.Large"
+            Disabled="@(isLoading || !string.IsNullOrEmpty(palm_id))"
+            Class="w-full md:w-auto">
+            @(isLoading ? "查询中..." : "查询")
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private const string StorageKey = "process3_taskId";
+
+    // ====== 统一编码正则（忽略左右手位 0/L/R）======
+    private static readonly Regex FingerCodeRegex =
+        new(@"^MO-\d{8}-\d{3}-(D|M|F)[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private const string FingerFormatError =
+        "编码格式错误，应为 MO-YYYYMMDD-XXX-(D|M|F)[0/L/R]-####";
+
+    // 手掌外壳前缀（设为 "" 可关闭 palmId 前缀校验）
+    private const string PalmPrefix = "DX";
+    private const string PalmPrefixError = "手掌外壳编号格式错误，应以 DX 开头";
+
+    private enum FingerClass
+    {
+        Unknown,
+        Thumb_M,
+        Single_D,
+        Split_F
+    }
+
+    [Parameter] public string task_id { get; set; }
+    [Parameter] public string palm_id { get; set; }
+    private string taskId = string.Empty;
+    private ProductTaskDto? task = null;
+    private bool isLoading = false;
+    private bool hasSearched = false;
+    private bool hasInputError = false;
+    private UserDto? currentUser;
+    private List<PalmDto> finishedPalms = new();
+    private MudForm? form;
+    private bool validation = true;
+
+    private AddPalmDto _PalmDto = new();
+    private string _split = string.Empty;
+    private string _finger1 = string.Empty;
+    private string _finger2 = string.Empty;
+    private string _finger3 = string.Empty;
+    private string _finger4 = string.Empty;
+    private string _finger5 = string.Empty;
+
+    private DotNetObjectReference<FingerBindPalm>? dotNetRef;
+
+    private BarcodeScanner? scanner; // 引用子组件
+    private List<BarcodeScanner.InputField> scannerInputs = new();
+
+    // 去重字段（分指=F 型 + 五指）
+    private readonly List<string> DuplicateCheckList = new() { "splitId", "finger1", "finger2", "finger3", "finger4", "finger5" };
+
+    private bool isBinding = false;
+
+    // ✅ 聚焦：等待渲染完成后执行
+    private string? _pendingFocusId;
+
+    // === 工具：第一个可编辑输入框（按 Index 顺序） ===
+    private string GetFirstEditableInputId()
+        => scannerInputs
+            .Where(i => i.Visible && !i.Disable)
+            .OrderBy(i => i.Index)
+            .Select(i => i.Id)
+            .FirstOrDefault() ?? "palmId";
+
+    // 申请在下一轮渲染完成后聚焦
+    private void RequestFocusToFirstInput()
+    {
+        _pendingFocusId = GetFirstEditableInputId();
+        StateHasChanged();
+    }
+
+    // 实际聚焦（保证 DOM 就绪；避免隐藏扫描输入抢焦点）
+    private async Task FocusInputById(string id, bool selectAll = true)
+    {
+        if (scanner is null) return;
+
+        await ScannerService.ExitAutoFocusModeAsync();
+        await Task.Yield();
+        await Task.Delay(50);
+
+        await scanner.FocusByIdAsync(id, selectAll);
+        ScannerService.SetCurrentFocusedInputId(id);
+
+        if (ScannerService.IsAutoMode)
+            await ScannerService.EnterAutoFocusModeAsync();
+    }
+
+    private static string Norm(string? s) => (s ?? string.Empty).Trim();
+
+    private static FingerClass ParseFingerClass(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return FingerClass.Unknown;
+        var m = Regex.Match(code.Trim(), @"-(D|M|F)[0LR]-", RegexOptions.IgnoreCase);
+        if (!m.Success) return FingerClass.Unknown;
+        return m.Groups[1].Value.ToUpperInvariant() switch
+        {
+            "M" => FingerClass.Thumb_M,
+            "D" => FingerClass.Single_D,
+            "F" => FingerClass.Split_F,
+            _ => FingerClass.Unknown
+        };
+    }
+
+    private void SetFieldError(string fieldId, bool isError, string? errorText = null)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+        input.Error = isError;
+        input.ErrorText = isError ? (errorText ?? "") : "";
+    }
+
+    // —— 字段校验（空值不报错）；“分指机构”只认 F 型编码 —— //
+    private void ValidateField(string fieldId)
+    {
+        var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
+        if (input == null) return;
+
+        var val = Norm(input.Value);
+        if (string.IsNullOrEmpty(val))
+        {
+            SetFieldError(fieldId, false);
+            return;
+        }
+
+        if (fieldId == "palmId")
+        {
+            if (string.IsNullOrEmpty(PalmPrefix))
+            {
+                SetFieldError(fieldId, false);
+            }
+            else
+            {
+                bool ok = val.StartsWith(PalmPrefix, StringComparison.OrdinalIgnoreCase);
+                SetFieldError(fieldId, !ok, ok ? null : PalmPrefixError);
+            }
+            return;
+        }
+
+        if (fieldId == "splitId")
+        {
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Split_F;
+            SetFieldError(fieldId, !ok, ok ? null : "分指机构必须为 F 型编码");
+            return;
+        }
+
+        if (fieldId == "finger1")
+        {
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Thumb_M;
+            SetFieldError(fieldId, !ok, ok ? null : "拇指位置必须为 M 型编码");
+            return;
+        }
+
+        if (fieldId is "finger2" or "finger3" or "finger4" or "finger5")
+        {
+            bool ok = FingerCodeRegex.IsMatch(val) && ParseFingerClass(val) == FingerClass.Single_D;
+            SetFieldError(fieldId, !ok, ok ? null : "该位置必须为 D 型（单指）编码");
+            return;
+        }
+    }
+
+    private async Task ToggleScanModeAsync()
+    {
+        await ScannerService.ToggleModeAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(task_id) && !string.IsNullOrEmpty(palm_id))
+        {
+            await ScannerService.ToggleModeAsync2(false);
+            StateHasChanged();
+            taskId = task_id;
+            await LoadTaskDetail();
+
+            var list = await ProcessThreeService.GetPalmDetail(palm_id);
+            var map = new Dictionary<string, int>
+            {
+                { "palmId", -1 },
+                { "splitId", 0 },
+                { "finger1", 1 },
+                { "finger2", 2 },
+                { "finger3", 3 },
+                { "finger4", 4 },
+                { "finger5", 5 },
+                { "remarks", 6 }
+            };
+
+            foreach (var kv in map)
+            {
+                var input = scannerInputs.FirstOrDefault(i => i.Id == kv.Key);
+                if (input != null) input.Value = kv.Key == "palmId" ? palm_id : (list.Count > kv.Value && kv.Value >= 0 ? list[kv.Value] : "");
+            }
+
+            if (scanner is not null) await scanner.RevalidateDuplicates();
+            ValidateField("palmId");
+            ValidateField("splitId");
+            ValidateField("finger1");
+            ValidateField("finger2");
+            ValidateField("finger3");
+            ValidateField("finger4");
+            ValidateField("finger5");
+
+            // ✅ 参数回填后，申请聚焦到第一个输入框
+            RequestFocusToFirstInput();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        scannerInputs = new List<BarcodeScanner.InputField>
+        {
+            new BarcodeScanner.InputField { Index = 1, Label = "手掌外壳编号", Id = "palmId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 2, Label = "分指机构（F 型）", Id = "splitId", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 3, Label = "大拇指编号（M 型）", Id = "finger1", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 4, Label = "食指编号（D 型）", Id = "finger2", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 5, Label = "中指编号（D 型）", Id = "finger3", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 6, Label = "无名指编号（D 型）", Id = "finger4", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 7, Label = "小拇指编号（D 型）", Id = "finger5", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 8, Label = "备注", Id = "remarks", IsSpecialInput = true }
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isLoading = true;
+            StateHasChanged();
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+            try
+            {
+                currentUser = await AuthService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    NavManager.NavigateTo("/login", true);
+                    return;
+                }
+
+                _PalmDto.operator_id = currentUser.employee_id;
+
+                if (string.IsNullOrWhiteSpace(taskId))
+                {
+                    var saved = await JSRuntime.InvokeAsync<string>("localStorage.getItem", StorageKey);
+                    if (!string.IsNullOrWhiteSpace(saved))
+                    {
+                        taskId = saved;
+                        hasSearched = true;
+                        await LoadTaskDetail();
+                    }
+                }
+            }
+            catch
+            {
+                NavManager.NavigateTo("/login", true);
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+
+        // ✅ 非首次渲染：如有待聚焦 Id，此时安全聚焦
+        if (!firstRender && _pendingFocusId is not null)
+        {
+            var id = _pendingFocusId;
+            _pendingFocusId = null;
+            await FocusInputById(id, selectAll: true);
+        }
+    }
+
+    private void HandleSpecialInputFocus()
+    {
+        ScannerService.SetCurrentFocusedInputId("taskId");
+        _ = ScannerService.ExitAutoFocusModeAsync();
+    }
+
+    private async Task HandleSpecialInputBlur()
+    {
+        if (ScannerService.IsAutoMode) await ScannerService.EnterAutoFocusModeAsync();
+        await ScannerService.HandleInputBlurAsync();
+    }
+
+    private async Task ClearTaskId()
+    {
+        taskId = string.Empty;
+        task = null;
+        hasSearched = false;
+        hasInputError = false;
+        finishedPalms.Clear();
+        _PalmDto = new AddPalmDto();
+        foreach (var input in scannerInputs) input.Value = string.Empty;
+        _split = _finger1 = _finger2 = _finger3 = _finger4 = _finger5 = string.Empty;
+        if (currentUser != null) _PalmDto.operator_id = currentUser.employee_id;
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        StateHasChanged();
+
+        if (scanner is not null) await scanner.RevalidateDuplicates();
+
+        ValidateField("palmId");
+        ValidateField("splitId");
+        ValidateField("finger1");
+        ValidateField("finger2");
+        ValidateField("finger3");
+        ValidateField("finger4");
+        ValidateField("finger5");
+    }
+
+    private async Task LoadTaskDetail()
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            hasInputError = true;
+            StateHasChanged();
+            return;
+        }
+
+        hasInputError = false;
+        isLoading = true;
+        StateHasChanged();
+        try
+        {
+            hasSearched = true;
+            StateHasChanged();
+            task = await TaskService.GetTaskDetail(taskId);
+            if (task == null) SnackbarHelper.Show(Snackbar, "生产单号不存在", Severity.Warning);
+
+            _PalmDto.task_id = taskId;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
+            await GetFinishedList();
+
+            // ✅ 任务已加载：申请聚焦到第一个输入框
+            RequestFocusToFirstInput();
+        }
+        catch (Exception ex)
+        {
+            task = null;
+            await DialogService.ShowMessageBox("错误", $"任务加载失败：{ex.Message}", "确定");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GetFinishedList()
+    {
+        try
+        {
+            var result = await ProcessThreeService.GetPalmList(taskId);
+            finishedPalms = result;
+            if (task != null)
+            {
+                if (finishedPalms.Count >= task.product_num)
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process7", 1);
+                else
+                    await TaskService.UpdateTaskProcessStatus(taskId, "process7", 0);
+            }
+        }
+        catch
+        {
+            finishedPalms = new List<PalmDto>();
+            SnackbarHelper.Show(Snackbar, "加载失败", Severity.Error);
+        }
+    }
+
+    private async Task NavigateToDetail()
+    {
+        if (!string.IsNullOrWhiteSpace(taskId))
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
+        NavManager.NavigateTo($"/TaskDetail/{taskId}/{6}");
+    }
+
+    private async Task HandleBinding()
+    {
+        var palmInput   = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
+        var splitInput  = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+        var finger1Input= scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+        var finger2Input= scannerInputs.FirstOrDefault(i => i.Id == "finger2");
+        var finger3Input= scannerInputs.FirstOrDefault(i => i.Id == "finger3");
+        var finger4Input= scannerInputs.FirstOrDefault(i => i.Id == "finger4");
+        var finger5Input= scannerInputs.FirstOrDefault(i => i.Id == "finger5");
+
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (splitInput == null || string.IsNullOrWhiteSpace(splitInput.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "分指机构（F 型）不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (finger1Input == null || string.IsNullOrWhiteSpace(finger1Input.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "大拇指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (finger2Input == null || string.IsNullOrWhiteSpace(finger2Input.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "食指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (finger3Input == null || string.IsNullOrWhiteSpace(finger3Input.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "中指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (finger4Input == null || string.IsNullOrWhiteSpace(finger4Input.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "无名指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+        if (finger5Input == null || string.IsNullOrWhiteSpace(finger5Input.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "小拇指编号不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+
+        // 提交前最后一次校验（防漏）
+        ValidateField("palmId");
+        ValidateField("splitId");
+        ValidateField("finger1");
+        ValidateField("finger2");
+        ValidateField("finger3");
+        ValidateField("finger4");
+        ValidateField("finger5");
+
+        bool hasFormatError = scannerInputs.Any(i =>
+            (i.Id == "palmId" || i.Id == "splitId" || i.Id == "finger1" || i.Id == "finger2" || i.Id == "finger3" || i.Id == "finger4" || i.Id == "finger5")
+            && i.Error && !string.IsNullOrWhiteSpace(i.ErrorText));
+        if (hasFormatError)
+        {
+            SnackbarHelper.Show(Snackbar, "存在编号格式错误，请修正后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+
+        // 去重拦截
+        if (scannerInputs.Where(i => DuplicateCheckList.Contains(i.Id))
+            .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
+        {
+            SnackbarHelper.Show(Snackbar, "存在重复编号（分指/五指），请先修改后再绑定", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+
+        isBinding = true;
+        try
+        {
+            _PalmDto.palm_id = palmInput.Value;
+            _PalmDto.remarks = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
+
+            var componentIds = new List<string>
+            {
+                splitInput.Value,
+                finger1Input.Value,
+                finger2Input.Value,
+                finger3Input.Value,
+                finger4Input.Value,
+                finger5Input.Value
+            };
+
+            var palmWithComponentsDto = new AddPalmWithComponentsDto
+            {
+                palm_id     = _PalmDto.palm_id,
+                task_id     = _PalmDto.task_id,
+                operator_id = _PalmDto.operator_id,
+                remarks     = _PalmDto.remarks,
+                component_ids = componentIds
+            };
+
+            var palmResponse = await ProcessThreeService.AddPalmWithComponents(palmWithComponentsDto);
+
+            if (palmResponse.ResultCode == 1)
+            {
+                // 清空表单
+                palmInput.Value = splitInput.Value =
+                    finger1Input.Value = finger2Input.Value = finger3Input.Value =
+                        finger4Input.Value = finger5Input.Value = "";
+                var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+                if (remarksInput != null) remarksInput.Value = "";
+
+                if (scanner is not null) await scanner.RevalidateDuplicates();
+
+                await LoadTaskDetail();
+                await TaskService.UpdateSingleTaskStatus(taskId);
+                SnackbarHelper.Show(Snackbar, "手掌与分指机构、手指绑定成功", Severity.Success);
+
+                // ✅ 成功后继续作业：回到第一个输入框
+                RequestFocusToFirstInput();
+            }
+            else
+            {
+                SnackbarHelper.Show(Snackbar, $"手掌绑定失败：{palmResponse?.Msg ?? "未知错误"}", Severity.Error);
+                RequestFocusToFirstInput();
+            }
+        }
+        catch (JsonException jsonEx)
+        {
+            SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
+            RequestFocusToFirstInput();
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"绑定异常：{ex.Message}", Severity.Error);
+            RequestFocusToFirstInput();
+        }
+        finally
+        {
+            isBinding = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<ApiResponse> HandleFingerBindPalm(string finger_id, string palm_id)
+    {
+        ApiResponse response = null;
+        try
+        {
+            response = await ProcessThreeService.FingerBindPalm(finger_id, palm_id);
+            if (response != null && response.ResultCode == 1)
+            {
+                SnackbarHelper.Show(Snackbar, $"手指 {finger_id} 绑定成功", Severity.Success);
+            }
+            else
+            {
+                SnackbarHelper.Show(Snackbar, $"手指 {finger_id} 绑定失败：{(response?.Msg ?? "未知错误")}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"手指 {finger_id} 绑定异常：{ex.Message}", Severity.Error);
+            response = new ApiResponse { ResultCode = -1, Msg = ex.Message };
+        }
+
+        return response;
+    }
+
+    private async Task HandleUpdateDemo()
+    {
+        var palmInput   = scannerInputs.FirstOrDefault(i => i.Id == "palmId");
+        var splitInput  = scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+        var finger1Input= scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+        var finger2Input= scannerInputs.FirstOrDefault(i => i.Id == "finger2");
+        var finger3Input= scannerInputs.FirstOrDefault(i => i.Id == "finger3");
+        var finger4Input= scannerInputs.FirstOrDefault(i => i.Id == "finger4");
+        var finger5Input= scannerInputs.FirstOrDefault(i => i.Id == "finger5");
+        var remarksInput= scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+
+        if (palmInput == null || string.IsNullOrWhiteSpace(palmInput.Value))
+        {
+            SnackbarHelper.Show(Snackbar, "手掌外壳ID不能为空", Severity.Warning);
+            RequestFocusToFirstInput();
+            return;
+        }
+
+        try
+        {
+            var originalData = await ProcessThreeService.GetPalmDetail(palmInput.Value);
+
+            var newSplit   = splitInput?.Value ?? "";
+            var newFinger1 = finger1Input?.Value ?? "";
+            var newFinger2 = finger2Input?.Value ?? "";
+            var newFinger3 = finger3Input?.Value ?? "";
+            var newFinger4 = finger4Input?.Value ?? "";
+            var newFinger5 = finger5Input?.Value ?? "";
+            var newRemarks = remarksInput?.Value ?? "";
+
+            var originalSplit   = originalData.Count > 0 ? originalData[0] : "";
+            var originalFinger1 = originalData.Count > 1 ? originalData[1] : "";
+            var originalFinger2 = originalData.Count > 2 ? originalData[2] : "";
+            var originalFinger3 = originalData.Count > 3 ? originalData[3] : "";
+            var originalFinger4 = originalData.Count > 4 ? originalData[4] : "";
+            var originalFinger5 = originalData.Count > 5 ? originalData[5] : "";
+            var originalRemarks = originalData.Count > 6 ? originalData[6] : "";
+
+            await CheckAndShowFingerChange("分指",   originalSplit,   newSplit);
+            await CheckAndShowFingerChange("大拇指", originalFinger1, newFinger1);
+            await CheckAndShowFingerChange("食指",   originalFinger2, newFinger2);
+            await CheckAndShowFingerChange("中指",   originalFinger3, newFinger3);
+            await CheckAndShowFingerChange("无名指", originalFinger4, newFinger4);
+            await CheckAndShowFingerChange("小拇指", originalFinger5, newFinger5);
+
+            if (scanner is not null) await scanner.RevalidateDuplicates();
+            ValidateField("palmId");
+            ValidateField("splitId");
+            ValidateField("finger1");
+            ValidateField("finger2");
+            ValidateField("finger3");
+            ValidateField("finger4");
+            ValidateField("finger5");
+
+            SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
+
+            // ✅ 检查结束，回到第一个输入框
+            RequestFocusToFirstInput();
+        }
+        catch (Exception ex)
+        {
+            SnackbarHelper.Show(Snackbar, $"检查异常：{ex.Message}", Severity.Error);
+            RequestFocusToFirstInput();
+        }
+    }
+
+    private async Task CheckAndShowFingerChange(string fingerName, string oldValue, string newValue)
+    {
+        if (oldValue != newValue)
+        {
+            if (!string.IsNullOrEmpty(oldValue))
+            {
+                var unbindResponse = await ProcessTwoService.UnBindFinger(oldValue);
+                if (unbindResponse.ResultCode != 1)
+                {
+                    SnackbarHelper.Show(Snackbar, $"{fingerName}解绑失败: {unbindResponse.Msg}", Severity.Error);
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(newValue))
+            {
+                var rebindResponse = await ProcessTwoService.ReBindFinger(newValue, taskId, palm_id);
+                if (rebindResponse.ResultCode != 1)
+                {
+                    SnackbarHelper.Show(Snackbar, $"{fingerName}重绑失败: {rebindResponse.Msg}", Severity.Error);
+                    return;
+                }
+            }
+
+            SnackbarHelper.Show(Snackbar, $"{fingerName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
+        }
+    }
+
+    // —— 自动匹配规则：先看 M/D/F，再按空位兜底 —— //
+    private BarcodeScanner.InputField? DetermineTargetInput(string barcodeData)
+    {
+        var code = Norm(barcodeData);
+
+        // 1) M/D/F 自动落位
+        if (FingerCodeRegex.IsMatch(code))
+        {
+            switch (ParseFingerClass(code))
+            {
+                case FingerClass.Split_F:
+                    return scannerInputs.FirstOrDefault(i => i.Id == "splitId");
+                case FingerClass.Thumb_M:
+                    return scannerInputs.FirstOrDefault(i => i.Id == "finger1");
+                case FingerClass.Single_D:
+                {
+                    var f2 = scannerInputs.FirstOrDefault(i => i.Id == "finger2" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f2 != null) return f2;
+                    var f3 = scannerInputs.FirstOrDefault(i => i.Id == "finger3" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f3 != null) return f3;
+                    var f4 = scannerInputs.FirstOrDefault(i => i.Id == "finger4" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f4 != null) return f4;
+                    var f5 = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(Norm(i.Value)));
+                    if (f5 != null) return f5;
+                    return scannerInputs.FirstOrDefault(i => i.Id == "finger2");
+                }
+            }
+        }
+
+        // 2) 兜底：按空位顺序
+        var palmEmpty = scannerInputs.FirstOrDefault(i => i.Id == "palmId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (palmEmpty != null) return palmEmpty;
+
+        var splitEmpty = scannerInputs.FirstOrDefault(i => i.Id == "splitId" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (splitEmpty != null) return splitEmpty;
+
+        var f1 = scannerInputs.FirstOrDefault(i => i.Id == "finger1" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f1 != null) return f1;
+        var f2e = scannerInputs.FirstOrDefault(i => i.Id == "finger2" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f2e != null) return f2e;
+        var f3e = scannerInputs.FirstOrDefault(i => i.Id == "finger3" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f3e != null) return f3e;
+        var f4e = scannerInputs.FirstOrDefault(i => i.Id == "finger4" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f4e != null) return f4e;
+        var f5e = scannerInputs.FirstOrDefault(i => i.Id == "finger5" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (f5e != null) return f5e;
+
+        return scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+    }
+
+    private async Task HandleInputValueChanged(BarcodeScanner.InputField input)
+    {
+        switch (input.Id)
+        {
+            case "palmId": _PalmDto.palm_id = input.Value; break;
+            case "splitId": _split = input.Value; break;
+            case "finger1": _finger1 = input.Value; break;
+            case "finger2": _finger2 = input.Value; break;
+            case "finger3": _finger3 = input.Value; break;
+            case "finger4": _finger4 = input.Value; break;
+            case "finger5": _finger5 = input.Value; break;
+            case "remarks": _PalmDto.remarks = input.Value; break;
+        }
+
+        // 实时校验
+        ValidateField(input.Id);
+
+        await Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dotNetRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("enterKeyHandler.dispose");
+            dotNetRef.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+}
+
+@inject BarcodeScannerService ScannerService
+@inject ISnackbar Snackbar

@@ -43,8 +43,8 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTWFpbkxheW91dC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/C\# Projects/NewPda/DexRobotPDA/Components/Layout/MyNavMenu.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTXlOYXZNZW51LnJhem9y
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/APi.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBUGkucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Components/AddTaskDialog.razor]
@@ -97,6 +97,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xFcnJvci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/FiveFingerPage.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xGaXZlRmluZ2VyUGFnZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Home.razor]
@@ -161,6 +165,18 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/Test/MotorCheck.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUZXN0XE1vdG9yQ2hlY2sucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/ThreeFingerPage.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUaHJlZUZpbmdlclBhZ2UucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/ThreeFinger/FingerBindPalm.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUaHJlZUZpbmdlclxGaW5nZXJCaW5kUGFsbS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/ThreeFinger/MotorBindFinger.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xUaHJlZUZpbmdlclxNb3RvckJpbmRGaW5nZXIucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Routes.razor]

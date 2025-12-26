@@ -19,9 +19,10 @@ namespace DexRobotPDA.Services
         {
         }
 
-        public async Task<List<ProductTaskDto>?> GetTasks()
+        public async Task<List<ProductTaskDto>?> GetTasks(string type)
         {
             var request = new RestRequest("api/ProductTask/GetTaskList");
+            request.AddParameter("type", type);
             return await ExecuteRequest<List<ProductTaskDto>>(request);
         }
 

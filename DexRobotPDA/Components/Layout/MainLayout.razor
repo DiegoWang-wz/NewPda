@@ -70,6 +70,8 @@ else
             return uri switch
             {
                 "TaskList" => "生产任务",
+                "FiveFingerPage" => "五指生产页面",
+                "ThreeFingerPage" => "三指生产页面",
                 "TaskDetail" => "生产详情",
                 "DataSummary" => "数据汇总",
                 "LogSummary" => "日志汇总",
@@ -91,6 +93,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await JSRuntime.InvokeVoidAsync("setTitle", "灵捷扫码绑定系统");
         if (firstRender)
         {
             isLoading = true;

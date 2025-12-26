@@ -12,6 +12,7 @@ namespace DexRobotPDA.DataModel
         public virtual DbSet<EmployeeModel> Employees { get; set; }
         public virtual DbSet<ProductTaskModel> ProductTasks { get; set; }
         public virtual DbSet<MotorModel> Motors { get; set; }
+        public virtual DbSet<ServoModel> Servos { get; set; }
         public virtual DbSet<FingerModel> Fingers { get; set; }
         public virtual DbSet<PalmModel> Palms { get; set; }
         public virtual DbSet<MotorWormDetectModel> Detect1 { get; set; }

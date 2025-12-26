@@ -4,7 +4,7 @@ public class ProductTaskDto
 {
     public string task_id { get; set; }
     public string? title { get; set; }
-    public string? description { get; set; }
+    public string? production_type { get; set; }
     public byte status { get; set; } = 0;
     public string? assignee_id { get; set; }
     public DateTime created_at { get; set; } = DateTime.Now;

@@ -32,7 +32,7 @@ public class ProductTaskModel
     /// <summary>
     /// 任务详细描述（大文本，支持长内容）
     /// </summary>
-    public string? description { get; set; }
+    public string? production_type { get; set; }
 
     /// <summary>
     /// 状态：0=未开始，1=进行中，2=已完成，3=已取消

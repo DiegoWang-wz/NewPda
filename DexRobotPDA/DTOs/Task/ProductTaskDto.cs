@@ -10,7 +10,7 @@ public class AddTaskDto
 
     [StringLength(255, ErrorMessage = "标题长度不能超过255个字符")]
     public string? title { get; set; } = "";
-    public string? description { get; set; } = "";
+    public string? production_type { get; set; } = "";
 
     [StringLength(64, ErrorMessage = "负责人ID长度不能超过64个字符")]
     public string? assignee_id { get; set; } = "";

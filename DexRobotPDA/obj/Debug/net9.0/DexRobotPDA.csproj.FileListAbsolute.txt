@@ -810,3 +810,4 @@ D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Process.dll
 D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Enrichers.Thread.dll
 D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Filters.Expressions.dll
 D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Superpower.dll
+D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\compressed\1geivr5qz9-d4ypubpf4b.gz

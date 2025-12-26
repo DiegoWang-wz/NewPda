@@ -80,7 +80,7 @@
         <MudCard Class="pa-4">
             <MudStack Spacing="2">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudText Typo="Typo.h6">手指详情</MudText>
+                    <MudText Typo="Typo.h6">手指外壳详情</MudText>
 
                     <MudChip T="string"
                              Color="@(_finger.is_qualified ? Color.Success : Color.Error)"
@@ -151,7 +151,7 @@
         <MudCard Class="pa-4">
             <MudStack Spacing="2">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudText Typo="Typo.h6">Palm 详情</MudText>
+                    <MudText Typo="Typo.h6">手掌外壳详情</MudText>
                     <MudChip T="string"
                              Color="@(_palm.is_qualified ? Color.Success : Color.Error)"
                              Variant="Variant.Filled"
@@ -197,6 +197,61 @@
             </MudStack>
         </MudCard>
     }
+    else if (_servo?.id > 0)
+    {
+        <MudCard Class="pa-4">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">舵机详情</MudText>
+                    <MudChip T="string"
+                             Color="@(_servo.is_qualified ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled"
+                             Size="Size.Small"
+                             Class="ml-2">
+                        @(_servo.is_qualified ? "合格" : "不合格")
+                    </MudChip>
+
+                    <MudText Class="ml-auto" Color="Color.Secondary" Typo="Typo.subtitle2">
+                        @_servo.servo_id
+                    </MudText>
+                </MudStack>
+                <MudDivider Class="my-2"/>
+                <MudList T="string" Dense="true" Class="kv-list">
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">任务编号</MudText>
+                        <MudText Class="kv-value">@(_servo.task_id.IsNullOrEmpty() ? "-" : _servo.task_id)</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">绑定的部件</MudText>
+                        <MudText Class="kv-value">@(_servo.superior_id.IsNullOrEmpty() ? "-" : _servo.superior_id)</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">操作人编号</MudText>
+                        <MudText Class="kv-value">@_servo.operator_id</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">创建日期</MudText>
+                        <MudText Class="kv-value">@_servo.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    </MudListItem>
+                    <MudListItem T="string">
+                        <MudText Color="Color.Secondary">更新日期</MudText>
+                        <MudText Class="kv-value">@(_servo.updated_at?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</MudText>
+                    </MudListItem>
+                </MudList>
+                @if (!string.IsNullOrWhiteSpace(_servo?.remarks))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                        备注：@_servo.remarks</MudAlert>
+                }
+                <div class="d-flex mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto mt-2"
+                               OnClick="HandleUnBind" Disabled="_isSubmitting">
+                        @(_isSubmitting ? "解绑中..." : "部件解绑")
+                    </MudButton>
+                </div>
+            </MudStack>
+        </MudCard>
+    }
     else if (_hasSearched)
     {
         <MudText Align="Align.Center" Color="Color.Warning">
@@ -221,7 +276,7 @@
             Variant="Variant.Filled"
             Color="Color.Error"
             StartIcon="@Icons.Material.Filled.DeleteForever"
-            OnClick="ClearData"
+            OnClick="@ClearData"
             Size="Size.Large"
             Class="w-full md:w-auto">
             清除
@@ -250,6 +305,7 @@
     private MotorDto? _motor = new();
     private FingerDto? _finger = new();
     private PalmDto? _palm = new();
+    private ServoDto? _servo= new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -287,6 +343,7 @@
         _motor = new();
         _finger = new();
         _palm = new();
+        _servo = new();
 
         StateHasChanged(); // 事件上下文，无需 InvokeAsync
     }
@@ -304,22 +361,25 @@
 
         try
         {
-            // 查询前先清空其他模型，避免旧值干扰
             _motor = new();
             _finger = new();
             _palm = new();
-
-            if (_partId.StartsWith("MOT", StringComparison.OrdinalIgnoreCase))
-            {
-                _motor = await DetectService.GetMotor(_partId);
-            }
-            else if (_partId.StartsWith("FG", StringComparison.OrdinalIgnoreCase) || _partId.StartsWith("MO-", StringComparison.OrdinalIgnoreCase))
+            var info = PartCodeHelper.Parse(_partId);
+            if (info.KindName == "Finger")
             {
                 _finger = await DetectService.GetFinger(_partId);
             }
-            else if (_partId.StartsWith("PM", StringComparison.OrdinalIgnoreCase) || _partId.StartsWith("DX", StringComparison.OrdinalIgnoreCase))
+            else if (info.KindName == "Motor")
+            {
+                _motor = await DetectService.GetMotor(_partId);
+            }
+            else if (info.KindName == "Palm")
             {
                 _palm = await DetectService.GetPalm(_partId);
+            }
+            else if (info.KindName == "Servo" || info.KindName == "RotaryServo")
+            {
+                _servo = await Idx023Service.GetServoByIdAsync(_partId);
             }
             else
             {
@@ -375,6 +435,14 @@
                     res?.ResultCode == 1);
                 await TaskService.UpdateSingleTaskStatus(_palm.task_id);
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }else if (_servo?.id > 0)
+            {
+                var res = await Idx023Service.UnbindServoAsync(_servo.servo_id);
+                await LogService.AddLog("部件解绑", _currentUser?.employee_id ?? "未知用户",
+                    $"舵机解绑 - 部件编号: {_palm.palm_id}, 任务单号: {_palm.task_id}, 结果: {(res ? "成功" : "失败")}",
+                    res);
+                await TaskService.UpdateSingleTaskStatus(_palm.task_id);
+                SnackbarHelper.Show(Snackbar, res ? "舵机解绑成功" : $"解绑失败", res ? Severity.Success : Severity.Error);
             }
 
             // 解绑后清空

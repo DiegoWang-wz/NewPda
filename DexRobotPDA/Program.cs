@@ -88,6 +88,7 @@ builder.Services.AddScoped<ProcessThreeService>();
 builder.Services.AddScoped<BarcodeScannerService>();
 builder.Services.AddScoped<DetectService>();
 builder.Services.AddScoped<LogService>();
+builder.Services.AddScoped<IDX023Service, DX023Service>();
 
 // ===== 获取当前请求信息（用于动态 BaseUrl）=====
 builder.Services.AddHttpContextAccessor();

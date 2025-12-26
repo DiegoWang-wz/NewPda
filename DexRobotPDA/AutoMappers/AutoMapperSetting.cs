@@ -17,6 +17,7 @@ public class AutoMapperSetting : Profile
         CreateMap<EmployeeModel, EmployeeDto>().ReverseMap();
         CreateMap<ProductTaskModel, ProductTaskDto>().ReverseMap();
         CreateMap<MotorModel, MotorDto>().ReverseMap();
+        CreateMap<ServoModel, ServoDto>().ReverseMap();
         CreateMap<FingerModel, FingerDto>().ReverseMap();
         CreateMap<PalmModel, PalmDto>().ReverseMap();
         CreateMap<MotorWormDetectModel, MotorWormDetectDto>().ReverseMap();
@@ -31,6 +32,9 @@ public class AutoMapperSetting : Profile
         CreateMap<EmployeeModel, UserDto>();
 
         CreateMap<AddMotorDto, MotorModel>()
+            .ForMember(dest => dest.id, opt => opt.Ignore());
+        
+        CreateMap<AddServoDto, ServoModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore());
 
         CreateMap<AddFingerDto, FingerModel>()

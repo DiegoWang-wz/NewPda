@@ -1,9 +1,9 @@
 ﻿@page "/tasklist"
+@page "/tasklist/{ProductionType}"
 @inject TaskService TaskService
 @implements IBrowserViewportObserver
 @using DexRobotPDA.Components.Pages.Components
 @implements IAsyncDisposable
-
 <MudPaper Elevation="3" Class="pa-4 ma-2 mx-md-8">
     <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
         <MudItem xs="12" md="7">
@@ -98,7 +98,7 @@
                         <MudTableSortLabel SortBy="(ProductTaskDto x) => x.title">任务名称</MudTableSortLabel>
                     </MudTh>
                     <MudTh>
-                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.description">任务描述</MudTableSortLabel>
+                        <MudTableSortLabel SortBy="(ProductTaskDto x) => x.production_type">产品型号</MudTableSortLabel>
                     </MudTh>
                     <MudTh>
                         <MudTableSortLabel SortBy="(ProductTaskDto x) => x.product_num">生产数量</MudTableSortLabel>
@@ -122,7 +122,7 @@
                     <MudTd DataLabel="任务ID">@context.task_id</MudTd>
                     <MudTd DataLabel="任务ID">@context.sale_order_number</MudTd>
                     <MudTd DataLabel="任务名称">@context.title</MudTd>
-                    <MudTd DataLabel="任务描述">@context.description</MudTd>
+                    <MudTd DataLabel="产品型号">@context.production_type</MudTd>
                     <MudTd DataLabel="生产数量">@context.product_num</MudTd>
                     <MudTd DataLabel="负责人">@context.assignee_id</MudTd>
                     <MudTd DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
@@ -152,7 +152,7 @@
     private string searchString1 = "";
     private string _tableHeight = "600px";
     private bool _ifDense = false;
-
+    [Parameter] public string ProductionType { get; set; }
     [Inject] private IBrowserViewportService ViewportService { get; set; }
     private Breakpoint _currentBreakpoint = Breakpoint.Xs;
 
@@ -224,7 +224,7 @@
         await TaskService.UpdateAllTaskStatus();
         try
         {
-            tasks = await TaskService.GetTasks();
+            tasks = await TaskService.GetTasks(ProductionType);
             if (_dateRange != null && _dateRange.Start != null && _dateRange.End != null)
             {
                 tasks = tasks.Where(t =>
@@ -274,7 +274,7 @@
         var search = searchString.ToLower();
         return (element.task_id?.ToLower().Contains(search) ?? false) ||
                (element.title?.ToLower().Contains(search) ?? false) ||
-               (element.description?.ToLower().Contains(search) ?? false) ||
+               (element.production_type?.ToLower().Contains(search) ?? false) ||
                (element.assignee_id?.ToLower().Contains(search) ?? false) ||
                element.created_at.ToString("yyyy-MM-dd").Contains(searchString) ||
                element.updated_at.ToString("yyyy-MM-dd").Contains(searchString);
