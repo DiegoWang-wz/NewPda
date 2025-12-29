@@ -9,20 +9,8 @@ using DexRobotPDA.DataModel; // 你的 DailyDbContext 命名空间（如果不�
 
 namespace DexRobotPDA.Services
 {
-    public enum SimplePartKind
-    {
-        Unknown = 0,
-        Product,     // DX021 / DX023
-        Palm,        // Palm-L / Palm-R
-        Motor,       // Motor
-        Finger,      // Finger / Finger-F-L ...
-        Servo,       // Servo
-        RotaryServo  // RotaryServo
-    }
-
     public sealed record SimplePartInfo(
         string Raw,
-        SimplePartKind Kind,
         string KindName,
         string Result,
         IReadOnlyDictionary<string, string> Fields
@@ -33,7 +21,6 @@ namespace DexRobotPDA.Services
     /// </summary>
     public sealed record TraceChainDto(
         string ScannedCode,
-        string IdentifiedKind,
         string IdentifiedResult,
 
         string? MotorId,
@@ -41,8 +28,7 @@ namespace DexRobotPDA.Services
         string? FingerId,
         string? PalmId,
         string? PalmSide,   // L / R if can infer
-        string? TaskId,
-        string? TaskNo      // 任务单号（如果表里没有 TaskNo，会尝试 TaskCode/TaskNumber）
+        string? TaskId
     );
 
     public static class PartCodeHelper
@@ -63,7 +49,6 @@ namespace DexRobotPDA.Services
 
         // =========================
         // ★ 关键：实体字段候选名（自动适配 motor_id / MotorId / Motor_id 等）
-        // 你如果确定你项目里的属性名，就把候选留一个也行。
         // =========================
         private static readonly string[] MotorIdProps = { "motor_id", "Motor_id", "MotorId" };
         private static readonly string[] ServoIdProps = { "servo_id", "Servo_id", "ServoId" };
@@ -80,9 +65,6 @@ namespace DexRobotPDA.Services
             "task_id", "Task_id", "TaskId",
             "producttask_id", "ProductTaskId", "ProductTask_id"
         };
-
-        // ProductTask 的“任务单号”字段候选名
-        private static readonly string[] TaskNoProps = { "task_no", "TaskNo", "TaskNO", "TaskCode", "TaskNumber" };
 
         // ProductTask 的“主键/ID字段”候选名（用来根据 task_id 去找 task）
         private static readonly string[] TaskIdProps =
@@ -105,18 +87,26 @@ namespace DexRobotPDA.Services
 
             // Motor
             if (s.StartsWith(MotorPrefix, StringComparison.Ordinal))
-                return New(raw, SimplePartKind.Motor, "Motor", "Motor",
+                return New(raw, "Motor", "Motor",
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["prefix"] = MotorPrefix });
 
-            // Servo
+            // ✅ Servo（普通）
             if (s.StartsWith(ServoPrefix, StringComparison.Ordinal))
-                return New(raw, SimplePartKind.Servo, "Servo", "Servo",
-                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["prefix"] = ServoPrefix });
+                return New(raw, "Servo", "Servo",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["prefix"] = ServoPrefix,
+                        ["servo_type"] = "Normal"
+                    });
 
-            // RotaryServo
+            // ✅ RotaryServo（归类为 Servo，但在 Result 区分）
             if (s.StartsWith(RotaryServoPrefix, StringComparison.Ordinal))
-                return New(raw, SimplePartKind.RotaryServo, "RotaryServo", "RotaryServo",
-                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["prefix"] = RotaryServoPrefix });
+                return New(raw, "Servo", "RotaryServo",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["prefix"] = RotaryServoPrefix,
+                        ["servo_type"] = "Rotary"
+                    });
 
             // MO -> Finger
             if (s.StartsWith(MoPrefix, StringComparison.Ordinal))
@@ -162,13 +152,13 @@ namespace DexRobotPDA.Services
                         result.Contains("Finger-M", StringComparison.Ordinal) ? "M" :
                         result.Contains("Finger-D", StringComparison.Ordinal) ? "D" : "";
 
-                    return New(raw, SimplePartKind.Finger, "Finger", result, fields);
+                    return New(raw, "Finger", result, fields);
                 }
 
                 if (parts.Length == 4)
-                    return New(raw, SimplePartKind.Finger, "Finger", "Finger", fields);
+                    return New(raw, "Finger", "Finger", fields);
 
-                return New(raw, SimplePartKind.Finger, "Finger", $"Finger(segments={parts.Length})", fields);
+                return New(raw, "Finger", $"Finger(segments={parts.Length})", fields);
             }
 
             // DX product line / palm
@@ -184,7 +174,7 @@ namespace DexRobotPDA.Services
                     if (ProductLines.Contains(line) && (sku == "60001" || sku == "60002"))
                     {
                         var side = sku == "60001" ? "L" : "R";
-                        return New(raw, SimplePartKind.Palm, "Palm", side == "L" ? "Palm-L" : "Palm-R",
+                        return New(raw, "Palm", side == "L" ? "Palm-L" : "Palm-R",
                             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                             {
                                 ["product_line"] = line,
@@ -199,7 +189,7 @@ namespace DexRobotPDA.Services
                 {
                     if (s.StartsWith(pl, StringComparison.Ordinal))
                     {
-                        return New(raw, SimplePartKind.Product, "Product", pl,
+                        return New(raw, "Product", pl,
                             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["product_line"] = pl });
                     }
                 }
@@ -210,10 +200,6 @@ namespace DexRobotPDA.Services
 
         // =========================
         // 2) 溯源：从下到上查链路
-        //    Motor -> Finger -> Palm -> ProductTask
-        //    Servo/RotaryServo -> Finger -> Palm -> ProductTask
-        //    Finger -> Palm -> ProductTask
-        //    Palm -> ProductTask
         // =========================
         public static async Task<TraceChainDto> TraceAsync(DailyDbContext db, string scannedCode, CancellationToken ct = default)
         {
@@ -225,21 +211,21 @@ namespace DexRobotPDA.Services
 
             var dto = new TraceChainDto(
                 ScannedCode: scannedCode,
-                IdentifiedKind: info.KindName,
                 IdentifiedResult: info.Result,
                 MotorId: null,
                 ServoId: null,
                 FingerId: null,
                 PalmId: null,
                 PalmSide: null,
-                TaskId: null,
-                TaskNo: null
+                TaskId: null
             );
 
-            if (info.Kind == SimplePartKind.Product)
+            // Product：不溯源
+            if (string.Equals(info.KindName, "Product", StringComparison.OrdinalIgnoreCase))
                 return dto;
 
-            if (info.Kind == SimplePartKind.Palm)
+            // Palm
+            if (string.Equals(info.KindName, "Palm", StringComparison.OrdinalIgnoreCase))
             {
                 var palm = await FindByAnyAsync(db.Palms.AsNoTracking(), PalmIdProps, rawTrim, upperTrim, ct);
                 if (palm is null) return dto;
@@ -251,7 +237,8 @@ namespace DexRobotPDA.Services
                 return dto;
             }
 
-            if (info.Kind == SimplePartKind.Finger)
+            // Finger
+            if (string.Equals(info.KindName, "Finger", StringComparison.OrdinalIgnoreCase))
             {
                 var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, rawTrim, upperTrim, ct);
                 if (finger is null) return dto;
@@ -263,7 +250,8 @@ namespace DexRobotPDA.Services
                 return dto;
             }
 
-            if (info.Kind == SimplePartKind.Motor)
+            // Motor
+            if (string.Equals(info.KindName, "Motor", StringComparison.OrdinalIgnoreCase))
             {
                 var motor = await FindByAnyAsync(db.Motors.AsNoTracking(), MotorIdProps, rawTrim, upperTrim, ct);
                 if (motor is null) return dto;
@@ -284,7 +272,8 @@ namespace DexRobotPDA.Services
                 return dto;
             }
 
-            if (info.Kind == SimplePartKind.Servo || info.Kind == SimplePartKind.RotaryServo)
+            // Servo（包含 RotaryServo：KindName 仍是 Servo，Result 再区分）
+            if (string.Equals(info.KindName, "Servo", StringComparison.OrdinalIgnoreCase))
             {
                 var servo = await FindByAnyAsync(db.Servos.AsNoTracking(), ServoIdProps, rawTrim, upperTrim, ct);
                 if (servo is null) return dto;
@@ -327,7 +316,7 @@ namespace DexRobotPDA.Services
         }
 
         // =========================
-        // Palm -> Task
+        // Palm -> Task（只填 TaskId）
         // =========================
         private static async Task<TraceChainDto> FillTaskFromPalmAsync(DailyDbContext db, object palm, TraceChainDto dto, CancellationToken ct)
         {
@@ -339,9 +328,7 @@ namespace DexRobotPDA.Services
             if (task is null) return dto;
 
             var taskId = GetStringByAny(task, TaskIdProps) ?? taskKey.Trim();
-            var taskNo = GetStringByAny(task, TaskNoProps);
-
-            dto = dto with { TaskId = taskId, TaskNo = taskNo };
+            dto = dto with { TaskId = taskId };
             return dto;
         }
 
@@ -355,17 +342,14 @@ namespace DexRobotPDA.Services
             string upperValue,
             CancellationToken ct) where T : class
         {
-            // 优先尝试 rawValue（保留空格/大小写），再尝试 upperValue
             var v1 = rawValue;
             var v2 = upperValue;
 
             foreach (var prop in ResolveExistingProps(typeof(T), propCandidates))
             {
-                // try raw
                 var hit = await FirstOrDefaultByStringPropAsync(query, prop, v1, ct);
                 if (hit is not null) return hit;
 
-                // try upper (fallback)
                 if (!string.Equals(v1, v2, StringComparison.Ordinal))
                 {
                     hit = await FirstOrDefaultByStringPropAsync(query, prop, v2, ct);
@@ -518,7 +502,6 @@ namespace DexRobotPDA.Services
                 if (p != null) yield return p;
             }
 
-            // 再做一次忽略大小写匹配（防止属性名大小写不同）
             foreach (var name in candidates)
             {
                 var p = type.GetProperties()
@@ -529,7 +512,6 @@ namespace DexRobotPDA.Services
 
         private static string? InferPalmSideFromPalmId(string? palmId)
         {
-            // 你之前 Palm 规则：60001=Left, 60002=Right
             if (string.IsNullOrWhiteSpace(palmId)) return null;
             var s = palmId.Trim().ToUpperInvariant();
             if (s.EndsWith("60001", StringComparison.Ordinal)) return "L";
@@ -540,11 +522,11 @@ namespace DexRobotPDA.Services
         // =========================================================
         // SimplePartInfo constructors
         // =========================================================
-        private static SimplePartInfo New(string raw, SimplePartKind kind, string kindName, string result, Dictionary<string, string> fields)
-            => new(raw, kind, kindName, result, fields);
+        private static SimplePartInfo New(string raw, string kindName, string result, Dictionary<string, string> fields)
+            => new(raw, kindName, result, fields);
 
         private static SimplePartInfo Unknown(string raw, string reason)
-            => new(raw, SimplePartKind.Unknown, "Unknown", "Unknown",
+            => new(raw, "Unknown", "Unknown",
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["reason"] = reason });
     }
 }

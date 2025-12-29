@@ -18,48 +18,54 @@ namespace DexRobotPDA.Controllers
             _logger = logger;
         }
 
+        // ==========================
+        // 查询类：Controller 包一层 ApiResponse
+        // ==========================
         [HttpGet]
         public async Task<ApiResponse<List<ServoDto>>> GetAll(CancellationToken ct)
         {
-            _logger.LogInformation("GET /api/servos called");
+            _logger.LogInformation("GET /api/Servo/GetAll called");
             try
             {
                 var data = await _idx023Service.GetAllAsync(ct);
-                _logger.LogInformation("GET /api/servos success, count={Count}", data.Count);
 
                 return new ApiResponse<List<ServoDto>>
                 {
-                    ResultCode = 0,
+                    ResultCode = 1,
                     Msg = "OK",
                     ResultData = data
                 };
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                _logger.LogError(ex, "GET /api/servos failed");
                 return new ApiResponse<List<ServoDto>>
                 {
-                    ResultCode = -1,
+                    ResultCode = -2,
+                    Msg = "Request canceled",
+                    ResultData = null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GET /api/Servo/GetAll failed");
+                return new ApiResponse<List<ServoDto>>
+                {
+                    ResultCode = 0,
                     Msg = ex.Message,
                     ResultData = null
                 };
             }
         }
-        
+
         [HttpGet]
         public async Task<ApiResponse<ServoDto?>> GetServoByIdAsync(string servo_id, CancellationToken ct)
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-
             try
             {
                 var data = await _idx023Service.GetServoByIdAsync(servo_id, ct);
 
-                sw.Stop();
-
                 if (data == null)
                 {
-                    _logger.LogWarning("GET /api/servos/{ServoId} not found", servo_id);
                     return new ApiResponse<ServoDto?>
                     {
                         ResultCode = 404,
@@ -68,109 +74,63 @@ namespace DexRobotPDA.Controllers
                     };
                 }
 
-                _logger.LogInformation("GET /api/servos/{ServoId} success", servo_id);
-
                 return new ApiResponse<ServoDto?>
                 {
-                    ResultCode = 0,
+                    ResultCode = 1,
                     Msg = "OK",
                     ResultData = data
                 };
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                sw.Stop();
-                _logger.LogError(ex, "GET /api/servos/{ServoId} failed", servo_id);
-
                 return new ApiResponse<ServoDto?>
                 {
-                    ResultCode = -1,
+                    ResultCode = -2,
+                    Msg = "Request canceled",
+                    ResultData = null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GET /api/Servo/GetServoByIdAsync failed, servo_id={ServoId}", servo_id);
+                return new ApiResponse<ServoDto?>
+                {
+                    ResultCode = 0,
                     Msg = ex.Message,
                     ResultData = null
                 };
             }
         }
 
+        // ==========================
+        // 写入类：直接 return Service 的 ApiResponse（关键）
+        // ==========================
         [HttpGet]
         public async Task<ApiResponse<bool>> UnbindServoAsync(string servo_id, CancellationToken ct = default)
         {
             try
             {
-                var ok = await _idx023Service.UnbindServoAsync(servo_id , ct);
-
-                _logger.LogInformation("GET /api/Servo/UnbindServoAsync success, ok={Ok}", ok);
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = 0,
-                    Msg = "OK",
-                    ResultData = ok
-                };
+                return await _idx023Service.UnbindServoAsync(servo_id, ct);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("GET /api/Servo/UnbindServoAsync canceled");
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -2, 
-                    Msg = "Request canceled",
-                    ResultData = false
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "POST /api/Servo/UnbindServoAsync failed");
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -1,
-                    Msg = ex.Message,
-                    ResultData = false
-                };
+                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
             }
         }
-        
+
         [HttpPost]
         public async Task<ApiResponse<bool>> RebindServoAsync([FromBody] RebindServoDto dto, CancellationToken ct = default)
         {
             try
             {
-                var ok = await _idx023Service.RebindServoAsync(dto , ct);
-
-                _logger.LogInformation("POST /api/Servo/RebindServoAsync success, ok={Ok}", ok);
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = 0,
-                    Msg = "OK",
-                    ResultData = ok
-                };
+                return await _idx023Service.RebindServoAsync(dto, ct);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("POST /api/Servo/RebindServoAsync canceled");
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -2,
-                    Msg = "Request canceled",
-                    ResultData = false
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "POST /api/Servo/RebindServoAsync failed");
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -1,
-                    Msg = ex.Message,
-                    ResultData = false
-                };
+                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
             }
         }
-        
+
         [HttpPost]
         public async Task<ApiResponse<bool>> AddServo([FromBody] AddServoDto dto, CancellationToken ct)
         {
@@ -179,39 +139,25 @@ namespace DexRobotPDA.Controllers
 
             try
             {
-                // 这里调用你的写入方法
-                var ok = await _idx023Service.AddServoAsync(dto /*, ct 如果你给 service 加上 ct */);
-
-                _logger.LogInformation("POST /api/Servo/AddServo success, ok={Ok}", ok);
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = 0,
-                    Msg = "OK",
-                    ResultData = ok
-                };
+                return await _idx023Service.AddServoAsync(dto, ct);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("POST /api/Servo/AddServo canceled");
-
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -2,
-                    Msg = "Request canceled",
-                    ResultData = false
-                };
+                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "POST /api/Servo/AddServo failed");
+        }
 
-                return new ApiResponse<bool>
-                {
-                    ResultCode = -1,
-                    Msg = ex.Message,
-                    ResultData = false
-                };
+        [HttpPost]
+        public async Task<ApiResponse<bool>> ServoBindFingerAsync([FromBody] ServoBindFingerDto dto, CancellationToken ct)
+        {
+            try
+            {
+                // ✅ 直接把 service 返回给前端，Msg/ResultCode 都保留
+                return await _idx023Service.ServoBindFingerAsync(dto, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
             }
         }
     }

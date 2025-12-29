@@ -364,6 +364,7 @@
             _motor = new();
             _finger = new();
             _palm = new();
+            _servo = new ServoDto();
             var info = PartCodeHelper.Parse(_partId);
             if (info.KindName == "Finger")
             {
@@ -439,10 +440,10 @@
             {
                 var res = await Idx023Service.UnbindServoAsync(_servo.servo_id);
                 await LogService.AddLog("部件解绑", _currentUser?.employee_id ?? "未知用户",
-                    $"舵机解绑 - 部件编号: {_palm.palm_id}, 任务单号: {_palm.task_id}, 结果: {(res ? "成功" : "失败")}",
-                    res);
+                    $"舵机解绑 - 部件编号: {_palm.palm_id}, 任务单号: {_palm.task_id}, 结果: {(res.ResultCode == 1 ? "成功" : "失败")}",
+                    res.ResultData);
                 await TaskService.UpdateSingleTaskStatus(_palm.task_id);
-                SnackbarHelper.Show(Snackbar, res ? "舵机解绑成功" : $"解绑失败", res ? Severity.Success : Severity.Error);
+                SnackbarHelper.Show(Snackbar, res.ResultData ? "舵机解绑成功" : $"解绑失败", res.ResultCode == 1 ? Severity.Success : Severity.Error);
             }
 
             // 解绑后清空

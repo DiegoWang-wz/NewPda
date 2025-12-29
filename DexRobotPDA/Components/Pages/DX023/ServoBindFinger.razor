@@ -1,5 +1,5 @@
-﻿@page "/ThreeFinger/MotorBindFinger"
-@page "/ThreeFinger/MotorBindFinger/{task_id}/{finger_id}"
+﻿@page "/ThreeFinger/ServoBindFinger"
+@page "/ThreeFinger/ServoBindFinger/{task_id}/{finger_id}"
 
 @using System.Text.Json
 @using System.Text.RegularExpressions
@@ -38,7 +38,7 @@
                     DetermineTargetInput="DetermineTargetInput"
                     OnInputBlur="HandleAnyInputBlur"
                     DuplicateCheckInputIds="DuplicateCheckList"
-                    DuplicateErrorMessage="电机编号重复"
+                    DuplicateErrorMessage="舵机编号重复"
                     OnInputValueChanged="HandleInputValueChanged"/>
                 <MudDivider Class="my-4"/>
                 <MudButton OnClick="HandleUpdateDemo" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
@@ -54,7 +54,7 @@
                     }
                 </MudButton>
             }
-            else if (finishedFingers.Count == (task.product_num* 6))
+            else if (finishedFingers.Count == (task.product_num * 3))
             {
                 <div class="d-flex flex-row align-center my-6">
                     <MudText Typo="Typo.h6" Class="text-primary mr-4">该任务已完成</MudText>
@@ -81,22 +81,22 @@
                     </MudButton>
                     <MudSpacer/>
 
-                    <MudButton Variant=" Variant.Filled"
-                               Color="@(_fingerDto.type == 0 ? Color.Error : Color.Default)"
-                               OnClick="@(e => SetFingerType(0))">
-                        四指
+                    <MudButton Variant="Variant.Filled"
+                               Color="@(_fingerDto.type == 3 ? Color.Error : Color.Default)"
+                               OnClick="@(async () => await SetFingerTypeAsync(3))">
+                        单舵机手指
                     </MudButton>
-                    <MudButton Variant=" Variant.Filled"
-                               Color="@(_fingerDto.type == 1 ? Color.Error : Color.Default)"
-                               OnClick="@(e => SetFingerType(1))">
-                        大拇指
+                    <MudButton Variant="Variant.Filled"
+                               Color="@(_fingerDto.type == 4 ? Color.Error : Color.Default)"
+                               OnClick="@(async () => await SetFingerTypeAsync(4))">
+                        双舵机手指
                     </MudButton>
 
                     <MudDivider Vertical="true" Class="mx-4 my-auto" Style="height: 1em; align-self: center;"/>
                     <MudButton Variant="Variant.Filled"
-                               OnClick="NavigateToDetail"
+                               OnClick="@NavigateToDetail"
                                Color="Color.Primary">
-                        已绑定数量@(finishedFingers.Count)/@(task.product_num* 6)
+                        已绑定数量@(finishedFingers.Count)/@(task.product_num * 3)
                     </MudButton>
                 </MudStack>
 
@@ -106,7 +106,7 @@
                     DetermineTargetInput="DetermineTargetInput"
                     OnInputBlur="HandleAnyInputBlur"
                     DuplicateCheckInputIds="DuplicateCheckList"
-                    DuplicateErrorMessage="电机编号重复"
+                    DuplicateErrorMessage="舵机编号重复"
                     OnInputValueChanged="HandleInputValueChanged"/>
                 <MudDivider Class="my-4"/>
                 <MudButton OnClick="HandleBinding" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary"
@@ -124,6 +124,7 @@
             }
         }
     </div>
+
     <MudDivider Class="my-4"/>
     <MudStack Row="true" Spacing="4" Class="d-flex align-center py-2">
         <MudTextField
@@ -166,47 +167,46 @@
 @code {
     private const string StorageKey = "process2_taskId";
 
-    // ===== 电机前缀校验（保留） =====
-    private const string MotorPrefix  = "M11021G27W";
-    private const string MotorPrefixError  = "电机编号格式错误，应以 M11021G27W 开头";
+    // ===== Servo 前缀校验 =====
+    private const string ServoPrefix = "R003D0";
+    private const string RotaryServoPrefix = "S009F0";
+    private const string ServoPrefixError = "舵机编号格式错误，应以 R003D0(普通舵机) 或 S009F0(旋转舵机) 开头";
 
     [Parameter] public string task_id { get; set; }
     [Parameter] public string finger_id { get; set; }
+
     private string taskId = string.Empty;
     private ProductTaskDto? task = null;
     private bool isLoading = false;
     private bool hasSearched = false;
     private bool hasInputError = false;
+
     private UserDto? currentUser;
     private List<FingerDto> finishedFingers = new List<FingerDto>();
+
     private MudForm form;
     private bool validation = true;
-    private AddFingerDto _fingerDto = new AddFingerDto(); // 0=四指(D), 1=拇指(M)
-    private string _motorId1 { get; set; } = string.Empty;
-    private string _motorId2 { get; set; } = string.Empty;
-    private string _motorId3 { get; set; } = string.Empty;
-    private DotNetObjectReference<MotorBindFinger>? dotNetRef;
+
+    // type=3 单舵机；type=4 双舵机
+    private AddFingerDto _fingerDto = new AddFingerDto { type = 3 };
+
+    private string _servoId1 { get; set; } = string.Empty;
+    private string _servoId2 { get; set; } = string.Empty;
+
+    private DotNetObjectReference<ServoBindFinger>? dotNetRef;
     private BarcodeScanner? scanner;
     private List<BarcodeScanner.InputField> scannerInputs = new();
-    private List<string> DuplicateCheckList = new() { "motorId1", "motorId2", "motorId3" };
+
+    private List<string> DuplicateCheckList = new() { "servoId1", "servoId2" };
     private bool isBinding = false;
 
     private string? _pendingFocusId;
 
-    // ===== 手指编号校验：按模式动态选择（本页不接受 F） =====
-    private static readonly Regex FingerCodeRegexForFour =
-        new(@"^MO-\d{8}-\d{3}-D[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // ===== 手指编号校验：通用 MO-... 规则 =====
+    // 兼容：D0/DL/DR、F0/FL/FR、M0/ML/MR 等（你后端 Parse 会做最终兜底）
+    private static readonly Regex FingerCodeRegex =
+        new(@"^MO-\d{8}-\d{3}-(?:[DFM][0LR]|FL|FR|ML|MR)-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex FingerCodeRegexForThumb =
-        new(@"^MO-\d{8}-\d{3}-M[0LR]-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private Regex CurrentFingerRegex => _fingerDto?.type == 1
-        ? FingerCodeRegexForThumb   // 拇指 → M
-        : FingerCodeRegexForFour;   // 四指 → D
-
-    private string CurrentFingerModeLetter => _fingerDto?.type == 1 ? "M(拇指)" : "D(四指)";
-
-    // === 工具方法：第一个可编辑输入框 Id（按 Index 的可见顺序） ===
     private string GetFirstEditableInputId()
         => scannerInputs
            .Where(i => i.Visible && !i.Disable)
@@ -259,17 +259,17 @@
 
         if (fieldId == "fingerId")
         {
-            // 使用当前模式对应的手指编码规则（四指=D* / 拇指=M*），本页不接受 F
-            bool ok = CurrentFingerRegex.IsMatch(val);
-            var err = ok ? null : $"手指编号格式错误，应为 MO-YYYYMMDD-XXX-{CurrentFingerModeLetter}[0/L/R]-NNNN";
+            bool ok = FingerCodeRegex.IsMatch(val);
+            var err = ok ? null : "手指编号格式错误，应为 MO-YYYYMMDD-XXX-(D/F/M...)-NNNN";
             SetFieldError(fieldId, !ok, err);
             return;
         }
 
-        if (fieldId == "motorId1" || fieldId == "motorId2" || fieldId == "motorId3")
+        if (fieldId == "servoId1" || fieldId == "servoId2")
         {
-            bool ok = val.StartsWith(MotorPrefix, StringComparison.OrdinalIgnoreCase);
-            SetFieldError(fieldId, !ok, ok ? null : MotorPrefixError);
+            bool ok = val.StartsWith(ServoPrefix, StringComparison.OrdinalIgnoreCase)
+                      || val.StartsWith(RotaryServoPrefix, StringComparison.OrdinalIgnoreCase);
+            SetFieldError(fieldId, !ok, ok ? null : ServoPrefixError);
             return;
         }
     }
@@ -282,24 +282,28 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // 参数模式：直接加载 task / finger 明细
         if (!string.IsNullOrEmpty(task_id) && !string.IsNullOrEmpty(finger_id))
         {
             taskId = task_id;
             await LoadTaskDetail();
+
+            // 你自己接接口：这里假设返回 list：servo1, servo2(可选), remarks(可选最后一项)
             var list = await ProcessTwoService.GetFingerDetail(finger_id);
-            _motorId1 = list.Count > 0 ? list[0] : string.Empty;
-            _motorId2 = list.Count > 1 ? list[1] : string.Empty;
-            _motorId3 = list.Count > 2 ? list[2] : string.Empty;
-            _fingerDto.type = list.Count > 2 ? 1 : 0; // 1=拇指(3电机), 0=四指(2电机)
+
+            _servoId1 = list.Count > 0 ? list[0] : string.Empty;
+            _servoId2 = list.Count > 1 ? list[1] : string.Empty;
+
+            // type 推断：>1 表示双舵机，否则单舵机
+            _fingerDto.type = list.Count > 1 ? 4 : 3;
         }
 
         scannerInputs = new List<BarcodeScanner.InputField>
         {
             new BarcodeScanner.InputField { Index = 1, Label = "手指编号", Id = "fingerId", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 2, Label = "电机1编号", Id = "motorId1", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 3, Label = "电机2编号", Id = "motorId2", IsSpecialInput = false },
-            new BarcodeScanner.InputField { Index = 4, Label = "电机3编号(大拇指)", Id = "motorId3", IsSpecialInput = false, Visible = (_fingerDto.type == 1) },
-            new BarcodeScanner.InputField { Index = 5, Label = "备注", Id = "remarks", IsSpecialInput = true }
+            new BarcodeScanner.InputField { Index = 2, Label = "舵机1编号", Id = "servoId1", IsSpecialInput = false },
+            new BarcodeScanner.InputField { Index = 3, Label = "舵机2编号(双舵机手指)", Id = "servoId2", IsSpecialInput = false, Visible = (_fingerDto.type == 4) },
+            new BarcodeScanner.InputField { Index = 4, Label = "备注", Id = "remarks", IsSpecialInput = true }
         };
     }
 
@@ -309,16 +313,18 @@
         {
             await ScannerService.ToggleModeAsync2(false);
             StateHasChanged();
+
             taskId = task_id;
             await LoadTaskDetail();
 
             var list = await ProcessTwoService.GetFingerDetail(finger_id);
+
             var inputValues = new Dictionary<string, string>
             {
                 { "fingerId", finger_id },
-                { "motorId1", list.Count > 0 ? list[0] : string.Empty },
-                { "motorId2", list.Count > 1 ? list[1] : string.Empty },
-                { "remarks", list.Count > 0 ? list[^1] : string.Empty }
+                { "servoId1", list.Count > 0 ? list[0] : string.Empty },
+                { "servoId2", list.Count > 1 ? list[1] : string.Empty },
+                { "remarks",  list.Count > 0 ? list[^1] : string.Empty } // 若接口最后一项是 remarks
             };
 
             foreach (var kvp in inputValues)
@@ -327,41 +333,42 @@
                 if (input != null) input.Value = kvp.Value;
             }
 
-            _fingerDto.type = list.Count > 2 ? 1 : 0;
-            var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
-            if (motor3Input != null)
+            _fingerDto.type = list.Count > 1 ? 4 : 3;
+
+            var servo2Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId2");
+            if (servo2Input != null)
             {
-                motor3Input.Visible = (_fingerDto.type == 1);
-                if (_fingerDto.type == 1) motor3Input.Value = list[2];
+                servo2Input.Visible = (_fingerDto.type == 4);
+                if (_fingerDto.type != 4) servo2Input.Value = "";
             }
 
-            _motorId3 = list.Count > 2 ? list[2] : "";
+            _servoId1 = list.Count > 0 ? list[0] : "";
+            _servoId2 = list.Count > 1 ? list[1] : "";
+
             StateHasChanged();
 
             if (scanner is not null)
-            {
                 await scanner.RevalidateDuplicates();
-            }
 
-            // 参数加载后，聚焦第一个输入框
             RequestFocusToFirstInput();
         }
     }
 
-    private async void SetFingerType(int t)
+    private async Task SetFingerTypeAsync(int t)
     {
-        _fingerDto.type = t; // 0=四指，1=大拇指
-        var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
-        if (motor3Input != null) motor3Input.Visible = (t == 1);
+        _fingerDto.type = t; // 3=单舵机；4=双舵机
+
+        var servo2Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId2");
+        if (servo2Input != null)
+        {
+            servo2Input.Visible = (t == 4);
+            if (t != 4) servo2Input.Value = "";
+        }
+
         StateHasChanged();
 
         if (scanner is not null)
-        {
             await scanner.RevalidateDuplicates();
-        }
-
-        // 切换模式后，重新校验 fingerId
-        ValidatePrefixForField("fingerId");
 
         // 切换后回到第一个输入框
         RequestFocusToFirstInput();
@@ -375,6 +382,7 @@
             StateHasChanged();
             dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("enterKeyHandler.initialize", dotNetRef);
+
             try
             {
                 currentUser = await AuthService.GetCurrentUserAsync();
@@ -435,19 +443,21 @@
         hasSearched = false;
         hasInputError = false;
         finishedFingers.Clear();
-        _fingerDto = new AddFingerDto(); // 默认 type=0
+
+        _fingerDto = new AddFingerDto { type = 3 };
+
         foreach (var input in scannerInputs) input.Value = string.Empty;
-        _motorId1 = string.Empty;
-        _motorId2 = string.Empty;
-        _motorId3 = string.Empty;
+
+        _servoId1 = string.Empty;
+        _servoId2 = string.Empty;
+
         if (currentUser != null) _fingerDto.operator_id = currentUser.employee_id;
+
         await JSRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         StateHasChanged();
 
         if (scanner is not null)
-        {
             await scanner.RevalidateDuplicates();
-        }
     }
 
     private async Task LoadTaskDetail()
@@ -467,9 +477,12 @@
         {
             hasSearched = true;
             StateHasChanged();
+
             task = await TaskService.GetTaskDetail(taskId);
             if (task == null) SnackbarHelper.Show(Snackbar, "生产单号不存在", Severity.Warning);
+
             _fingerDto.task_id = taskId;
+
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
             await GetFinishedList();
 
@@ -493,9 +506,10 @@
         {
             var result = await ProcessTwoService.GetFinishedList(taskId);
             finishedFingers = result;
+
             if (task != null)
             {
-                if (finishedFingers.Count >= (task.product_num* 6))
+                if (finishedFingers.Count >= (task.product_num * 3))
                     await TaskService.UpdateTaskProcessStatus(taskId, "process5", 1);
                 else
                     await TaskService.UpdateTaskProcessStatus(taskId, "process5", 0);
@@ -512,6 +526,7 @@
     {
         if (!string.IsNullOrWhiteSpace(taskId))
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
+
         NavManager.NavigateTo($"/TaskDetail/{taskId}/{4}");
     }
 
@@ -523,52 +538,41 @@
     private async Task HandleBinding()
     {
         var fingerIdInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
-        var motor1Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId1");
-        var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2");
-        var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
+        var servo1Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId1");
+        var servo2Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId2");
+        var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
         if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
         {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id, "手指绑定失败 - 手指编号为空", false);
+            await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id, "绑定失败 - 手指编号为空", false);
             SnackbarHelper.Show(Snackbar, "请输入手指外壳编号", Severity.Warning);
             RequestFocusToFirstInput();
             return;
         }
 
-        if (motor1Input == null || string.IsNullOrWhiteSpace(motor1Input.Value))
+        if (servo1Input == null || string.IsNullOrWhiteSpace(servo1Input.Value))
         {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机1编号为空", false);
-            SnackbarHelper.Show(Snackbar, "请输入电机1编号", Severity.Warning);
+            await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                $"绑定失败 - 手指编号: {fingerIdInput.Value}, 舵机1编号为空", false);
+            SnackbarHelper.Show(Snackbar, "请输入舵机1编号", Severity.Warning);
             RequestFocusToFirstInput();
             return;
         }
 
-        if (motor2Input == null || string.IsNullOrWhiteSpace(motor2Input.Value))
+        if (_fingerDto.type == 4 && (servo2Input == null || string.IsNullOrWhiteSpace(servo2Input.Value)))
         {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机2编号为空", false);
-            SnackbarHelper.Show(Snackbar, "请输入电机2编号", Severity.Warning);
+            await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                $"绑定失败 - 手指编号: {fingerIdInput.Value}, 舵机2编号为空(双舵机手指)", false);
+            SnackbarHelper.Show(Snackbar, "请输入舵机2编号", Severity.Warning);
             RequestFocusToFirstInput();
             return;
         }
 
-        if (_fingerDto.type == 1 && (motor3Input == null || string.IsNullOrWhiteSpace(motor3Input.Value)))
-        {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定失败 - 手指编号: {fingerIdInput.Value}, 电机3编号为空(大拇指)", false);
-            SnackbarHelper.Show(Snackbar, "请输入电机3编号", Severity.Warning);
-            RequestFocusToFirstInput();
-            return;
-        }
-
-        // 先跑一遍本地校验
+        // 本地校验
         ValidatePrefixForField("fingerId");
-        ValidatePrefixForField("motorId1");
-        ValidatePrefixForField("motorId2");
-        if (_fingerDto.type == 1) ValidatePrefixForField("motorId3");
+        ValidatePrefixForField("servoId1");
+        if (_fingerDto.type == 4) ValidatePrefixForField("servoId2");
 
-        // 若存在错误，拦截
         bool hasError = scannerInputs.Any(i => i.Visible && i.Error);
         if (hasError)
         {
@@ -577,12 +581,12 @@
             return;
         }
 
-        // 去重拦截
+        // 去重拦截（只对可见舵机输入）
         if (scannerInputs
             .Where(i => DuplicateCheckList.Contains(i.Id) && i.Visible)
             .Any(i => i.Error && !string.IsNullOrWhiteSpace(i.ErrorText)))
         {
-            SnackbarHelper.Show(Snackbar, "存在重复的电机编号，请先修改后再绑定", Severity.Warning);
+            SnackbarHelper.Show(Snackbar, "存在重复的舵机编号，请先修改后再绑定", Severity.Warning);
             RequestFocusToFirstInput();
             return;
         }
@@ -591,68 +595,66 @@
         try
         {
             _fingerDto.finger_id = fingerIdInput.Value;
-            _fingerDto.remarks   = scannerInputs.FirstOrDefault(i => i.Id == "remarks")?.Value ?? "";
+            _fingerDto.remarks = remarksInput?.Value ?? "";
 
-            var motorIds = new List<string> { motor1Input.Value, motor2Input.Value };
-            if (_fingerDto.type == 1 && motor3Input != null && !string.IsNullOrWhiteSpace(motor3Input.Value))
+            // ===== 绑定请求 DTO（你自己接接口即可）=====
+            var req = new ServoBindFingerDto
             {
-                motorIds.Add(motor3Input.Value);
-            }
-
-            var fingerWithMotorsDto = new AddFingerWithMotorsDto
-            {
-                finger_id   = _fingerDto.finger_id,
-                task_id     = _fingerDto.task_id,
+                finger_id = _fingerDto.finger_id,
+                task_id = _fingerDto.task_id,
                 operator_id = _fingerDto.operator_id,
-                remarks     = _fingerDto.remarks,
-                type        = _fingerDto.type,   // 1=大拇指，0=四指
-                motor_ids   = motorIds
+                remarks = _fingerDto.remarks,
+                servo_id1 = servo1Input.Value,
+                servo_id2 = (_fingerDto.type == 4 && servo2Input != null) ? servo2Input.Value : ""
             };
 
-            var response = await ProcessTwoService.AddFingerWithMotors(fingerWithMotorsDto);
+            // ===== 接口占位：你自己实现这个方法/路由 =====
+            var res = await Idx023Service.ServoBindFingerAsync(req);
 
-            if (response.ResultCode == 1)
+            if (res.ResultCode == 1)
             {
-                await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                    $"手指绑定成功 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 电机绑定: 电机1({motor1Input.Value}) 电机2({motor2Input.Value})"
-                    + (_fingerDto.type == 1 && motor3Input != null ? $" 电机3({motor3Input.Value})" : ""), true);
+                await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                    $"绑定成功 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 舵机: 1({servo1Input.Value})"
+                    + (_fingerDto.type == 4 ? $" 2({servo2Input?.Value})" : ""),
+                    true);
 
                 fingerIdInput.Value = "";
-                motor1Input.Value = "";
-                motor2Input.Value = "";
-                if (motor3Input != null) motor3Input.Value = "";
-                var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
+                servo1Input.Value = "";
+                if (servo2Input != null) servo2Input.Value = "";
                 if (remarksInput != null) remarksInput.Value = "";
 
                 if (scanner is not null)
-                {
                     await scanner.RevalidateDuplicates();
-                }
 
                 SnackbarHelper.Show(Snackbar, "绑定成功", Severity.Success);
-
                 RequestFocusToFirstInput();
             }
             else
             {
-                await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                    $"手指绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {response.Msg}", false);
-                SnackbarHelper.Show(Snackbar, response.Msg, Severity.Error);
+                await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                    $"绑定失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}",
+                    false);
+
+                SnackbarHelper.Show(Snackbar, $"绑定失败:{res.Msg}", Severity.Error);
                 RequestFocusToFirstInput();
             }
         }
         catch (JsonException jsonEx)
         {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定JSON解析失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {jsonEx.Message}", false);
+            await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                $"绑定JSON解析失败 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 错误信息: {jsonEx.Message}",
+                false);
+
             SnackbarHelper.Show(Snackbar, $"数据解析失败: {jsonEx.Message}", Severity.Error);
             RequestFocusToFirstInput();
         }
         catch (Exception ex)
         {
-            await LogService.AddLog("手指绑定", _fingerDto.operator_id,
-                $"手指绑定异常 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 异常信息: {ex.Message}", false);
-            SnackbarHelper.Show(Snackbar, "绑定失败", Severity.Error);
+            await LogService.AddLog("舵机绑定手指", _fingerDto.operator_id,
+                $"绑定异常 - 手指编号: {_fingerDto.finger_id}, 任务单号: {_fingerDto.task_id}, 异常信息: {ex.Message}",
+                false);
+
+            SnackbarHelper.Show(Snackbar, $"绑定失败:{ex}", Severity.Error);
             RequestFocusToFirstInput();
         }
         finally
@@ -662,73 +664,17 @@
         }
     }
 
-    private async Task<ApiResponse> HandleMotorBindFinger(string motor_id, string finger_id)
-    {
-        ApiResponse response = null;
-        try
-        {
-            response = await ProcessTwoService.MotorBindFinger(motor_id, finger_id);
-            if (response != null && response.ResultCode == 1)
-            {
-                await TaskService.UpdateSingleTaskStatus(taskId);
-                SnackbarHelper.Show(Snackbar, $"电机{motor_id},绑定成功", Severity.Success);
-            }
-            else
-            {
-                var errorMessage = response?.Msg ?? $"电机{motor_id},绑定失败";
-                SnackbarHelper.Show(Snackbar, errorMessage, Severity.Error);
-            }
-        }
-        catch
-        {
-            SnackbarHelper.Show(Snackbar, $"电机{motor_id},绑定失败", Severity.Error);
-        }
-
-        return response;
-    }
-
-    private async Task HandleSubmit()
-    {
-        if (string.IsNullOrWhiteSpace(taskId) || task == null)
-        {
-            SnackbarHelper.Show(Snackbar, "请先查询并加载有效的任务数据", Severity.Warning);
-            return;
-        }
-
-        try
-        {
-            var response = await TaskService.UpdateTaskProcessStatus(taskId, "process2", 1);
-            if (response != null && response.ResultCode == 1)
-            {
-                SnackbarHelper.Show(Snackbar, "流程提交成功", Severity.Success);
-                await LoadTaskDetail();
-            }
-            else
-            {
-                var errorMsg = response?.Msg ?? "提交失败，请重试";
-                SnackbarHelper.Show(Snackbar, errorMsg, Severity.Error);
-            }
-        }
-        catch
-        {
-            SnackbarHelper.Show(Snackbar, "系统异常，提交失败", Severity.Error);
-        }
-    }
-
     private async Task HandleInputValueChanged(BarcodeScanner.InputField input)
     {
         switch (input.Id)
         {
             case "fingerId": _fingerDto.finger_id = input.Value; break;
-            case "motorId1": _motorId1 = input.Value; break;
-            case "motorId2": _motorId2 = input.Value; break;
-            case "motorId3": _motorId3 = input.Value; break;
+            case "servoId1": _servoId1 = input.Value; break;
+            case "servoId2": _servoId2 = input.Value; break;
             case "remarks":  _fingerDto.remarks = input.Value; break;
         }
 
-        // 即时校验
         ValidatePrefixForField(input.Id);
-
         await Task.CompletedTask;
     }
 
@@ -736,45 +682,41 @@
     {
         var code = Norm(barcodeData);
 
-        // 1) 按“当前模式”的指令码正则匹配（四指=D* / 拇指=M*）
-        if (CurrentFingerRegex.IsMatch(code))
+        // finger
+        if (FingerCodeRegex.IsMatch(code))
         {
             var fingerInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
             if (fingerInput != null) return fingerInput;
         }
 
-        if (code.StartsWith(MotorPrefix, StringComparison.OrdinalIgnoreCase))
+        // servo
+        if (code.StartsWith(ServoPrefix, StringComparison.OrdinalIgnoreCase) ||
+            code.StartsWith(RotaryServoPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            var motor1Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId1" && string.IsNullOrEmpty(Norm(i.Value)));
-            if (motor1Input != null) return motor1Input;
+            var s1 = scannerInputs.FirstOrDefault(i => i.Id == "servoId1" && string.IsNullOrEmpty(Norm(i.Value)));
+            if (s1 != null) return s1;
 
-            var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(Norm(i.Value)));
-            if (motor2Input != null) return motor2Input;
-
-            if (_fingerDto.type == 1)
+            if (_fingerDto.type == 4)
             {
-                var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
-                if (motor3Input != null) return motor3Input;
+                var s2 = scannerInputs.FirstOrDefault(i => i.Id == "servoId2" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+                if (s2 != null) return s2;
             }
 
-            // 都已占用：回到 motorId1
-            return scannerInputs.FirstOrDefault(i => i.Id == "motorId1");
+            // 都已占用：回到 servoId1
+            return scannerInputs.FirstOrDefault(i => i.Id == "servoId1");
         }
 
-        // 2) 兼容“哪个空填哪个”的顺序
+        // 兼容“哪个空填哪个”
         var fingerEmpty = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && string.IsNullOrEmpty(Norm(i.Value)));
         if (fingerEmpty != null) return fingerEmpty;
 
-        var m1 = scannerInputs.FirstOrDefault(i => i.Id == "motorId1" && string.IsNullOrEmpty(Norm(i.Value)));
-        if (m1 != null) return m1;
+        var servo1Empty = scannerInputs.FirstOrDefault(i => i.Id == "servoId1" && string.IsNullOrEmpty(Norm(i.Value)));
+        if (servo1Empty != null) return servo1Empty;
 
-        var m2 = scannerInputs.FirstOrDefault(i => i.Id == "motorId2" && string.IsNullOrEmpty(Norm(i.Value)));
-        if (m2 != null) return m2;
-
-        if (_fingerDto.type == 1)
+        if (_fingerDto.type == 4)
         {
-            var m3 = scannerInputs.FirstOrDefault(i => i.Id == "motorId3" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
-            if (m3 != null) return m3;
+            var servo2Empty = scannerInputs.FirstOrDefault(i => i.Id == "servoId2" && i.Visible && string.IsNullOrEmpty(Norm(i.Value)));
+            if (servo2Empty != null) return servo2Empty;
         }
 
         return scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
@@ -783,9 +725,8 @@
     private async Task HandleUpdateDemo()
     {
         var fingerIdInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
-        var motor1Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId1");
-        var motor2Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId2");
-        var motor3Input = scannerInputs.FirstOrDefault(i => i.Id == "motorId3");
+        var servo1Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId1");
+        var servo2Input = scannerInputs.FirstOrDefault(i => i.Id == "servoId2");
         var remarksInput = scannerInputs.FirstOrDefault(i => i.Id == "remarks");
 
         if (fingerIdInput == null || string.IsNullOrWhiteSpace(fingerIdInput.Value))
@@ -797,30 +738,25 @@
 
         try
         {
+            // 你自己接接口：假设返回 list：servo1, servo2(可选), remarks(可选最后一项)
             var originalData = await ProcessTwoService.GetFingerDetail(fingerIdInput.Value);
-            var newMotor1 = motor1Input?.Value ?? "";
-            var newMotor2 = motor2Input?.Value ?? "";
-            var newMotor3 = motor3Input?.Value ?? "";
+
+            var newServo1 = servo1Input?.Value ?? "";
+            var newServo2 = servo2Input?.Value ?? "";
             var newRemarks = remarksInput?.Value ?? "";
 
-            int remarksIndex = (_fingerDto.type == 1) ? 3 : 2;
+            var originalServo1 = originalData.Count > 0 ? originalData[0] : "";
+            var originalServo2 = originalData.Count > 1 ? originalData[1] : "";
 
-            var originalMotor1 = originalData.Count > 0 ? originalData[0] : "";
-            var originalMotor2 = originalData.Count > 1 ? originalData[1] : "";
-            var originalMotor3 = originalData.Count > 2 && _fingerDto.type == 1 ? originalData[2] : "";
-            var originalRemark = originalData.Count > remarksIndex ? originalData[remarksIndex] : "";
+            await CheckAndShowServoChange("舵机1", originalServo1, newServo1);
 
-            await CheckAndShowMotorChange("电机1", originalMotor1, newMotor1);
-            await CheckAndShowMotorChange("电机2", originalMotor2, newMotor2);
-            if (_fingerDto.type == 1) await CheckAndShowMotorChange("电机3", originalMotor3, newMotor3);
+            if (_fingerDto.type == 4)
+                await CheckAndShowServoChange("舵机2", originalServo2, newServo2);
 
             if (scanner is not null)
-            {
                 await scanner.RevalidateDuplicates();
-            }
 
             SnackbarHelper.Show(Snackbar, "更新检查完成", Severity.Success);
-
             RequestFocusToFirstInput();
         }
         catch (Exception ex)
@@ -830,31 +766,33 @@
         }
     }
 
-    private async Task CheckAndShowMotorChange(string motorName, string oldValue, string newValue)
+    private async Task CheckAndShowServoChange(string servoName, string oldValue, string newValue)
     {
         if (oldValue != newValue)
         {
-            if (!string.IsNullOrEmpty(oldValue))
-            {
-                var unbindResponse = await ProcessOneService.UnBindMotor(oldValue);
-                if (unbindResponse.ResultCode != 1)
-                {
-                    SnackbarHelper.Show(Snackbar, $"{motorName}解绑失败: {unbindResponse.Msg}", Severity.Error);
-                    return;
-                }
-            }
+            // if (!string.IsNullOrEmpty(oldValue))
+            // {
+            //     // 你自己接接口
+            //     var unbindResponse = await ProcessOneService.UnBindServo(oldValue);
+            //     if (unbindResponse.ResultCode != 1)
+            //     {
+            //         SnackbarHelper.Show(Snackbar, $"{servoName}解绑失败: {unbindResponse.Msg}", Severity.Error);
+            //         return;
+            //     }
+            // }
+            //
+            // if (!string.IsNullOrEmpty(newValue))
+            // {
+            //     // 你自己接接口
+            //     var rebindResponse = await ProcessOneService.ReBindServo(newValue, taskId, finger_id);
+            //     if (rebindResponse.ResultCode != 1)
+            //     {
+            //         SnackbarHelper.Show(Snackbar, $"{servoName}重绑失败: {rebindResponse.Msg}", Severity.Error);
+            //         return;
+            //     }
+            // }
 
-            if (!string.IsNullOrEmpty(newValue))
-            {
-                var rebindResponse = await ProcessOneService.ReBindMotor(newValue, taskId, finger_id);
-                if (rebindResponse.ResultCode != 1)
-                {
-                    SnackbarHelper.Show(Snackbar, $"{motorName}重绑失败: {rebindResponse.Msg}", Severity.Error);
-                    return;
-                }
-            }
-
-            SnackbarHelper.Show(Snackbar, $"{motorName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
+            SnackbarHelper.Show(Snackbar, $"{servoName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
         }
     }
 
@@ -872,3 +810,11 @@
 
 @inject BarcodeScannerService ScannerService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavManager
+@inject IDialogService DialogService
+@inject AuthService AuthService
+@inject TaskService TaskService
+@inject ProcessTwoService ProcessTwoService
+@inject ProcessOneService ProcessOneService
+@inject LogService LogService
