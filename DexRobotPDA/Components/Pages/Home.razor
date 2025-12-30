@@ -9,14 +9,14 @@
 
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
-                   OnClick="@(() => GoToLine("FiveFingerPage"))"
+                   OnClick="@(() => GoToLine("DX021Page"))"
                    Class="line-button">
             DX021（五指）
         </MudButton>
 
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
-                   OnClick="@(() => GoToLine("ThreeFingerPage"))"
+                   OnClick="@(() => GoToLine("DX023Page"))"
                    Class="line-button">
             DX023（三指）
         </MudButton>
@@ -25,10 +25,6 @@
 </MudPaper>
 
 @code {
-    // // 这里写“路由片段”（不要带 /）
-    // private const string FiveFingerPage = "FiveFingerPage";
-    // private const string ThreeFingerPage = "ThreeFingerPage";
-
     private void GoToLine(string page)
     {
         Nav.NavigateTo($"/{page}");

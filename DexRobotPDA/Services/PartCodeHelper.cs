@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using DexRobotPDA.DataModel; // 你的 DailyDbContext 命名空间（如果不同就改这里）
+using DexRobotPDA.DataModel;
 
 namespace DexRobotPDA.Services
 {
@@ -17,18 +17,35 @@ namespace DexRobotPDA.Services
     );
 
     /// <summary>
-    /// Trace result (Bottom -> Top)
+    /// 每一层节点（Bottom -> Top）
     /// </summary>
-    public sealed record TraceChainDto(
+    public sealed record TraceNodeDto(
+        int Level,
+        string Kind,              // Motor / Servo / Finger / Palm / Task
+        string? Id,               // 해당层的 id
+        string? Display,          // UI展示用
+        string? ParentKind,       // 上一层 kind
+        string? ParentId,         // 上一层 id
+        string? Relation          // 关联字段名：superior_id / finger_id / palm_id / task_id
+    );
+
+    /// <summary>
+    /// Trace result: 平铺字段 + Nodes 层级链路
+    /// </summary>
+    public sealed record TracePathDto(
         string ScannedCode,
         string IdentifiedResult,
 
+        // 平铺（兼容旧代码）
         string? MotorId,
         string? ServoId,
         string? FingerId,
         string? PalmId,
-        string? PalmSide,   // L / R if can infer
-        string? TaskId
+        string? PalmSide,
+        string? TaskId,
+
+        // 层级链路（凸显上下关系）
+        IReadOnlyList<TraceNodeDto> Nodes
     );
 
     public static class PartCodeHelper
@@ -48,17 +65,23 @@ namespace DexRobotPDA.Services
         };
 
         // =========================
-        // ★ 关键：实体字段候选名（自动适配 motor_id / MotorId / Motor_id 等）
+        // ★ 实体字段候选名
         // =========================
         private static readonly string[] MotorIdProps = { "motor_id", "Motor_id", "MotorId" };
         private static readonly string[] ServoIdProps = { "servo_id", "Servo_id", "ServoId" };
         private static readonly string[] FingerIdProps = { "finger_id", "Finger_id", "FingerId" };
-        private static readonly string[] PalmIdProps  = { "palm_id",  "Palm_id",  "PalmId" };
+        private static readonly string[] PalmIdProps = { "palm_id", "Palm_id", "PalmId" };
 
-        // 关联字段（child -> finger / finger -> palm / palm -> task）
-        private static readonly string[] MotorFingerIdProps = { "finger_id", "Finger_id", "FingerId" };
-        private static readonly string[] ServoFingerIdProps = { "finger_id", "Finger_id", "FingerId" };
-        private static readonly string[] FingerPalmIdProps  = { "palm_id",   "Palm_id",   "PalmId" };
+        // ✅ 你确认：Servo 表用 superior_id 指向上级（Finger 或 Palm）
+        private static readonly string[] ServoSuperiorIdProps = { "superior_id", "Superior_id", "SuperiorId" };
+
+        // ✅ servo.type（1=普通舵机，2=旋转舵机）——用于兜底判断
+        private static readonly string[] ServoTypeProps = { "type", "Type" };
+
+        // Motor -> finger（motor 可能是 finger_id 或 superior_id）
+        private static readonly string[] MotorFingerIdProps = { "finger_id", "Finger_id", "FingerId", "superior_id", "Superior_id", "SuperiorId" };
+
+        private static readonly string[] FingerPalmIdProps = { "palm_id", "Palm_id", "PalmId" };
 
         private static readonly string[] PalmTaskIdProps =
         {
@@ -66,7 +89,6 @@ namespace DexRobotPDA.Services
             "producttask_id", "ProductTaskId", "ProductTask_id"
         };
 
-        // ProductTask 的“主键/ID字段”候选名（用来根据 task_id 去找 task）
         private static readonly string[] TaskIdProps =
         {
             "task_id", "Task_id", "TaskId",
@@ -85,12 +107,10 @@ namespace DexRobotPDA.Services
 
             var s = raw.ToUpperInvariant();
 
-            // Motor
             if (s.StartsWith(MotorPrefix, StringComparison.Ordinal))
                 return New(raw, "Motor", "Motor",
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["prefix"] = MotorPrefix });
 
-            // ✅ Servo（普通）
             if (s.StartsWith(ServoPrefix, StringComparison.Ordinal))
                 return New(raw, "Servo", "Servo",
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -99,7 +119,6 @@ namespace DexRobotPDA.Services
                         ["servo_type"] = "Normal"
                     });
 
-            // ✅ RotaryServo（归类为 Servo，但在 Result 区分）
             if (s.StartsWith(RotaryServoPrefix, StringComparison.Ordinal))
                 return New(raw, "Servo", "RotaryServo",
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -108,11 +127,9 @@ namespace DexRobotPDA.Services
                         ["servo_type"] = "Rotary"
                     });
 
-            // MO -> Finger
             if (s.StartsWith(MoPrefix, StringComparison.Ordinal))
             {
                 var parts = s.Split('-', StringSplitOptions.RemoveEmptyEntries);
-
                 if (parts.Length < 4)
                     return Unknown(raw, $"MO invalid segments={parts.Length}");
 
@@ -127,7 +144,7 @@ namespace DexRobotPDA.Services
 
                 if (parts.Length == 5)
                 {
-                    var t = parts[3]; // D0/F0/M0 or FL/FR/ML/MR
+                    var t = parts[3];
                     fields["type_code"] = t;
 
                     var result = t switch
@@ -161,7 +178,6 @@ namespace DexRobotPDA.Services
                 return New(raw, "Finger", $"Finger(segments={parts.Length})", fields);
             }
 
-            // DX product line / palm
             if (s.StartsWith("DX", StringComparison.Ordinal))
             {
                 var parts = s.Split('-', StringSplitOptions.RemoveEmptyEntries);
@@ -199,9 +215,9 @@ namespace DexRobotPDA.Services
         }
 
         // =========================
-        // 2) 溯源：从下到上查链路
+        // 2) 溯源：返回“层级链路”，更凸显上下关系
         // =========================
-        public static async Task<TraceChainDto> TraceAsync(DailyDbContext db, string scannedCode, CancellationToken ct = default)
+        public static async Task<TracePathDto> TraceAsync(DailyDbContext db, string scannedCode, CancellationToken ct = default)
         {
             if (db is null) throw new ArgumentNullException(nameof(db));
 
@@ -209,131 +225,220 @@ namespace DexRobotPDA.Services
             var rawTrim = (scannedCode ?? "").Trim();
             var upperTrim = rawTrim.ToUpperInvariant();
 
-            var dto = new TraceChainDto(
-                ScannedCode: scannedCode,
-                IdentifiedResult: info.Result,
-                MotorId: null,
-                ServoId: null,
-                FingerId: null,
-                PalmId: null,
-                PalmSide: null,
-                TaskId: null
-            );
+            // Nodes：Bottom -> Top
+            var nodes = new List<TraceNodeDto>();
+            int level = 0;
 
-            // Product：不溯源
+            // 平铺字段（兼容）
+            string? motorId = null;
+            string? servoId = null;
+            string? fingerId = null;
+            string? palmId = null;
+            string? palmSide = null;
+            string? taskId = null;
+
+            // 产品不溯源
             if (string.Equals(info.KindName, "Product", StringComparison.OrdinalIgnoreCase))
-                return dto;
+            {
+                return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
+            }
 
-            // Palm
+            // ============= Palm =============
             if (string.Equals(info.KindName, "Palm", StringComparison.OrdinalIgnoreCase))
             {
                 var palm = await FindByAnyAsync(db.Palms.AsNoTracking(), PalmIdProps, rawTrim, upperTrim, ct);
-                if (palm is null) return dto;
+                if (palm is null)
+                    return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
 
-                var palmId = GetStringByAny(palm, PalmIdProps);
-                dto = dto with { PalmId = palmId, PalmSide = InferPalmSideFromPalmId(palmId) };
+                palmId = GetStringByAny(palm, PalmIdProps);
+                palmSide = InferPalmSideFromPalmId(palmId);
 
-                dto = await FillTaskFromPalmAsync(db, palm, dto, ct);
-                return dto;
+                nodes.Add(new TraceNodeDto(level++, "Palm", palmId, $"Palm {palmId} ({palmSide ?? "?"})", null, null, null));
+
+                var (tid, taskNode) = await TryGetTaskFromPalmAsync(db, palm, palmId, ct);
+                taskId = tid;
+                if (taskNode != null) nodes.Add(taskNode);
+
+                return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
             }
 
-            // Finger
+            // ============= Finger =============
             if (string.Equals(info.KindName, "Finger", StringComparison.OrdinalIgnoreCase))
             {
                 var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, rawTrim, upperTrim, ct);
-                if (finger is null) return dto;
+                if (finger is null)
+                    return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
 
-                var fingerId = GetStringByAny(finger, FingerIdProps);
-                dto = dto with { FingerId = fingerId };
+                fingerId = GetStringByAny(finger, FingerIdProps);
+                nodes.Add(new TraceNodeDto(level++, "Finger", fingerId, $"Finger {fingerId}", null, null, null));
 
-                dto = await FillPalmFromFingerAsync(db, finger, dto, ct);
-                return dto;
+                var (pid, pside, palmNode, taskNode) = await TryGetPalmAndTaskFromFingerAsync(db, finger, fingerId, ct);
+                palmId = pid;
+                palmSide = pside;
+                if (palmNode != null) nodes.Add(palmNode);
+                if (taskNode != null) { taskId = taskNode.Id; nodes.Add(taskNode); }
+
+                return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
             }
 
-            // Motor
+            // ============= Motor =============
             if (string.Equals(info.KindName, "Motor", StringComparison.OrdinalIgnoreCase))
             {
                 var motor = await FindByAnyAsync(db.Motors.AsNoTracking(), MotorIdProps, rawTrim, upperTrim, ct);
-                if (motor is null) return dto;
+                if (motor is null)
+                    return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
 
-                var motorId = GetStringByAny(motor, MotorIdProps);
-                dto = dto with { MotorId = motorId };
+                motorId = GetStringByAny(motor, MotorIdProps);
+                nodes.Add(new TraceNodeDto(level++, "Motor", motorId, $"Motor {motorId}", null, null, null));
 
-                // motor -> finger_id
+                // motor -> finger_id/superior_id
                 var fingerKey = GetStringByAny(motor, MotorFingerIdProps);
-                if (string.IsNullOrWhiteSpace(fingerKey)) return dto;
+                if (!string.IsNullOrWhiteSpace(fingerKey))
+                {
+                    var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, fingerKey.Trim(), fingerKey.Trim().ToUpperInvariant(), ct);
+                    if (finger != null)
+                    {
+                        fingerId = GetStringByAny(finger, FingerIdProps);
+                        nodes.Add(new TraceNodeDto(level++, "Finger", fingerId, $"Finger {fingerId}", "Motor", motorId, "finger_id/superior_id"));
 
-                var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, fingerKey.Trim(), fingerKey.Trim().ToUpperInvariant(), ct);
-                if (finger is null) return dto;
+                        var (pid, pside, palmNode, taskNode) = await TryGetPalmAndTaskFromFingerAsync(db, finger, fingerId, ct);
+                        palmId = pid;
+                        palmSide = pside;
+                        if (palmNode != null) nodes.Add(palmNode);
+                        if (taskNode != null) { taskId = taskNode.Id; nodes.Add(taskNode); }
+                    }
+                }
 
-                dto = dto with { FingerId = GetStringByAny(finger, FingerIdProps) };
-
-                dto = await FillPalmFromFingerAsync(db, finger, dto, ct);
-                return dto;
+                return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
             }
 
-            // Servo（包含 RotaryServo：KindName 仍是 Servo，Result 再区分）
+            // ============= Servo（普通/旋转） =============
             if (string.Equals(info.KindName, "Servo", StringComparison.OrdinalIgnoreCase))
             {
                 var servo = await FindByAnyAsync(db.Servos.AsNoTracking(), ServoIdProps, rawTrim, upperTrim, ct);
-                if (servo is null) return dto;
+                if (servo is null)
+                    return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
 
-                var servoId = GetStringByAny(servo, ServoIdProps);
-                dto = dto with { ServoId = servoId };
+                servoId = GetStringByAny(servo, ServoIdProps);
 
-                // servo -> finger_id
-                var fingerKey = GetStringByAny(servo, ServoFingerIdProps);
-                if (string.IsNullOrWhiteSpace(fingerKey)) return dto;
+                // 判定是否旋转舵机：优先 Parse.Result，否则兜底读 servo.type==2
+                var isRotary = string.Equals(info.Result, "RotaryServo", StringComparison.OrdinalIgnoreCase);
+                if (!isRotary)
+                {
+                    var servoTypeStr = GetStringByAny(servo, ServoTypeProps);
+                    if (int.TryParse(servoTypeStr, out var st) && st == 2) isRotary = true;
+                }
 
-                var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, fingerKey.Trim(), fingerKey.Trim().ToUpperInvariant(), ct);
-                if (finger is null) return dto;
+                nodes.Add(new TraceNodeDto(level++, "Servo", servoId, isRotary ? $"Servo(Rotary) {servoId}" : $"Servo {servoId}", null, null, null));
 
-                dto = dto with { FingerId = GetStringByAny(finger, FingerIdProps) };
+                // servo -> superior_id
+                var supKey = GetStringByAny(servo, ServoSuperiorIdProps);
+                if (string.IsNullOrWhiteSpace(supKey))
+                    return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
 
-                dto = await FillPalmFromFingerAsync(db, finger, dto, ct);
-                return dto;
+                supKey = supKey.Trim();
+                var supUpper = supKey.ToUpperInvariant();
+
+                if (isRotary)
+                {
+                    // 旋转舵机：superior_id -> Palm
+                    var palm = await FindByAnyAsync(db.Palms.AsNoTracking(), PalmIdProps, supKey, supUpper, ct);
+                    if (palm != null)
+                    {
+                        palmId = GetStringByAny(palm, PalmIdProps);
+                        palmSide = InferPalmSideFromPalmId(palmId);
+
+                        nodes.Add(new TraceNodeDto(level++, "Palm", palmId, $"Palm {palmId} ({palmSide ?? "?"})", "Servo", servoId, "superior_id"));
+
+                        var (tid, taskNode) = await TryGetTaskFromPalmAsync(db, palm, palmId, ct);
+                        taskId = tid;
+                        if (taskNode != null) nodes.Add(taskNode);
+                    }
+                }
+                else
+                {
+                    // 普通舵机：superior_id -> Finger
+                    var finger = await FindByAnyAsync(db.Fingers.AsNoTracking(), FingerIdProps, supKey, supUpper, ct);
+                    if (finger != null)
+                    {
+                        fingerId = GetStringByAny(finger, FingerIdProps);
+                        nodes.Add(new TraceNodeDto(level++, "Finger", fingerId, $"Finger {fingerId}", "Servo", servoId, "superior_id"));
+
+                        var (pid, pside, palmNode, taskNode) = await TryGetPalmAndTaskFromFingerAsync(db, finger, fingerId, ct);
+                        palmId = pid;
+                        palmSide = pside;
+                        if (palmNode != null) nodes.Add(palmNode);
+                        if (taskNode != null) { taskId = taskNode.Id; nodes.Add(taskNode); }
+                    }
+                }
+
+                return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
             }
 
-            return dto;
+            return new TracePathDto(scannedCode, info.Result, motorId, servoId, fingerId, palmId, palmSide, taskId, nodes);
         }
 
         // =========================
-        // Finger -> Palm -> Task
+        // Finger -> Palm -> Task (节点化)
         // =========================
-        private static async Task<TraceChainDto> FillPalmFromFingerAsync(DailyDbContext db, object finger, TraceChainDto dto, CancellationToken ct)
+        private static async Task<(string? PalmId, string? PalmSide, TraceNodeDto? PalmNode, TraceNodeDto? TaskNode)>
+            TryGetPalmAndTaskFromFingerAsync(DailyDbContext db, object finger, string? fingerId, CancellationToken ct)
         {
             var palmKey = GetStringByAny(finger, FingerPalmIdProps);
-            if (string.IsNullOrWhiteSpace(palmKey)) return dto;
+            if (string.IsNullOrWhiteSpace(palmKey))
+                return (null, null, null, null);
 
-            var palm = await FindByAnyAsync(db.Palms.AsNoTracking(), PalmIdProps, palmKey.Trim(), palmKey.Trim().ToUpperInvariant(), ct);
-            if (palm is null) return dto;
+            palmKey = palmKey.Trim();
+            var palm = await FindByAnyAsync(db.Palms.AsNoTracking(), PalmIdProps, palmKey, palmKey.ToUpperInvariant(), ct);
+            if (palm is null)
+                return (null, null, null, null);
 
             var palmId = GetStringByAny(palm, PalmIdProps);
-            dto = dto with { PalmId = palmId, PalmSide = InferPalmSideFromPalmId(palmId) };
+            var palmSide = InferPalmSideFromPalmId(palmId);
 
-            dto = await FillTaskFromPalmAsync(db, palm, dto, ct);
-            return dto;
+            var palmNode = new TraceNodeDto(
+                Level: -1, // Level 由上层 TraceAsync 统一赋值，这里不关心
+                Kind: "Palm",
+                Id: palmId,
+                Display: $"Palm {palmId} ({palmSide ?? "?"})",
+                ParentKind: "Finger",
+                ParentId: fingerId,
+                Relation: "palm_id"
+            );
+
+            var (taskId, taskNode) = await TryGetTaskFromPalmAsync(db, palm, palmId, ct);
+            return (palmId, palmSide, palmNode, taskNode);
         }
 
-        // =========================
-        // Palm -> Task（只填 TaskId）
-        // =========================
-        private static async Task<TraceChainDto> FillTaskFromPalmAsync(DailyDbContext db, object palm, TraceChainDto dto, CancellationToken ct)
+        private static async Task<(string? TaskId, TraceNodeDto? TaskNode)>
+            TryGetTaskFromPalmAsync(DailyDbContext db, object palm, string? palmId, CancellationToken ct)
         {
             var taskKey = GetStringByAny(palm, PalmTaskIdProps);
-            if (string.IsNullOrWhiteSpace(taskKey)) return dto;
+            if (string.IsNullOrWhiteSpace(taskKey))
+                return (null, null);
 
-            // 根据 task_id 去 ProductTasks 找记录（支持 string/int 主键）
-            var task = await FindByKeyAsync(db.ProductTasks.AsNoTracking(), TaskIdProps, taskKey.Trim(), ct);
-            if (task is null) return dto;
+            taskKey = taskKey.Trim();
+            var task = await FindByKeyAsync(db.ProductTasks.AsNoTracking(), TaskIdProps, taskKey, ct);
+            if (task is null)
+                return (null, null);
 
-            var taskId = GetStringByAny(task, TaskIdProps) ?? taskKey.Trim();
-            dto = dto with { TaskId = taskId };
-            return dto;
+            var taskId = GetStringByAny(task, TaskIdProps) ?? taskKey;
+
+            var taskNode = new TraceNodeDto(
+                Level: -1,
+                Kind: "Task",
+                Id: taskId,
+                Display: $"Task {taskId}",
+                ParentKind: "Palm",
+                ParentId: palmId,
+                Relation: "task_id"
+            );
+
+            return (taskId, taskNode);
         }
 
         // =========================================================
-        // Generic: Find entity by string property (try several prop names)
+        // Generic find helpers
         // =========================================================
         private static async Task<object?> FindByAnyAsync<T>(
             IQueryable<T> query,
@@ -410,9 +515,6 @@ namespace DexRobotPDA.Services
             return null;
         }
 
-        // =========================================================
-        // Build translated EF predicate: e => e.Prop == value
-        // =========================================================
         private static Task<T?> FirstOrDefaultByStringPropAsync<T>(IQueryable<T> query, System.Reflection.PropertyInfo prop, string value, CancellationToken ct)
             where T : class
         {
@@ -431,12 +533,9 @@ namespace DexRobotPDA.Services
             var member = Expression.Property(param, prop);
 
             Expression constant = Expression.Constant(value, typeof(int));
-            Expression body;
-
-            if (prop.PropertyType == typeof(int?))
-                body = Expression.Equal(member, Expression.Convert(constant, typeof(int?)));
-            else
-                body = Expression.Equal(member, constant);
+            Expression body = prop.PropertyType == typeof(int?)
+                ? Expression.Equal(member, Expression.Convert(constant, typeof(int?)))
+                : Expression.Equal(member, constant);
 
             var lambda = Expression.Lambda<Func<T, bool>>(body, param);
             return query.FirstOrDefaultAsync(lambda, ct);
@@ -449,12 +548,9 @@ namespace DexRobotPDA.Services
             var member = Expression.Property(param, prop);
 
             Expression constant = Expression.Constant(value, typeof(long));
-            Expression body;
-
-            if (prop.PropertyType == typeof(long?))
-                body = Expression.Equal(member, Expression.Convert(constant, typeof(long?)));
-            else
-                body = Expression.Equal(member, constant);
+            Expression body = prop.PropertyType == typeof(long?)
+                ? Expression.Equal(member, Expression.Convert(constant, typeof(long?)))
+                : Expression.Equal(member, constant);
 
             var lambda = Expression.Lambda<Func<T, bool>>(body, param);
             return query.FirstOrDefaultAsync(lambda, ct);
@@ -467,19 +563,16 @@ namespace DexRobotPDA.Services
             var member = Expression.Property(param, prop);
 
             Expression constant = Expression.Constant(value, typeof(Guid));
-            Expression body;
-
-            if (prop.PropertyType == typeof(Guid?))
-                body = Expression.Equal(member, Expression.Convert(constant, typeof(Guid?)));
-            else
-                body = Expression.Equal(member, constant);
+            Expression body = prop.PropertyType == typeof(Guid?)
+                ? Expression.Equal(member, Expression.Convert(constant, typeof(Guid?)))
+                : Expression.Equal(member, constant);
 
             var lambda = Expression.Lambda<Func<T, bool>>(body, param);
             return query.FirstOrDefaultAsync(lambda, ct);
         }
 
         // =========================================================
-        // Reflection helpers: read string by candidate property names
+        // Reflection helpers
         // =========================================================
         private static string? GetStringByAny(object obj, string[] propCandidates)
         {
@@ -519,9 +612,6 @@ namespace DexRobotPDA.Services
             return null;
         }
 
-        // =========================================================
-        // SimplePartInfo constructors
-        // =========================================================
         private static SimplePartInfo New(string raw, string kindName, string result, Dictionary<string, string> fields)
             => new(raw, kindName, result, fields);
 

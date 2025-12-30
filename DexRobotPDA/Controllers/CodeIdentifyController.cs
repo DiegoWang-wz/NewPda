@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using DexRobotPDA.ApiResponses;
 using DexRobotPDA.DataModel;
 using Microsoft.AspNetCore.Mvc;
 using DexRobotPDA.Services;
@@ -28,8 +29,6 @@ namespace DexRobotPDA.Controllers
             return Ok(info);
         }
 
-        // POST /api/codeidentify
-        // Body: "MO-20250411-001-FL-0001"
         [HttpPost]
         public ActionResult<SimplePartInfo> IdentifyPost([FromBody] string code)
         {
@@ -37,11 +36,37 @@ namespace DexRobotPDA.Controllers
             return Ok(info);
         }
         
-        [HttpGet("trace")]
-        public async Task<ActionResult<TraceChainDto>> Trace([FromQuery] string code, CancellationToken ct)
+        [HttpGet]
+        public async Task<IActionResult> Trace([FromQuery] string code, CancellationToken ct = default)
         {
-            var res = await PartCodeHelper.TraceAsync(db, code, ct);
-            return Ok(res);
+            var resp = new ApiResponse<TracePathDto>();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(code))
+                {
+                    resp.ResultCode = -1;
+                    resp.Msg = "code 不能为空";
+                    resp.ResultData = null;
+                    return Ok(resp);
+                }
+
+                var result = await PartCodeHelper.TraceAsync(db, code.Trim(), ct);
+
+                resp.ResultCode = 1;
+                resp.Msg = "Success";
+                resp.ResultData = result;
+                return Ok(resp);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Trace failed, code={Code}", code);
+
+                resp.ResultCode = -1;
+                resp.Msg = "Error";
+                resp.ResultData = null;
+                return Ok(resp);
+            }
         }
 
     }

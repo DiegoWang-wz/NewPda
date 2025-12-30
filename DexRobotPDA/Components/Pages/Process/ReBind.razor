@@ -105,17 +105,7 @@
             SnackbarHelper.Show(Snackbar, "请输入正确的部件编号", Severity.Warning);
             return;
         }
-
-        // // 验证部件类型
-        // if (!_reBindDto.part_id.Contains("MOT") &&
-        //     !_reBindDto.part_id.Contains("FG") &&
-        //     !_reBindDto.part_id.Contains("SP") &&
-        //     !_reBindDto.part_id.Contains("PM"))
-        // {
-        //     SnackbarHelper.Show(Snackbar, "不支持的部件类型", Severity.Warning);
-        //     return;
-        // }
-
+        
         try
         {
             _isSubmitting = true;
@@ -141,6 +131,21 @@
             else if (info.KindName == "Palm")
             {
                 var res = await ProcessThreeService.ReBindPalm(_reBindDto.part_id, _reBindDto.task_id);
+                await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
+                    $"手掌外壳重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
+                    res?.ResultCode == 1);
+                SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳绑定成功" : $"绑定失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
+            }
+            else if (info.KindName == "Servo")
+            {
+                RebindServoDto dto = new RebindServoDto()
+                {
+                    servo_id = _reBindDto.part_id,
+                    task_id = _reBindDto.task_id,
+                    operator_id = _currentUser.employee_id,
+                    superior_id = _reBindDto.on_part_id
+                };
+                var res = await Idx023Service.RebindServoAsync(dto);
                 await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
                     $"手掌外壳重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);

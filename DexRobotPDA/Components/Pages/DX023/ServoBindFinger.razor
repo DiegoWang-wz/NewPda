@@ -1,5 +1,5 @@
-﻿@page "/ThreeFinger/ServoBindFinger"
-@page "/ThreeFinger/ServoBindFinger/{task_id}/{finger_id}"
+﻿@page "/DX023ServoBindFinger"
+@page "/DX023ServoBindFinger/{task_id}/{finger_id}"
 
 @using System.Text.Json
 @using System.Text.RegularExpressions
@@ -60,7 +60,7 @@
                     <MudText Typo="Typo.h6" Class="text-primary mr-4">该任务已完成</MudText>
                     <MudSpacer/>
                     <MudButton Variant="Variant.Filled"
-                               OnClick="NavigateToDetail"
+                               OnClick="@NavigateToDetail"
                                Color="Color.Primary">
                         查看明细
                     </MudButton>
@@ -202,10 +202,12 @@
 
     private string? _pendingFocusId;
 
-    // ===== 手指编号校验：通用 MO-... 规则 =====
-    // 兼容：D0/DL/DR、F0/FL/FR、M0/ML/MR 等（你后端 Parse 会做最终兜底）
+    // ✅ 手指编号校验：与你上一个页面一致（无 M/F/L/R 等识别）
+    // 格式：MO-YYYYMMDD-XXX-#### 例如 MO-20251224-001-0001
     private static readonly Regex FingerCodeRegex =
-        new(@"^MO-\d{8}-\d{3}-(?:[DFM][0LR]|FL|FR|ML|MR)-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        new(@"^MO-\d{8}-\d{3}-\d{4}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private const string FingerFormatError = "手指编号格式错误，应为：MO-YYYYMMDD-XXX-####";
 
     private string GetFirstEditableInputId()
         => scannerInputs
@@ -245,6 +247,7 @@
         input.ErrorText = isError ? (errorText ?? "") : "";
     }
 
+    // ✅ 校验：finger 用新正则；servo 用前缀校验
     private void ValidatePrefixForField(string fieldId)
     {
         var input = scannerInputs.FirstOrDefault(i => i.Id == fieldId);
@@ -260,8 +263,7 @@
         if (fieldId == "fingerId")
         {
             bool ok = FingerCodeRegex.IsMatch(val);
-            var err = ok ? null : "手指编号格式错误，应为 MO-YYYYMMDD-XXX-(D/F/M...)-NNNN";
-            SetFieldError(fieldId, !ok, err);
+            SetFieldError(fieldId, !ok, ok ? null : FingerFormatError);
             return;
         }
 
@@ -349,6 +351,11 @@
 
             if (scanner is not null)
                 await scanner.RevalidateDuplicates();
+
+            // ✅ 回填后做一次校验，避免显示“看起来没错但其实格式不对”
+            ValidatePrefixForField("fingerId");
+            ValidatePrefixForField("servoId1");
+            if (_fingerDto.type == 4) ValidatePrefixForField("servoId2");
 
             RequestFocusToFirstInput();
         }
@@ -458,6 +465,11 @@
 
         if (scanner is not null)
             await scanner.RevalidateDuplicates();
+
+        // ✅ 清空后清掉错误提示
+        ValidatePrefixForField("fingerId");
+        ValidatePrefixForField("servoId1");
+        ValidatePrefixForField("servoId2");
     }
 
     private async Task LoadTaskDetail()
@@ -527,7 +539,7 @@
         if (!string.IsNullOrWhiteSpace(taskId))
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
 
-        NavManager.NavigateTo($"/TaskDetail/{taskId}/{4}");
+        NavManager.NavigateTo($"/TaskDetail/{taskId}/{3}");
     }
 
     private async Task HandleAnyInputBlur(string inputId)
@@ -597,7 +609,6 @@
             _fingerDto.finger_id = fingerIdInput.Value;
             _fingerDto.remarks = remarksInput?.Value ?? "";
 
-            // ===== 绑定请求 DTO（你自己接接口即可）=====
             var req = new ServoBindFingerDto
             {
                 finger_id = _fingerDto.finger_id,
@@ -608,7 +619,6 @@
                 servo_id2 = (_fingerDto.type == 4 && servo2Input != null) ? servo2Input.Value : ""
             };
 
-            // ===== 接口占位：你自己实现这个方法/路由 =====
             var res = await Idx023Service.ServoBindFingerAsync(req);
 
             if (res.ResultCode == 1)
@@ -682,14 +692,13 @@
     {
         var code = Norm(barcodeData);
 
-        // finger
+        // ✅ finger：只要是 MO-YYYYMMDD-XXX-#### 就进 fingerId
         if (FingerCodeRegex.IsMatch(code))
         {
-            var fingerInput = scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
-            if (fingerInput != null) return fingerInput;
+            return scannerInputs.FirstOrDefault(i => i.Id == "fingerId");
         }
 
-        // servo
+        // servo：按前缀自动落位
         if (code.StartsWith(ServoPrefix, StringComparison.OrdinalIgnoreCase) ||
             code.StartsWith(RotaryServoPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -702,11 +711,10 @@
                 if (s2 != null) return s2;
             }
 
-            // 都已占用：回到 servoId1
             return scannerInputs.FirstOrDefault(i => i.Id == "servoId1");
         }
 
-        // 兼容“哪个空填哪个”
+        // 兜底：哪个空填哪个
         var fingerEmpty = scannerInputs.FirstOrDefault(i => i.Id == "fingerId" && string.IsNullOrEmpty(Norm(i.Value)));
         if (fingerEmpty != null) return fingerEmpty;
 
@@ -738,12 +746,10 @@
 
         try
         {
-            // 你自己接接口：假设返回 list：servo1, servo2(可选), remarks(可选最后一项)
             var originalData = await ProcessTwoService.GetFingerDetail(fingerIdInput.Value);
 
             var newServo1 = servo1Input?.Value ?? "";
             var newServo2 = servo2Input?.Value ?? "";
-            var newRemarks = remarksInput?.Value ?? "";
 
             var originalServo1 = originalData.Count > 0 ? originalData[0] : "";
             var originalServo2 = originalData.Count > 1 ? originalData[1] : "";
@@ -770,30 +776,9 @@
     {
         if (oldValue != newValue)
         {
-            // if (!string.IsNullOrEmpty(oldValue))
-            // {
-            //     // 你自己接接口
-            //     var unbindResponse = await ProcessOneService.UnBindServo(oldValue);
-            //     if (unbindResponse.ResultCode != 1)
-            //     {
-            //         SnackbarHelper.Show(Snackbar, $"{servoName}解绑失败: {unbindResponse.Msg}", Severity.Error);
-            //         return;
-            //     }
-            // }
-            //
-            // if (!string.IsNullOrEmpty(newValue))
-            // {
-            //     // 你自己接接口
-            //     var rebindResponse = await ProcessOneService.ReBindServo(newValue, taskId, finger_id);
-            //     if (rebindResponse.ResultCode != 1)
-            //     {
-            //         SnackbarHelper.Show(Snackbar, $"{servoName}重绑失败: {rebindResponse.Msg}", Severity.Error);
-            //         return;
-            //     }
-            // }
-
             SnackbarHelper.Show(Snackbar, $"{servoName}从'{oldValue}'变更为'{newValue}'", Severity.Info);
         }
+        await Task.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
@@ -818,3 +803,4 @@
 @inject ProcessTwoService ProcessTwoService
 @inject ProcessOneService ProcessOneService
 @inject LogService LogService
+@inject IDX023Service Idx023Service

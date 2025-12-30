@@ -13,6 +13,18 @@ using Microsoft.Extensions.Logging;
 
 namespace DexRobotPDA.Services
 {
+    public interface IDX023Service
+    {
+        Task<List<ServoDto>> GetAllAsync(CancellationToken ct = default);
+        Task<ServoDto?> GetServoByIdAsync(string servo_id, CancellationToken ct = default);
+
+        Task<ApiResponse<bool>> UnbindServoAsync(string servo_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>> RebindServoAsync(RebindServoDto dto, CancellationToken ct = default);
+        Task<ApiResponse<bool>> AddServoAsync(AddServoDto dto, CancellationToken ct = default);
+        Task<ApiResponse<bool>> ServoBindFingerAsync(ServoBindFingerDto dto, CancellationToken ct = default);
+
+        Task<List<ServoDto>> GetFingerDetailAsync(string superior_id, CancellationToken ct = default);
+    }
     public class DX023Service : IDX023Service
     {
         private readonly DailyDbContext _db;
@@ -25,10 +37,7 @@ namespace DexRobotPDA.Services
             _mapper = mapper;
             _logger = logger;
         }
-
-        // ==========================
-        // Query
-        // ==========================
+        
         public async Task<List<ServoDto>> GetAllAsync(CancellationToken ct = default)
         {
             _logger.LogInformation("Query Servos start");
@@ -105,10 +114,7 @@ namespace DexRobotPDA.Services
                 throw;
             }
         }
-
-        // ==========================
-        // Write (return ApiResponse<bool> so frontend can see Msg)
-        // ==========================
+        
         public async Task<ApiResponse<bool>> UnbindServoAsync(string servo_id, CancellationToken ct = default)
         {
             try
@@ -408,10 +414,7 @@ namespace DexRobotPDA.Services
                 return FailBool($"系统异常：{root.Message}");
             }
         }
-
-        // ==========================
-        // Helpers
-        // ==========================
+        
         private static ApiResponse<bool> OkBool(bool data, string msg)
             => new ApiResponse<bool> { ResultCode = 1, Msg = msg, ResultData = data };
 
