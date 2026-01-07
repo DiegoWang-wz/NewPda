@@ -2,6 +2,7 @@
 using DexRobotPDA.DataModel;
 using DexRobotPDA.DTOs;
 
+
 namespace DexRobotPDA.AutoMappers;
 
 public class AutoMapperSetting : Profile
@@ -25,6 +26,8 @@ public class AutoMapperSetting : Profile
         CreateMap<SplitCalibrateDetectModel, SplitCalibrateDetectDto>().ReverseMap();
         CreateMap<FingerCalibrateDetectModel, FingerCalibrateDetectDto>().ReverseMap();
         CreateMap<PalmCalibrateDetectModel, PalmCalibrateDetectDto>().ReverseMap();
+        CreateMap<DX023CalibrateDetectsModel, DX023CalibrateDetectsDto>().ReverseMap();
+        CreateMap<DX023FunctionalDetectsModel, DX023FunctionalDetectsDto>().ReverseMap();
         CreateMap<EventLogModel, EventLogDto>().ReverseMap();
         CreateMap<AddTaskDto, ProductTaskModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore());
@@ -32,6 +35,10 @@ public class AutoMapperSetting : Profile
         CreateMap<EmployeeModel, UserDto>();
 
         CreateMap<AddMotorDto, MotorModel>()
+            .ForMember(dest => dest.id, opt => opt.Ignore());
+        CreateMap<AddDX023CalibrateDetectsDto, DX023CalibrateDetectsModel>()
+            .ForMember(dest => dest.id, opt => opt.Ignore());
+        CreateMap<AddDX023FunctionalDetectsDto, DX023FunctionalDetectsModel>()
             .ForMember(dest => dest.id, opt => opt.Ignore());
         
         CreateMap<AddServoDto, ServoModel>()

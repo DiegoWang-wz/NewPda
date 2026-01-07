@@ -36,7 +36,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\ThreeFinger\" />
+      <Folder Include="DTOs\DX021\" />
       <Folder Include="logs\" />
     </ItemGroup>
 
@@ -64,6 +64,30 @@
       <_ContentIncludedByDefault Remove="Components\Pages\ProductionTask\LogSummary.razor" />
       <_ContentIncludedByDefault Remove="Components\Pages\ProductionTask\TaskDetail.razor" />
       <_ContentIncludedByDefault Remove="Components\Pages\ProductionTask\TaskList.razor" />
+      <_ContentIncludedByDefault Remove="Components\Pages\Detection\ThumbDetect.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <UpToDateCheckInput Remove="Components\Pages\Detection\Detect1.razor" />
+      <UpToDateCheckInput Remove="Components\Pages\Detection\Detect2.razor" />
+      <UpToDateCheckInput Remove="Components\Pages\Detection\Detect3.razor" />
+      <UpToDateCheckInput Remove="Components\Pages\Detection\Detect4.razor" />
+      <UpToDateCheckInput Remove="Components\Pages\Detection\Detect5.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\Detect1.razor" />
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\Detect2.razor" />
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\Detect3.razor" />
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\Detect4.razor" />
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\Detect5.razor" />
+      <AdditionalFiles Include="Components\Pages\DX021\Detection\ThumbDetect.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="Components\Pages\ProductionTask\TaskDetail.css">
+        <DependentUpon>TaskDetail.razor</DependentUpon>
+      </None>
     </ItemGroup>
 
 </Project>

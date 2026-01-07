@@ -608,7 +608,7 @@
                 type = 2
             };
             // ✅ 再绑定旋转舵机：预留 API 调用位置（你自己填写）
-            var servoBindResp = await Idx023Service.AddServoAsync(servoDto);
+            var servoBindResp = await IPartService.AddServoAsync(servoDto);
 
             if (servoBindResp != null && servoBindResp.ResultCode != 1)
             {

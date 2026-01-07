@@ -380,7 +380,7 @@
             }
             else if (info.KindName == "Servo" || info.KindName == "RotaryServo")
             {
-                _servo = await Idx023Service.GetServoByIdAsync(_partId);
+                _servo = (await IPartService.GetServoByIdAsync(_partId)).ResultData;
             }
             else
             {
@@ -438,7 +438,7 @@
                 SnackbarHelper.Show(Snackbar, res?.ResultCode == 1 ? "手掌外壳解绑成功" : $"解绑失败：{res?.Msg}", res?.ResultCode == 1 ? Severity.Success : Severity.Error);
             }else if (_servo?.id > 0)
             {
-                var res = await Idx023Service.UnbindServoAsync(_servo.servo_id);
+                var res = await IPartService.UnbindServoAsync(_servo.servo_id);
                 await LogService.AddLog("部件解绑", _currentUser?.employee_id ?? "未知用户",
                     $"舵机解绑 - 部件编号: {_palm.palm_id}, 任务单号: {_palm.task_id}, 结果: {(res.ResultCode == 1 ? "成功" : "失败")}",
                     res.ResultData);

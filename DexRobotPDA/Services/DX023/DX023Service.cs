@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -8,424 +6,546 @@ using AutoMapper.QueryableExtensions;
 using DexRobotPDA.ApiResponses;
 using DexRobotPDA.DataModel;
 using DexRobotPDA.DTOs;
+using DexRobotPDA.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 
 namespace DexRobotPDA.Services
 {
     public interface IDX023Service
     {
-        Task<List<ServoDto>> GetAllAsync(CancellationToken ct = default);
-        Task<ServoDto?> GetServoByIdAsync(string servo_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>>
+            AddDX023CalibrateDetect(AddDX023CalibrateDetectsDto dto, CancellationToken ct = default);
 
-        Task<ApiResponse<bool>> UnbindServoAsync(string servo_id, CancellationToken ct = default);
-        Task<ApiResponse<bool>> RebindServoAsync(RebindServoDto dto, CancellationToken ct = default);
-        Task<ApiResponse<bool>> AddServoAsync(AddServoDto dto, CancellationToken ct = default);
-        Task<ApiResponse<bool>> ServoBindFingerAsync(ServoBindFingerDto dto, CancellationToken ct = default);
+        Task<ApiResponse<List<DX023CalibrateDetectsDto>>> GetDX023CalibrateDetectByPalm(string palm_id,
+            CancellationToken ct = default);
 
-        Task<List<ServoDto>> GetFingerDetailAsync(string superior_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>> AddDX023FunctionalDetect(AddDX023FunctionalDetectsDto dto,
+            CancellationToken ct = default);
+
+        Task<ApiResponse<List<DX023FunctionalDetectsDto>>> GetDX023FunctionalDetectByPalm(string palm_id,
+            CancellationToken ct = default);
+
+        Task<ApiResponse<bool>> GetProcess1Status(string task_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>> GetProcess2Status(string task_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>> GetProcess3Status(string task_id, CancellationToken ct = default);
+        Task<ApiResponse<bool>> GetProcess4Status(string task_id, CancellationToken ct = default);
     }
+
     public class DX023Service : IDX023Service
     {
         private readonly DailyDbContext _db;
         private readonly IMapper _mapper;
         private readonly ILogger<DX023Service> _logger;
+        private readonly IPartService _partService;
 
-        public DX023Service(DailyDbContext db, IMapper mapper, ILogger<DX023Service> logger)
+        // ✅ 必须有构造函数注入并赋值
+        public DX023Service(
+            DailyDbContext db,
+            IMapper mapper,
+            ILogger<DX023Service> logger,
+            IPartService partService // ✅ 新增
+        )
         {
-            _db = db;
-            _mapper = mapper;
-            _logger = logger;
-        }
-        
-        public async Task<List<ServoDto>> GetAllAsync(CancellationToken ct = default)
-        {
-            _logger.LogInformation("Query Servos start");
-            try
-            {
-                var list = await _db.Servos
-                    .AsNoTracking()
-                    .OrderByDescending(x => x.id)
-                    .ProjectTo<ServoDto>(_mapper.ConfigurationProvider)
-                    .ToListAsync(ct);
-
-                _logger.LogInformation("Query Servos done, count={Count}", list.Count);
-                return list;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Query Servos failed");
-                throw;
-            }
+            _db = db ?? throw new ArgumentNullException(nameof(db));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _partService = partService ?? throw new ArgumentNullException(nameof(partService));
         }
 
-        public async Task<ServoDto?> GetServoByIdAsync(string servo_id, CancellationToken ct = default)
-        {
-            _logger.LogInformation("Query Servo start, servo_id={ServoId}", servo_id);
-
-            try
-            {
-                var entity = await _db.Servos
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(t => t.Servo_id == servo_id, ct);
-
-                if (entity == null)
-                {
-                    _logger.LogWarning("Query Servo not found, servo_id={ServoId}", servo_id);
-                    return null;
-                }
-
-                return _mapper.Map<ServoDto>(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Query Servo failed, servo_id={ServoId}", servo_id);
-                throw;
-            }
-        }
-
-        public async Task<List<ServoDto>> GetFingerDetailAsync(string superior_id, CancellationToken ct = default)
-        {
-            _logger.LogInformation("Query Servos by superior_id start, superior_id={SuperiorId}", superior_id);
-
-            try
-            {
-                if (string.IsNullOrWhiteSpace(superior_id))
-                {
-                    _logger.LogWarning("Query Servos by superior_id: superior_id is empty");
-                    return new List<ServoDto>();
-                }
-
-                var list = await _db.Servos
-                    .AsNoTracking()
-                    .Where(x => x.superior_id == superior_id)
-                    .OrderByDescending(x => x.id)
-                    .ProjectTo<ServoDto>(_mapper.ConfigurationProvider)
-                    .ToListAsync(ct);
-
-                _logger.LogInformation("Query Servos by superior_id done, superior_id={SuperiorId}, count={Count}",
-                    superior_id, list.Count);
-
-                return list;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Query Servos by superior_id failed, superior_id={SuperiorId}", superior_id);
-                throw;
-            }
-        }
-        
-        public async Task<ApiResponse<bool>> UnbindServoAsync(string servo_id, CancellationToken ct = default)
+        public async Task<ApiResponse<bool>> AddDX023CalibrateDetect(AddDX023CalibrateDetectsDto dto,
+            CancellationToken ct = default)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(servo_id))
-                    return FailBool("servo_id不能为空");
+                if (dto == null) return ApiResponse<bool>.BadRequest("请求体为空");
 
-                var rows = await _db.Servos
-                    .Where(t => t.Servo_id == servo_id)
-                    .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(x => x.superior_id, (string?)null)
-                            .SetProperty(x => x.task_id, (string?)null)
-                            .SetProperty(x => x.updated_at, DateTime.Now),
-                        ct);
+                if (string.IsNullOrWhiteSpace(dto.palm_id))
+                    return ApiResponse<bool>.BadRequest("手掌id不能为空");
 
-                if (rows == 0)
-                {
-                    _logger.LogWarning("UnbindServoAsync: Servo not found, servo_id={ServoId}", servo_id);
-                    return FailBool($"Servo不存在：{servo_id}");
-                }
+                if (string.IsNullOrWhiteSpace(dto.inspector))
+                    return ApiResponse<bool>.BadRequest("操作人员id不能为空");
 
-                return OkBool(true, "OK");
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogWarning("UnbindServoAsync canceled, servo_id={ServoId}", servo_id);
-                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
-            }
-            catch (Exception ex)
-            {
-                var root = GetRootException(ex);
-                _logger.LogError(ex, "UnbindServoAsync failed, servo_id={ServoId}, root={Root}", servo_id, root.Message);
-                return FailBool($"系统异常：{root.Message}");
-            }
-        }
-
-        public async Task<ApiResponse<bool>> RebindServoAsync(RebindServoDto dto, CancellationToken ct = default)
-        {
-            try
-            {
-                if (dto == null) return FailBool("请求体为空");
-
-                if (string.IsNullOrWhiteSpace(dto.servo_id))
-                    return FailBool("servo_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.superior_id))
-                    return FailBool("superior_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.task_id))
-                    return FailBool("task_id不能为空");
-
-                var rows = await _db.Servos
-                    .Where(t => t.Servo_id == dto.servo_id)
-                    .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(x => x.superior_id, dto.superior_id)
-                            .SetProperty(x => x.task_id, dto.task_id)
-                            .SetProperty(x => x.updated_at, DateTime.Now),
-                        ct);
-
-                if (rows == 0)
-                {
-                    _logger.LogWarning("RebindServoAsync: Servo not found, servo_id={ServoId}", dto.servo_id);
-                    return FailBool($"Servo不存在：{dto.servo_id}");
-                }
-
-                return OkBool(true, "OK");
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogWarning("RebindServoAsync canceled, servo_id={ServoId}", dto?.servo_id);
-                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
-            }
-            catch (Exception ex)
-            {
-                var root = GetRootException(ex);
-                _logger.LogError(ex, "RebindServoAsync failed, servo_id={ServoId}, root={Root}", dto?.servo_id, root.Message);
-                return FailBool($"系统异常：{root.Message}");
-            }
-        }
-
-        public async Task<ApiResponse<bool>> AddServoAsync(AddServoDto dto, CancellationToken ct = default)
-        {
-            try
-            {
-                if (dto == null) return FailBool("请求体为空");
-
-                if (string.IsNullOrWhiteSpace(dto.servo_id))
-                    return FailBool("servo_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.operator_id))
-                    return FailBool("operator_id不能为空");
-
-                var info = PartCodeHelper.Parse(dto.servo_id);
+                var info = PartCodeHelper.Parse(dto.palm_id);
                 if (info.KindName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
-                    return FailBool("servo_id编码错误");
+                    return ApiResponse<bool>.Fail("palm_id编码错误", data: false);
 
-                dto.type = info.Result switch
-                {
-                    "Servo" => 1,
-                    "RotaryServo" => 2,
-                    _ => 0
-                };
-                if (dto.type == 0)
-                    return FailBool("servo类型不支持");
+                var entity = _mapper.Map<DX023CalibrateDetectsModel>(dto);
 
-                // 主键不允许重复新增
-                var exists = await _db.Servos.AsNoTracking().AnyAsync(x => x.Servo_id == dto.servo_id, ct);
-                if (exists)
-                    return FailBool($"servo_id已存在：{dto.servo_id}");
+                if (entity.calibrate_time == default)
+                    entity.calibrate_time = DateTime.Now;
 
-                var entity = _mapper.Map<ServoModel>(dto);
-                if (entity.created_at == default)
-                    entity.created_at = DateTime.Now;
-
-                _db.Servos.Add(entity);
+                _db.DX023CalibrateDetects.Add(entity);
                 var rows = await _db.SaveChangesAsync(ct);
 
-                _logger.LogInformation("AddServoAsync success, inserted_rows={Rows}, new_id={Id}", rows, entity.id);
+                _logger.LogInformation(
+                    "AddDX023CalibrateDetect success, inserted_rows={Rows}, new_id={Id}, palm_id={PalmId}, inspector={Inspector}",
+                    rows, entity.id, dto.palm_id, dto.inspector
+                );
 
-                return rows > 0 ? OkBool(true, "OK") : FailBool("保存失败");
+                return rows > 0
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail("保存失败", data: false);
             }
             catch (DbUpdateException dbEx)
             {
-                var root = GetRootException(dbEx);
-                _logger.LogError(dbEx, "AddServoAsync DbUpdateException, root={Root}", root.Message);
-                return FailBool($"保存失败：{root.Message}");
+                var root = dbEx.Root();
+                _logger.LogError(dbEx, "AddDX023CalibrateDetect DbUpdateException, palm_id={PalmId}, root={Root}",
+                    dto?.palm_id, root.Message);
+
+                return ApiResponse<bool>.Fail($"保存失败：{root.Message}", data: false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                _logger.LogWarning("AddServoAsync canceled, servo_id={ServoId}", dto?.servo_id);
-                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
+                _logger.LogWarning("AddDX023CalibrateDetect canceled, palm_id={PalmId}", dto?.palm_id);
+                return ApiResponse<bool>.Canceled();
             }
             catch (Exception ex)
             {
-                var root = GetRootException(ex);
-                _logger.LogError(ex, "AddServoAsync failed, root={Root}", root.Message);
-                return FailBool($"系统异常：{root.Message}");
+                var root = ex.Root();
+                _logger.LogError(ex, "AddDX023CalibrateDetect failed, palm_id={PalmId}, root={Root}",
+                    dto?.palm_id, root.Message);
+
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
             }
         }
 
-        public async Task<ApiResponse<bool>> ServoBindFingerAsync(ServoBindFingerDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<List<DX023CalibrateDetectsDto>>> GetDX023CalibrateDetectByPalm(string palm_id,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(palm_id))
+                {
+                    _logger.LogWarning("Query GetDX023CalibrateDetectByTaskId: palm_id is empty");
+                    return ApiResponse<List<DX023CalibrateDetectsDto>>.BadRequest("palm_id不能为空");
+                }
+
+                var list = await _db.DX023CalibrateDetects
+                    .AsNoTracking()
+                    .Where(x => x.palm_id == palm_id)
+                    .OrderByDescending(x => x.id)
+                    .ProjectTo<DX023CalibrateDetectsDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+
+                _logger.LogInformation("Query DX023CalibrateDetect by palm_id done, palm_id={palm_id}, count={Count}",
+                    palm_id,
+                    list.Count);
+
+                return ApiResponse<List<DX023CalibrateDetectsDto>>.Ok(list, "OK");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetDX023CalibrateDetectByTaskId canceled, palm_id={palm_id}", palm_id);
+                return ApiResponse<List<DX023CalibrateDetectsDto>>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetDX023CalibrateDetectByTaskId failed, palm_id={palm_id}, root={Root}", palm_id,
+                    root.Message);
+                return ApiResponse<List<DX023CalibrateDetectsDto>>.Fail($"系统异常：{root.Message}",
+                    data: new List<DX023CalibrateDetectsDto>());
+            }
+        }
+
+        public async Task<ApiResponse<bool>> AddDX023FunctionalDetect(AddDX023FunctionalDetectsDto dto,
+            CancellationToken ct = default)
         {
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             try
             {
-                // ========= 参数校验（返回给前端）=========
-                if (dto == null) return FailBool("请求体为空");
+                if (dto == null) return ApiResponse<bool>.BadRequest("请求体为空");
 
-                if (string.IsNullOrWhiteSpace(dto.task_id))
-                    return FailBool("task_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.operator_id))
-                    return FailBool("operator_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.finger_id))
-                    return FailBool("finger_id不能为空");
-                if (string.IsNullOrWhiteSpace(dto.servo_id1))
-                    return FailBool("servo_id1不能为空");
+                if (string.IsNullOrWhiteSpace(dto.palm_id))
+                    return ApiResponse<bool>.BadRequest("手掌id不能为空");
 
-                // ========= 校验 finger 编码 =========
-                {
-                    var info = PartCodeHelper.Parse(dto.finger_id);
-                    if (info.KindName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
-                        return FailBool("finger编码错误");
-                }
+                if (string.IsNullOrWhiteSpace(dto.inspector))
+                    return ApiResponse<bool>.BadRequest("操作人员id不能为空");
 
-                // ========= servo1 =========
-                var servo1Info = PartCodeHelper.Parse(dto.servo_id1);
-                if (servo1Info.KindName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
-                    return FailBool("servo_id1编码错误");
+                var info = PartCodeHelper.Parse(dto.palm_id);
+                if (info.KindName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                    return ApiResponse<bool>.Fail("palm_id编码错误", data: false);
 
-                var servo1Type = servo1Info.Result switch
-                {
-                    "Servo" => 1,
-                    "RotaryServo" => 2,
-                    _ => 0
-                };
-                if (servo1Type == 0) return FailBool("servo_id1类型不支持");
+                var entity = _mapper.Map<DX023FunctionalDetectsModel>(dto);
 
-                var servo1 = new AddServoDto
-                {
-                    task_id = dto.task_id,
-                    operator_id = dto.operator_id,
-                    servo_id = dto.servo_id1,
-                    superior_id = dto.finger_id,
-                    remarks = dto.remarks,
-                    type = servo1Type
-                };
+                if (entity.calibrate_time == default)
+                    entity.calibrate_time = DateTime.Now;
 
-                // ========= servo2（可选）=========
-                AddServoDto? servo2 = null;
-                if (!string.IsNullOrWhiteSpace(dto.servo_id2))
-                {
-                    var servo2Info = PartCodeHelper.Parse(dto.servo_id2);
-                    if (servo2Info.KindName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
-                        return FailBool("servo_id2编码错误");
+                _db.DX023FunctionalDetects.Add(entity);
+                var rows = await _db.SaveChangesAsync(ct);
 
-                    var servo2Type = servo2Info.Result switch
-                    {
-                        "Servo" => 1,
-                        "RotaryServo" => 2,
-                        _ => 0
-                    };
-                    if (servo2Type == 0) return FailBool("servo_id2类型不支持");
-
-                    servo2 = new AddServoDto
-                    {
-                        task_id = dto.task_id,
-                        operator_id = dto.operator_id,
-                        servo_id = dto.servo_id2,
-                        superior_id = dto.finger_id,
-                        remarks = dto.remarks,
-                        type = servo2Type
-                    };
-                }
-
-                // ========= finger =========
-                var fingerDto = new AddFingerDto
-                {
-                    task_id = dto.task_id,
-                    operator_id = dto.operator_id,
-                    finger_id = dto.finger_id,
-                    remarks = dto.remarks,
-                    type = string.IsNullOrWhiteSpace(dto.servo_id2) ? 3 : 4 // 3=单舵机，4=双舵机
-                };
-
-                // ========= 主键重复检查（业务错误）=========
-                var fingerExists = await _db.Fingers.AsNoTracking().AnyAsync(x => x.finger_id == dto.finger_id, ct);
-                if (fingerExists)
+                if (rows <= 0)
                 {
                     await tx.RollbackAsync(ct);
-                    return FailBool($"finger_id已存在：{dto.finger_id}");
+                    return ApiResponse<bool>.Fail("保存失败", data: false);
                 }
-
-                var servo1Exists = await _db.Servos.AsNoTracking().AnyAsync(x => x.Servo_id == dto.servo_id1, ct);
-                if (servo1Exists)
-                {
-                    await tx.RollbackAsync(ct);
-                    return FailBool($"servo_id1已存在：{dto.servo_id1}");
-                }
-
-                if (servo2 != null)
-                {
-                    var servo2Exists = await _db.Servos.AsNoTracking().AnyAsync(x => x.Servo_id == dto.servo_id2, ct);
-                    if (servo2Exists)
-                    {
-                        await tx.RollbackAsync(ct);
-                        return FailBool($"servo_id2已存在：{dto.servo_id2}");
-                    }
-                }
-
-                // ========= 入库（同一事务）=========
-                var entityFinger = _mapper.Map<FingerModel>(fingerDto);
-                var entityServo1 = _mapper.Map<ServoModel>(servo1);
-
-                _db.Fingers.Add(entityFinger);
-                _db.Servos.Add(entityServo1);
-
-                if (servo2 != null)
-                {
-                    var entityServo2 = _mapper.Map<ServoModel>(servo2);
-                    _db.Servos.Add(entityServo2);
-                }
-
-                await _db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
 
                 _logger.LogInformation(
-                    "ServoBindFingerAsync success, task_id={TaskId}, operator_id={OperatorId}, finger_id={FingerId}, servo1={Servo1}, servo2={Servo2}",
-                    dto.task_id, dto.operator_id, dto.finger_id, dto.servo_id1, dto.servo_id2
+                    "AddDX023FunctionalDetect success, inserted_rows={Rows}, new_id={Id}, palm_id={PalmId}, inspector={Inspector}",
+                    rows, entity.id, dto.palm_id, dto.inspector
                 );
 
-                return OkBool(true, "绑定成功");
+                var newdto = new UpdatePalmDto
+                {
+                    palm_id = dto.palm_id,
+                    is_qualified = dto.if_qualified
+                };
+
+                var res = await _partService.UpdatePalm(newdto, ct);
+
+                if (res.ResultCode != 1)
+                {
+                    await tx.RollbackAsync(ct);
+                    return ApiResponse<bool>.Fail($"新增检测成功，但更新Palm失败：{res.Msg}", data: false);
+                }
+
+                await tx.CommitAsync(ct);
+                return ApiResponse<bool>.Ok(true, "OK");
             }
             catch (DbUpdateException dbEx)
             {
-                try { await tx.RollbackAsync(ct); } catch (Exception rbEx) { _logger.LogError(rbEx, "ServoBindFingerAsync rollback failed"); }
+                try
+                {
+                    await tx.RollbackAsync(ct);
+                }
+                catch
+                {
+                }
 
-                var root = GetRootException(dbEx);
-                _logger.LogError(dbEx,
-                    "ServoBindFingerAsync DbUpdateException rolled back. root={RootMessage}, task_id={TaskId}, finger_id={FingerId}, servo1={Servo1}, servo2={Servo2}",
-                    root.Message, dto?.task_id, dto?.finger_id, dto?.servo_id1, dto?.servo_id2);
+                var root = dbEx.Root();
+                _logger.LogError(dbEx, "AddDX023FunctionalDetect DbUpdateException, palm_id={PalmId}, root={Root}",
+                    dto?.palm_id, root.Message);
 
-                return FailBool($"保存失败：{root.Message}");
+                return ApiResponse<bool>.Fail($"保存失败：{root.Message}", data: false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                try { await tx.RollbackAsync(ct); } catch { /* ignore */ }
-                _logger.LogWarning("ServoBindFingerAsync canceled, task_id={TaskId}, finger_id={FingerId}", dto?.task_id, dto?.finger_id);
-                return new ApiResponse<bool> { ResultCode = -2, Msg = "Request canceled", ResultData = false };
+                try
+                {
+                    await tx.RollbackAsync(ct);
+                }
+                catch
+                {
+                }
+
+                _logger.LogWarning("AddDX023FunctionalDetect canceled, palm_id={PalmId}", dto?.palm_id);
+                return ApiResponse<bool>.Canceled();
             }
             catch (Exception ex)
             {
-                try { await tx.RollbackAsync(ct); } catch (Exception rbEx) { _logger.LogError(rbEx, "ServoBindFingerAsync rollback failed"); }
+                try
+                {
+                    await tx.RollbackAsync(ct);
+                }
+                catch
+                {
+                }
 
-                var root = GetRootException(ex);
-                _logger.LogError(ex,
-                    "ServoBindFingerAsync failed and rolled back. root={RootMessage}, task_id={TaskId}, finger_id={FingerId}, servo1={Servo1}, servo2={Servo2}",
-                    root.Message, dto?.task_id, dto?.finger_id, dto?.servo_id1, dto?.servo_id2);
+                var root = ex.Root();
+                _logger.LogError(ex, "AddDX023FunctionalDetect failed, palm_id={PalmId}, root={Root}",
+                    dto?.palm_id, root.Message);
 
-                return FailBool($"系统异常：{root.Message}");
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
+            }
+        }
+
+        public async Task<ApiResponse<List<DX023FunctionalDetectsDto>>> GetDX023FunctionalDetectByPalm(string palm_id,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(palm_id))
+                {
+                    _logger.LogWarning("Query GetDX023FunctionalDetectByTaskId: palm_id is empty");
+                    return ApiResponse<List<DX023FunctionalDetectsDto>>.BadRequest("palm_id不能为空");
+                }
+
+                var list = await _db.DX023FunctionalDetects
+                    .AsNoTracking()
+                    .Where(x => x.palm_id == palm_id)
+                    .OrderByDescending(x => x.id)
+                    .ProjectTo<DX023FunctionalDetectsDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+
+                _logger.LogInformation("Query DX023FunctionalDetect by palm_id done, palm_id={palm_id}, count={Count}",
+                    palm_id,
+                    list.Count);
+
+                return ApiResponse<List<DX023FunctionalDetectsDto>>.Ok(list, "OK");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetDX023FunctionalDetectByTaskId canceled, palm_id={palm_id}", palm_id);
+                return ApiResponse<List<DX023FunctionalDetectsDto>>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetDX023FunctionalDetectByTaskId failed, palm_id={palm_id}, root={Root}", palm_id,
+                    root.Message);
+                return ApiResponse<List<DX023FunctionalDetectsDto>>.Fail($"系统异常：{root.Message}",
+                    data: new List<DX023FunctionalDetectsDto>());
+            }
+        }
+
+        public async Task<ApiResponse<bool>> GetProcess1Status(string task_id, CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("GetProcess1Status: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                var task = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                int servo_number = task.Count * 5;
+                
+                
+                var list = await _db.Servos
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id && x.type == 1)
+                    .ProjectTo<ServoDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                int bind_servo_number = list.Count;
+
+
+                _logger.LogInformation("GetProcess1Status, 应绑定数量={servo_number}, 实际绑定数量={bind_servo_number}",
+                    servo_number,
+                    bind_servo_number);
+
+                return (bind_servo_number == servo_number)
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail($"绑定数量不满足,应绑定数量={servo_number}, 实际绑定数量={bind_servo_number}", data: false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetProcess1Status canceled, task_id={task_id}", task_id);
+                return ApiResponse<bool>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetProcess1Status failed, task_id={task_id}, root={Root}", task_id,
+                    root.Message);
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
             }
         }
         
-        private static ApiResponse<bool> OkBool(bool data, string msg)
-            => new ApiResponse<bool> { ResultCode = 1, Msg = msg, ResultData = data };
-
-        private static ApiResponse<bool> FailBool(string msg)
-            => new ApiResponse<bool> { ResultCode = 0, Msg = msg, ResultData = false };
-
-        private static Exception GetRootException(Exception ex)
+        public async Task<ApiResponse<bool>> GetProcess2Status(string task_id, CancellationToken ct = default)
         {
-            var root = ex;
-            while (root.InnerException != null) root = root.InnerException;
-            return root;
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("GetProcess2Status: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                var task = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                int finger_number = task.Count * 3;
+                
+                var list = await _db.Fingers
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id && (x.type == 4 || x.type == 3))
+                    .ProjectTo<FingerDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                
+                int bind_Finger_number = list.Count;
+                
+                _logger.LogInformation("GetProcess2Status, 应绑定数量={finger_number}, 实际绑定数量={bind_Finger_number}",
+                    finger_number,
+                    bind_Finger_number);
+
+                return (finger_number == bind_Finger_number)
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail($"绑定数量不满足,应绑定数量={finger_number}, 实际绑定数量={bind_Finger_number}", data: false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetProcess2Status canceled, task_id={task_id}", task_id);
+                return ApiResponse<bool>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetProcess2Status failed, task_id={task_id}, root={Root}", task_id,
+                    root.Message);
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
+            }
+        }
+        
+        public async Task<ApiResponse<bool>> GetProcess3Status(string task_id, CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("GetProcess3Status: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                var task = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+
+                
+                
+                var list = await _db.Palms
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<PalmDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                
+                int bind_palm_number = list.Count;
+
+
+                _logger.LogInformation("GetProcess3Status, 应绑定数量={task.Count}, 实际绑定数量={bind_palm_number}",
+                    task.Count,
+                    bind_palm_number);
+
+                return (task.Count == bind_palm_number)
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail($"绑定数量不满足,应绑定数量={task.Count}, 实际绑定数量={bind_palm_number}", data: false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetProcess3Status canceled, task_id={task_id}", task_id);
+                return ApiResponse<bool>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetProcess3Status failed, task_id={task_id}, root={Root}", task_id,
+                    root.Message);
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
+            }
+        }
+
+        public async Task<ApiResponse<bool>> GetProcess4Status(string task_id, CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("GetProcess4Status: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                var task = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                
+                // var palms = await _db.Palms
+                //     .AsNoTracking()
+                //     .Where(x => x.task_id == task_id)
+                //     .ProjectTo<PalmDto>(_mapper.ConfigurationProvider)
+                //     .ToListAsync(ct);
+                //
+                // var list = await _db.DX023CalibrateDetects
+                //     .AsNoTracking()
+                //     .Where(x => x.palm_id == palm_id)
+                //     .ProjectTo<PalmDto>(_mapper.ConfigurationProvider)
+                //     .ToListAsync(ct);
+                
+                var qualifiedCount = await (
+                    from p in _db.Palms.AsNoTracking()
+                    where p.task_id == task_id
+
+                    // 对每个 palm 做子查询：只取最新 1 条（Left Join 语义）
+                    from d in _db.DX023CalibrateDetects.AsNoTracking()
+                        .Where(x => x.palm_id == p.palm_id)
+                        .OrderByDescending(x => x.id) // ✅ 最新规则：id 最大
+                        .Take(1)
+                        .DefaultIfEmpty()
+
+                    select d
+                ).CountAsync(d => d != null && d.if_qualified == true, ct);
+                _logger.LogInformation("GetProcess4Status, 应绑定数量={task.Count}, 实际绑定数量={bind_palm_number}",
+                    task.Count,
+                    qualifiedCount);
+
+                return (task.Count == qualifiedCount)
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail($"绑定数量不满足,应绑定数量={task.Count}, 实际绑定数量={qualifiedCount}", data: false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetProcess4Status canceled, task_id={task_id}", task_id);
+                return ApiResponse<bool>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetProcess4Status failed, task_id={task_id}, root={Root}", task_id,
+                    root.Message);
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
+            }
+        }
+        
+        public async Task<ApiResponse<bool>> GetProcess5Status(string task_id, CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("GetProcess5Status: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                var task = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(x => x.task_id == task_id)
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .ToListAsync(ct);
+                
+                var qualifiedCount = await (
+                    from p in _db.Palms.AsNoTracking()
+                    where p.task_id == task_id
+
+                    from d in _db.DX023FunctionalDetects.AsNoTracking()
+                        .Where(x => x.palm_id == p.palm_id)
+                        .OrderByDescending(x => x.id) // ✅ 最新规则：id 最大
+                        .Take(1)
+                        .DefaultIfEmpty()
+
+                    select d
+                ).CountAsync(d => d != null && d.if_qualified == true, ct);
+                _logger.LogInformation("GetProcess5Status, 应绑定数量={task.Count}, 实际绑定数量={bind_palm_number}",
+                    task.Count,
+                    qualifiedCount);
+
+                return (task.Count == qualifiedCount)
+                    ? ApiResponse<bool>.Ok(true, "OK")
+                    : ApiResponse<bool>.Fail($"绑定数量不满足,应绑定数量={task.Count}, 实际绑定数量={qualifiedCount}", data: false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetProcess5Status canceled, task_id={task_id}", task_id);
+                return ApiResponse<bool>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetProcess5Status failed, task_id={task_id}, root={Root}", task_id,
+                    root.Message);
+                return ApiResponse<bool>.Fail($"系统异常：{root.Message}", data: false);
+            }
         }
     }
 }

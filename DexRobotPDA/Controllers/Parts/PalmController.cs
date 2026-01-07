@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using DexRobotPDA.ApiResponses;
 using DexRobotPDA.DataModel;
 using DexRobotPDA.DTOs;
+using DexRobotPDA.Services;
 using Microsoft.Data.SqlClient;
 
 namespace DexRobotPDA.Controllers;
@@ -17,12 +18,15 @@ public class PalmController : ControllerBase
     private readonly DailyDbContext db;
     private readonly IMapper mapper;
     private readonly ILogger<PalmController> _logger;
+    private readonly IPartService _ipartService;
 
-    public PalmController(DailyDbContext _db, IMapper _mapper, ILogger<PalmController> logger)
+    public PalmController(DailyDbContext _db, IMapper _mapper, ILogger<PalmController> logger,
+        IPartService ipartService)
     {
         db = _db;
         mapper = _mapper;
         _logger = logger;
+        _ipartService = ipartService;
     }
 
     [HttpGet]
@@ -311,13 +315,13 @@ public class PalmController : ControllerBase
                 res.Msg = "手指外壳不存在";
                 return NotFound(res);
             }
-            
+
 
             var fingerIds = await db.Fingers
                 .Where(m => m.palm_id == palm_id)
                 .Select(m => m.finger_id)
                 .ToListAsync();
-            
+
 
             res.ResultCode = 1;
             res.Msg = "查询成功";
@@ -463,7 +467,7 @@ public class PalmController : ControllerBase
                 res.Msg = $"手掌 {dto.palm_id} 已存在";
                 return BadRequest(res);
             }
-            
+
             // 2. 检查是否有重复的电机ID
             var duplicateMotors = dto.component_ids
                 .GroupBy(x => x)
@@ -481,7 +485,6 @@ public class PalmController : ControllerBase
             // 2. 验证所有组件是否存在且未被绑定
             foreach (var componentId in dto.component_ids)
             {
-
                 // 检查是否为手指
                 var finger = await db.Fingers
                     .FirstOrDefaultAsync(f => f.finger_id == componentId);
@@ -494,7 +497,7 @@ public class PalmController : ControllerBase
                         res.Msg = $"手指 {componentId} 已被绑定";
                         return BadRequest(res);
                     }
-                    
+
                     if (finger.is_qualified == false)
                     {
                         res.ResultCode = -1;
@@ -504,7 +507,7 @@ public class PalmController : ControllerBase
 
                     continue;
                 }
-                
+
 
                 // 组件不存在
                 res.ResultCode = -1;
@@ -573,4 +576,13 @@ public class PalmController : ControllerBase
             return BadRequest(res);
         }
     }
+
+    [HttpGet]
+    public Task<ApiResponse<List<PalmDto>>> GetPalmByTaskId(string task_id,
+        CancellationToken ct = default)
+        => _ipartService.GetPalmByTaskId(task_id, ct);
+
+    [HttpPut]
+    public Task<ApiResponse<bool>> NewUpdatePalm(UpdatePalmDto dto,
+        CancellationToken ct = default) => _ipartService.UpdatePalm(dto, ct);
 }

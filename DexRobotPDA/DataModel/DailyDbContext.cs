@@ -21,6 +21,8 @@ namespace DexRobotPDA.DataModel
         public virtual DbSet<FingerCalibrateDetectModel> Detect4 { get; set; }
         public virtual DbSet<PalmCalibrateDetectModel> Detect5 { get; set; }
         public virtual DbSet<EventLogModel> EventLogs { get; set; }
+        public virtual DbSet<DX023CalibrateDetectsModel> DX023CalibrateDetects { get; set; }
+        public virtual DbSet<DX023FunctionalDetectsModel> DX023FunctionalDetects { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

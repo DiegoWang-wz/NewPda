@@ -1162,6 +1162,7 @@ else
     private List<MotorDto> finishedMotors = new List<MotorDto>();
     private List<FingerDto> finishedFingers = new List<FingerDto>();
     private List<PalmDto> finishedPalms = new List<PalmDto>();
+    private List<ServoDto> finishedServos = new List<ServoDto>();
     private List<MotorWormDetectDto> Detect1List = new List<MotorWormDetectDto>();
     private List<SplitWormDetectDto> Detect2List = new List<SplitWormDetectDto>();
     private List<SplitCalibrateDetectDto> Detect3List = new List<SplitCalibrateDetectDto>();
@@ -1702,49 +1703,5 @@ else
 
         return !result.Canceled && result.Data is bool ok && ok;
     }
-
-
 }
 
-<style>
-    .table-scroll-container {
-        max-width: 100%;
-        max-height: 720px;
-        overflow-x: auto;
-        overflow-y: auto;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-    }
-
-    .table-scroll-container .mud-table {
-        min-width: 100%;
-        table-layout: auto;
-    }
-
-    .table-scroll-container .mud-table th {
-        min-width: 120px;
-        white-space: nowrap;
-    }
-
-    .table-scroll-container .mud-table td {
-        min-width: 120px;
-        white-space: nowrap;
-    }
-
-
-    .horiz-scroll {
-        width: 100%;
-        overflow-x: auto;
-    }
-
-    .horiz-scroll::-webkit-scrollbar,
-    :root ::-webkit-scrollbar {
-        height: 10px;
-        width: 10px;
-    }
-
-    .horiz-scroll::-webkit-scrollbar-thumb,
-    :root ::-webkit-scrollbar-thumb {
-        border-radius: 8px;
-    }
-</style>

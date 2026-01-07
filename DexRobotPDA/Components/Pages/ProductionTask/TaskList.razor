@@ -17,7 +17,7 @@
         </MudItem>
         <MudSpacer/>
         <MudItem xs="12" md="5" Class="d-flex justify-end">
-            
+
             <MudButton
                 Variant="Variant.Filled"
                 Color="Color.Warning"
@@ -44,7 +44,7 @@
             </MudButton>
         </MudItem>
 
-       
+
     </MudStack>
 </MudPaper>
 
@@ -85,7 +85,8 @@
                 </ToolBarContent>
                 <HeaderContent>
                     <MudTh>
-                        <MudTableSortLabel T="ProductTaskDto" SortBy="@(context => tasks.IndexOf(context) + 1)">序号</MudTableSortLabel>
+                        <MudTableSortLabel T="ProductTaskDto" SortBy="@(context => tasks.IndexOf(context) + 1)">序号
+                        </MudTableSortLabel>
                     </MudTh>
 
                     <MudTh>
@@ -128,10 +129,12 @@
                     <MudTd DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
                     <MudTd DataLabel="更新时间">@context.updated_at.ToString("yyyy-MM-dd HH:mm")</MudTd>
                     <MudTd DataLabel="状态">
-                        <MudChip T="string" Color="GetStatusColor(context.status)">@GetStatusText(context.status)</MudChip>
+                        <MudChip T="string"
+                                 Color="GetStatusColor(context.status)">@GetStatusText(context.status)</MudChip>
                     </MudTd>
                     <MudTd DataLabel="操作">
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => NavigateToDetail(context.task_id))">查看明细
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   OnClick="@(() => NavigateToDetail(context.task_id))">查看明细
                         </MudButton>
                     </MudTd>
                 </RowTemplate>
@@ -157,26 +160,27 @@
     private Breakpoint _currentBreakpoint = Breakpoint.Xs;
 
     private readonly DialogOptions _addTaskDialog = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
     private async Task OpenDialogAsync(DialogOptions options)
     {
-        var dialog  = await DialogService.ShowAsync<AddTaskDialog>("", options);
+        var dialog = await DialogService.ShowAsync<AddTaskDialog>("", options);
         var result = await dialog.Result;
         if (!result.Canceled)
         {
             await LoadTasks();
         }
     }
-    
+
     private async Task OpenDialogAsync2(DialogOptions options)
     {
-        var dialog  = await DialogService.ShowAsync<SaleOrderBindingDialog>("", options);
+        var dialog = await DialogService.ShowAsync<SaleOrderBindingDialog>("", options);
         var result = await dialog.Result;
         if (!result.Canceled)
         {
             await LoadTasks();
         }
     }
-    
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)

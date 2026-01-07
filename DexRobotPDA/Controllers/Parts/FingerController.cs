@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DexRobotPDA.ApiResponses;
 using DexRobotPDA.DTOs;
+using DexRobotPDA.Services;
 using Microsoft.Data.SqlClient;
 
 namespace DexRobotPDA.Controllers;
@@ -15,12 +16,13 @@ public class FingerController : ControllerBase
     private readonly DailyDbContext db;
     private readonly IMapper mapper;
     private readonly ILogger<FingerController> _logger;
-
-    public FingerController(DailyDbContext _db, IMapper _mapper, ILogger<FingerController> logger)
+    private readonly IPartService _ipartService;
+    public FingerController(DailyDbContext _db, IMapper _mapper, ILogger<FingerController> logger,IPartService ipartService)
     {
         db = _db;
         mapper = _mapper;
         _logger = logger;
+        _ipartService = ipartService;
     }
 
     [HttpGet]
@@ -599,4 +601,8 @@ public class FingerController : ControllerBase
             return BadRequest(res);
         }
     }
+    
+    [HttpPost]
+    public Task<ApiResponse<List<FingerDto>>> GetFingerByTaskId(string task_id, CancellationToken ct = default)
+        => _ipartService.GetFingerByTaskId(task_id,ct);
 }

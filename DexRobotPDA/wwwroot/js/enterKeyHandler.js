@@ -1,5 +1,4 @@
-﻿// 存储键盘事件监听器的引用，以便后续移除
-let enterKeyListener = null;
+﻿let enterKeyListener = null;
 let currentDotNetRef = null;
 
 // 初始化回车键监听器

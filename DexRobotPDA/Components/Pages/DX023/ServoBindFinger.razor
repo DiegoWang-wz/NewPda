@@ -619,7 +619,7 @@
                 servo_id2 = (_fingerDto.type == 4 && servo2Input != null) ? servo2Input.Value : ""
             };
 
-            var res = await Idx023Service.ServoBindFingerAsync(req);
+            var res = await IPartService.ServoBindFingerAsync(req);
 
             if (res.ResultCode == 1)
             {

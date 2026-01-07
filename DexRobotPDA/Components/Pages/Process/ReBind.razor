@@ -145,7 +145,7 @@
                     operator_id = _currentUser.employee_id,
                     superior_id = _reBindDto.on_part_id
                 };
-                var res = await Idx023Service.RebindServoAsync(dto);
+                var res = await IPartService.RebindServoAsync(dto);
                 await LogService.AddLog("部件重绑", _currentUser?.employee_id ?? "未知用户",
                     $"手掌外壳重绑 - 部件编号: {_reBindDto.part_id}, 任务单号: {_reBindDto.task_id}, 结果: {(res?.ResultCode == 1 ? "成功" : "失败")}",
                     res?.ResultCode == 1);
