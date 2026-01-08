@@ -134,7 +134,7 @@
                     </MudTd>
                     <MudTd DataLabel="操作">
                         <MudButton Variant="Variant.Filled" Color="Color.Success"
-                                   OnClick="@(() => NavigateToDetail(context.task_id))">查看明细
+                                   OnClick="@(() => NavigateToDetail(context))">查看明细
                         </MudButton>
                     </MudTd>
                 </RowTemplate>
@@ -265,9 +265,18 @@
         _ => Color.Default
     };
 
-    private void NavigateToDetail(string task_id)
+    private void NavigateToDetail(ProductTaskDto dto)
     {
-        NavManager.NavigateTo($"/TaskDetail/{task_id}");
+        if (dto.production_type == "DX021")
+        {
+            NavManager.NavigateTo($"/TaskDetail/{dto.task_id}");
+        }
+
+        if (dto.production_type == "DX023")
+        {
+        NavManager.NavigateTo($"/DX023TaskDetail/{dto.task_id}");
+            
+        }
     }
 
     private bool FilterFunc1(ProductTaskDto element) => FilterFunc(element, searchString1);

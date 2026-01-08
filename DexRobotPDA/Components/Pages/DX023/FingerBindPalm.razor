@@ -79,7 +79,7 @@
                     </MudButton>
                     <MudSpacer/>
                     <MudButton Variant="Variant.Filled"
-                               OnClick="NavigateToDetail"
+                               OnClick="@NavigateToDetail"
                                Color="Color.Primary">
                         已完成数量@(finishedPalms.Count)/@task.product_num
                     </MudButton>
@@ -499,7 +499,7 @@
     {
         if (!string.IsNullOrWhiteSpace(taskId))
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
-        NavManager.NavigateTo($"/TaskDetail/{taskId}/{6}");
+        NavManager.NavigateTo($"/DX023TaskDetail/{taskId}/{2}");
     }
 
     private async Task HandleBinding()

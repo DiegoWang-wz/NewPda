@@ -119,6 +119,18 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEWDAyMVxQcm9jZXNzXFByb2Nlc3NUd28ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/DX023/DX023Detect1Page.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEWDAyM1xEWDAyM0RldGVjdDFQYWdlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/DX023/DX023Detect2Page.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEWDAyM1xEWDAyM0RldGVjdDJQYWdlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/DX023/DX023TaskDetail.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEWDAyM1xEWDAyM1Rhc2tEZXRhaWwucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/C\# Projects/NewPda/DexRobotPDA/Components/Pages/DX023/FingerBindPalm.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xEWDAyM1xGaW5nZXJCaW5kUGFsbS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 

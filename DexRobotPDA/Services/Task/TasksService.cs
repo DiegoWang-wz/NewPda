@@ -4,17 +4,26 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using DexRobotPDA.ApiResponses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using DexRobotPDA.DataModel;
 using DexRobotPDA.DTOs;
+using DexRobotPDA.Utilities;
 
 namespace DexRobotPDA.Services
 {
     public interface ITasksService
     {
         Task<ApiResponse<List<FullTaskDataDto>>> GetFullTaskDataAsync(string taskId, CancellationToken ct = default);
+        Task<ApiResponse<ProductTaskDto>> GetTaskById(string taskId, CancellationToken ct = default);
+
+        Task<ApiResponse<bool>> UpdateTaskProcessStatus(
+            string task_id,
+            int process,
+            bool status = false,
+            CancellationToken ct = default);
     }
 
     public class TasksService : ITasksService
@@ -30,7 +39,8 @@ namespace DexRobotPDA.Services
             _logger = logger;
         }
 
-        public async Task<ApiResponse<List<FullTaskDataDto>>> GetFullTaskDataAsync(string taskId, CancellationToken ct = default)
+        public async Task<ApiResponse<List<FullTaskDataDto>>> GetFullTaskDataAsync(string taskId,
+            CancellationToken ct = default)
         {
             var response = new ApiResponse<List<FullTaskDataDto>>();
 
@@ -213,9 +223,15 @@ namespace DexRobotPDA.Services
                         {
                             var fid = finger.finger_id ?? "";
 
-                            var fDetect4 = detect4ByFinger.TryGetValue(fid, out var d4) ? d4 : new List<FingerCalibrateDetectDto>();
-                            var fDetect3 = detect3ByFinger.TryGetValue(fid, out var d3) ? d3 : new List<SplitCalibrateDetectDto>();
-                            var fDetect2 = detect2ByFinger.TryGetValue(fid, out var d2) ? d2 : new List<SplitWormDetectDto>();
+                            var fDetect4 = detect4ByFinger.TryGetValue(fid, out var d4)
+                                ? d4
+                                : new List<FingerCalibrateDetectDto>();
+                            var fDetect3 = detect3ByFinger.TryGetValue(fid, out var d3)
+                                ? d3
+                                : new List<SplitCalibrateDetectDto>();
+                            var fDetect2 = detect2ByFinger.TryGetValue(fid, out var d2)
+                                ? d2
+                                : new List<SplitWormDetectDto>();
 
                             // motors + detect1
                             var motorDataWithDetect = new List<MotorDataDto>();
@@ -224,7 +240,9 @@ namespace DexRobotPDA.Services
                                 foreach (var m in fMotors)
                                 {
                                     var mid = m.motor_id ?? "";
-                                    var mDetect1 = detect1ByMotor.TryGetValue(mid, out var d1) ? d1 : new List<MotorWormDetectDto>();
+                                    var mDetect1 = detect1ByMotor.TryGetValue(mid, out var d1)
+                                        ? d1
+                                        : new List<MotorWormDetectDto>();
 
                                     motorDataWithDetect.Add(new MotorDataDto
                                     {
@@ -255,7 +273,7 @@ namespace DexRobotPDA.Services
                     {
                         task = taskDto,
                         palm = palmDto,
-                        rotateServo = rotateServo,      // ✅ 单个（可能为 null）
+                        rotateServo = rotateServo, // ✅ 单个（可能为 null）
                         fingers = fingerDataList,
                         detects = palmDetectDtos
                     });
@@ -273,6 +291,155 @@ namespace DexRobotPDA.Services
                 response.Msg = "Error";
                 response.ResultData = null;
                 return response;
+            }
+        }
+
+        public async Task<ApiResponse<ProductTaskDto>> GetTaskById(string taskId, CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(taskId))
+                {
+                    _logger.LogWarning("GetTaskById: taskId is empty");
+                    return ApiResponse<ProductTaskDto>.BadRequest("task_id不能为空");
+                }
+
+                var entity = await _db.ProductTasks
+                    .AsNoTracking()
+                    .Where(t => t.task_id == taskId) // ✅ 修正：按 task_id 过滤
+                    .ProjectTo<ProductTaskDto>(_mapper.ConfigurationProvider)
+                    .SingleOrDefaultAsync(ct); // ✅ 唯一键用 SingleOrDefaultAsync 更合理
+
+                if (entity == null)
+                {
+                    _logger.LogWarning("GetTaskById: task not found, taskId={taskId}", taskId);
+                    return ApiResponse<ProductTaskDto>.BadRequest("task_id不存在");
+                }
+
+                _logger.LogInformation("GetTaskById success, taskId={taskId}", taskId);
+                return ApiResponse<ProductTaskDto>.Ok(entity, "OK");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("GetTaskById canceled, taskId={taskId}", taskId);
+                return ApiResponse<ProductTaskDto>.Canceled();
+            }
+            catch (Exception ex)
+            {
+                var root = ex.Root();
+                _logger.LogError(ex, "GetTaskById failed, taskId={taskId}, root={Root}", taskId, root.Message);
+                return ApiResponse<ProductTaskDto>.Fail($"系统异常：{root.Message}", data: default);
+            }
+        }
+
+
+        public async Task<ApiResponse<bool>> UpdateTaskProcessStatus(
+            string task_id,
+            int process,
+            bool status = false,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(task_id))
+                {
+                    _logger.LogWarning("UpdateTaskProcessStatus: task_id is empty");
+                    return ApiResponse<bool>.BadRequest("task_id不能为空");
+                }
+
+                // ✅ 查询实体并跟踪，才能更新落库
+                var task = await _db.ProductTasks
+                    .SingleOrDefaultAsync(x => x.task_id == task_id, ct);
+
+                if (task is null)
+                {
+                    _logger.LogWarning("UpdateTaskProcessStatus: task not found, task_id={task_id}", task_id);
+                    return ApiResponse<bool>.BadRequest("task_id 不存在");
+                }
+
+                var maxProcess = task.production_type switch
+                {
+                    "DX021" => 8,
+                    "DX023" => 5,
+                    _ => 0
+                };
+
+                if (maxProcess == 0)
+                {
+                    _logger.LogWarning(
+                        "UpdateTaskProcessStatus: unsupported production_type={production_type}, task_id={task_id}",
+                        task.production_type, task_id);
+                    return ApiResponse<bool>.BadRequest("production_type 不支持");
+                }
+
+                if (process <= 0 || process > maxProcess)
+                {
+                    _logger.LogWarning(
+                        "UpdateTaskProcessStatus: process is error, process={process}, max={max}, type={type}, task_id={task_id}",
+                        process, maxProcess, task.production_type, task_id);
+                    return ApiResponse<bool>.BadRequest("process 错误");
+                }
+
+                // ✅ bool -> byte（0/1）
+                byte stepValue = status ? (byte)1 : (byte)0;
+
+                // ✅ 更新对应步骤
+                switch (process)
+                {
+                    case 1: task.process_1 = stepValue; break;
+                    case 2: task.process_2 = stepValue; break;
+                    case 3: task.process_3 = stepValue; break;
+                    case 4: task.process_4 = stepValue; break;
+                    case 5: task.process_5 = stepValue; break;
+                    case 6: task.process_6 = stepValue; break;
+                    case 7: task.process_7 = stepValue; break;
+                    case 8: task.process_8 = stepValue; break;
+                    default:
+                        return ApiResponse<bool>.BadRequest("process 错误");
+                }
+
+                // ✅ 按 production_type 取当前任务的所有步骤值（只取到 maxProcess）
+                List<byte> steps = maxProcess == 5
+                    ? new List<byte> { task.process_1, task.process_2, task.process_3, task.process_4, task.process_5 }
+                    : new List<byte>
+                    {
+                        task.process_1, task.process_2, task.process_3, task.process_4, task.process_5, task.process_6,
+                        task.process_7, task.process_8
+                    };
+
+                // ✅ 三态规则：
+                // all 0 => status=0
+                // any 1 (but not all 1) => status=1
+                // all 1 => status=2
+                bool anyOne = steps.Any(v => v == 1);
+                bool allOne = steps.All(v => v == 1);
+
+                if (!anyOne)
+                    task.status = 0;
+                else if (allOne)
+                    task.status = 2;
+                else
+                    task.status = 1;
+
+                await _db.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "UpdateTaskProcessStatus: success, task_id={task_id}, process={process}, stepValue={stepValue}, taskStatus={taskStatus}",
+                    task_id, process, stepValue, task.status);
+
+                return ApiResponse<bool>.Ok(true, "OK");
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("UpdateTaskProcessStatus: canceled, task_id={task_id}, process={process}", task_id,
+                    process);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateTaskProcessStatus: failed, task_id={task_id}, process={process}", task_id,
+                    process);
+                return ApiResponse<bool>.BadRequest("更新失败");
             }
         }
     }

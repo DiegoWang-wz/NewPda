@@ -13,7 +13,7 @@ namespace DexRobotPDA.Controllers
         private readonly ITasksService _itaskService;
         private readonly ILogger<ServoController> _logger;
 
-        public TasksController(IDX023Service idx023Service,ITasksService itaskService, ILogger<ServoController> logger)
+        public TasksController(IDX023Service idx023Service, ITasksService itaskService, ILogger<ServoController> logger)
         {
             _idx023Service = idx023Service;
             _itaskService = itaskService;
@@ -27,5 +27,15 @@ namespace DexRobotPDA.Controllers
             return Ok(res);
         }
 
+        [HttpGet]
+        public Task<ApiResponse<bool>> UpdateTaskProcessStatus(
+            string task_id,
+            int process,
+            bool status = false,
+            CancellationToken ct = default) => _itaskService.UpdateTaskProcessStatus(task_id, process, status, ct);
+
+        [HttpGet]
+        public Task<ApiResponse<ProductTaskDto>> GetTaskById(string taskId, CancellationToken ct = default) =>
+            _itaskService.GetTaskById(taskId, ct);
     }
 }

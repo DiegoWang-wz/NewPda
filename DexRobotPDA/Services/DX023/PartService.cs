@@ -424,6 +424,7 @@ namespace DexRobotPDA.Services
                     operator_id = dto.operator_id,
                     finger_id = dto.finger_id,
                     remarks = dto.remarks,
+                    is_qualified = true,
                     type = string.IsNullOrWhiteSpace(dto.servo_id2) ? 3 : 4
                 };
 

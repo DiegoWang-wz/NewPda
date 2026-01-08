@@ -8,7 +8,7 @@ public class AddDX023FunctionalDetectsDto
 
     public string? remarks { get; set; }
 
-    public bool? if_qualified { get; set; }
+    public bool if_qualified { get; set; } = false;
 
     public DateTime? calibrate_time { get; set; }
 }

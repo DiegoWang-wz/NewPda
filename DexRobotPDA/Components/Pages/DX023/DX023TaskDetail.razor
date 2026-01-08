@@ -1,0 +1,689 @@
+﻿@page "/DX023TaskDetail"
+@page "/DX023TaskDetail/{taskId}"
+@page "/DX023TaskDetail/{taskId}/{stepIndex:int}"
+
+@using System.Reflection
+@using DexRobotPDA.DTOs
+@using DexRobotPDA.ApiResponses
+@using MudBlazor
+
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+@inject IDX023Service DX023Service
+@inject ITasksService TasksService
+@inject IPartService PartService
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center min-vh-100">
+        <MudSpinner Color="Color.Primary" Size="Size.Large" />
+        <MudText Class="ms-4" Typo="Typo.h6">加载任务数据中...</MudText>
+    </div>
+}
+else if (task == null)
+{
+    <div class="d-flex justify-content-center align-items-center min-vh-100">
+        <MudText Typo="Typo.h6" Color="Color.Error">无法加载任务数据，请检查任务ID是否正确</MudText>
+    </div>
+}
+else
+{
+    <MudPaper Class="ma-2 pa-md-4 mx-md-8" Elevation="3">
+        <MudStepper NonLinear="true"
+                    @bind-ActiveIndex="currentStepIndex"
+                    NavClass="border-b mud-border-lines-default"
+                    OnPreviewInteraction="OnPreviewInteraction"
+                    StepClass="pt-2"
+                    ShowResetButton>
+
+            @* ✅ 关键：与 TaskDetail 一致，覆盖默认 Title 渲染，避免与 LabelTemplate 重复 *@
+            <TitleTemplate>
+                @* keep empty *@
+            </TitleTemplate>
+
+            <ConnectorTemplate Context="step">
+                <div class="mud-stepper-nav-connector">
+                    @{
+                        int value = step.Completed ? 100 : 0;
+                        <MudProgressLinear Striped Value="value" Min="0" Max="100" Color="Color.Success"
+                                           Style="height: 4px; background-color: #d4ddeb; border-radius: 2px;" />
+                    }
+                </div>
+            </ConnectorTemplate>
+
+            <LabelTemplate>
+                @if (context.IsActive)
+                {
+                    if (context.Completed)
+                    {
+                        <MudBadge Dot="true" Color="Color.Error" Class="mx-8">
+                            <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle"
+                                     Color="Color.Success">@(context.Title)</MudChip>
+                        </MudBadge>
+                    }
+                    else
+                    {
+                        <MudBadge Dot="true" Color="Color.Error" Class="mx-8">
+                            <MudChip T="string">@(context.Title)</MudChip>
+                        </MudBadge>
+                    }
+                }
+                else if (context.Completed)
+                {
+                    <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle"
+                             Color="Color.Success">@(context.Title)</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string">@(context.Title)</MudChip>
+                }
+            </LabelTemplate>
+
+            <ChildContent>
+                <MudStep Completed="task.process_1" Title="1.舵机绑定">
+                    @StepLoadingOrTable(
+                        isEmpty: Servos.Count == 0,
+                        emptyText: "暂无 舵机数据",
+                        table: @<div class="table-scroll-container">
+                                    <div class="horiz-scroll">
+                                        <MudTable Items="Servos"
+                                                  Hover="true"
+                                                  FixedHeader="true"
+                                                  Height="@TableBodyMaxHeight"
+                                                  Dense="true"
+                                                  Bordered="true"
+                                                  Striped="true"
+                                                  Breakpoint="Breakpoint.Xs"
+                                                  Filter="FilterServos">
+                                            <ToolBarContent>
+                                                <MudTextField T="string"
+                                                              @bind-Value="currentSearchString"
+                                                              Placeholder="搜索 舵机..."
+                                                              Adornment="Adornment.Start"
+                                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                                              IconSize="Size.Medium"
+                                                              Style="width: 320px;" />
+                                            </ToolBarContent>
+
+                                            <HeaderContent>
+                                                <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">舵机ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">绑定部件ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">任务ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">操作员</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">类型</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">创建时间</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">更新时间</MudTh>
+                                            </HeaderContent>
+
+                                            <RowTemplate>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="ID">@context.id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="ServoID">@context.servo_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="SuperiorID">@context.superior_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="任务ID">@context.task_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="操作员">@context.operator_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="类型">@context.type</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
+                                                    <MudChip T="string" Color="@(context.is_qualified ? Color.Success : Color.Error)">
+                                                        @(context.is_qualified ? "是" : "否")
+                                                    </MudChip>
+                                                </MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                            </RowTemplate>
+
+                                            <PagerContent>
+                                                <MudTablePager RowsPerPageString="显示数量"
+                                                               PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    </div>
+                                </div>)
+                </MudStep>
+
+                <MudStep Completed="task.process_2" Title="2. 手指绑定">
+                    @StepLoadingOrTable(
+                        isEmpty: Fingers.Count == 0,
+                        emptyText: "暂无 手指数据",
+                        table: @<div class="table-scroll-container">
+                                    <div class="horiz-scroll">
+                                        <MudTable Items="Fingers"
+                                                  Hover="true"
+                                                  FixedHeader="true"
+                                                  Height="@TableBodyMaxHeight"
+                                                  Dense="true"
+                                                  Bordered="true"
+                                                  Striped="true"
+                                                  Breakpoint="Breakpoint.Xs"
+                                                  Filter="FilterFingers">
+                                            <ToolBarContent>
+                                                <MudTextField T="string"
+                                                              @bind-Value="currentSearchString"
+                                                              Placeholder="搜索 手指..."
+                                                              Adornment="Adornment.Start"
+                                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                                              IconSize="Size.Medium"
+                                                              Style="width: 320px;" />
+                                            </ToolBarContent>
+
+                                            <HeaderContent>
+                                                <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">手指ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">手掌ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">任务ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">操作员</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">类型</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">创建时间</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">更新时间</MudTh>
+                                            </HeaderContent>
+
+                                            <RowTemplate>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="ID">@context.id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="FingerID">@context.finger_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="PalmID">@context.palm_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="任务ID">@context.task_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="操作员">@context.operator_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="类型">@context.type</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
+                                                    <MudChip T="string" Color="@(context.is_qualified ? Color.Success : Color.Error)">
+                                                        @(context.is_qualified ? "是" : "否")
+                                                    </MudChip>
+                                                </MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                            </RowTemplate>
+
+                                            <PagerContent>
+                                                <MudTablePager RowsPerPageString="显示数量"
+                                                               PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    </div>
+                                </div>)
+                </MudStep>
+
+                <MudStep Completed="task.process_3" Title="3. 手掌绑定">
+                    @StepLoadingOrTable(
+                        isEmpty: Palms.Count == 0,
+                        emptyText: "暂无 手掌数据",
+                        table: @<div class="table-scroll-container">
+                                    <div class="horiz-scroll">
+                                        <MudTable Items="Palms"
+                                                  Hover="true"
+                                                  FixedHeader="true"
+                                                  Height="@TableBodyMaxHeight"
+                                                  Dense="true"
+                                                  Bordered="true"
+                                                  Striped="true"
+                                                  Breakpoint="Breakpoint.Xs"
+                                                  Filter="FilterPalms">
+                                            <ToolBarContent>
+                                                <MudTextField T="string"
+                                                              @bind-Value="currentSearchString"
+                                                              Placeholder="搜索 手掌..."
+                                                              Adornment="Adornment.Start"
+                                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                                              IconSize="Size.Medium"
+                                                              Style="width: 320px;" />
+                                            </ToolBarContent>
+
+                                            <HeaderContent>
+                                                <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">手掌ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">任务ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">操作员</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">创建时间</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">更新时间</MudTh>
+                                            </HeaderContent>
+
+                                            <RowTemplate>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="ID">@context.id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="PalmID">@context.palm_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="任务ID">@context.task_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="操作员">@context.operator_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
+                                                    <MudChip T="string" Color="@(context.is_qualified ? Color.Success : Color.Error)">
+                                                        @(context.is_qualified ? "是" : "否")
+                                                    </MudChip>
+                                                </MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="创建时间">@context.created_at.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="更新时间">@context.updated_at?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                            </RowTemplate>
+
+                                            <PagerContent>
+                                                <MudTablePager RowsPerPageString="显示数量"
+                                                               PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    </div>
+                                </div>)
+                </MudStep>
+
+                <MudStep Completed="task.process_4" Title="4. 标定检测">
+                    @StepLoadingOrTable(
+                        isEmpty: DX023CalibrateDetects.Count == 0,
+                        emptyText: "暂无 标定检测 数据",
+                        table: @<div class="table-scroll-container">
+                                    <div class="horiz-scroll">
+                                        <MudTable Items="DX023CalibrateDetects"
+                                                  Hover="true"
+                                                  FixedHeader="true"
+                                                  Height="@TableBodyMaxHeight"
+                                                  Dense="true"
+                                                  Bordered="true"
+                                                  Striped="true"
+                                                  Breakpoint="Breakpoint.Xs"
+                                                  Filter="FilterCalibrates">
+                                            <ToolBarContent>
+                                                <MudTextField T="string"
+                                                              @bind-Value="currentSearchString"
+                                                              Placeholder="搜索 标定检测..."
+                                                              Adornment="Adornment.Start"
+                                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                                              IconSize="Size.Medium"
+                                                              Style="width: 320px;" />
+                                            </ToolBarContent>
+
+                                            <HeaderContent>
+                                                <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">PalmID</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">检测员</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">标定时间</MudTh>
+                                                <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                            </HeaderContent>
+
+                                            <RowTemplate>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="ID">@context.id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="PalmID">@context.palm_id</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="检测员">@context.inspector</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="是否合格">
+                                                    <MudChip T="string" Color="@(context.if_qualified.GetValueOrDefault() ? Color.Success : Color.Error)">
+                                                        @(context.if_qualified.HasValue ? (context.if_qualified.Value ? "是" : "否") : "未知")
+                                                    </MudChip>
+                                                </MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="标定时间">@context.calibrate_time?.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                                                <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
+                                            </RowTemplate>
+
+                                            <PagerContent>
+                                                <MudTablePager RowsPerPageString="显示数量"
+                                                               PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    </div>
+                                </div>)
+                </MudStep>
+
+                <MudStep Completed="task.process_5" Title="5. 功能检测">
+                    @StepLoadingOrTable(
+                        isEmpty: DX023FunctionalDetects.Count == 0,
+                        emptyText: "暂无 功能检测 数据",
+                        table: @<div class="table-scroll-container">
+                                    <div class="horiz-scroll">
+                                        <MudTable Items="DX023FunctionalDetects"
+                                                  Hover="true"
+                                                  FixedHeader="true"
+                                                  Height="@TableBodyMaxHeight"
+                                                  Dense="true"
+                                                  Bordered="true"
+                                                  Striped="true"
+                                                  Breakpoint="Breakpoint.Xs"
+                                                  Filter="FilterFunctionalByReflection">
+                                            <ToolBarContent>
+                                                <MudTextField T="string"
+                                                              @bind-Value="currentSearchString"
+                                                              Placeholder="搜索 功能检测..."
+                                                              Adornment="Adornment.Start"
+                                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                                              IconSize="Size.Medium"
+                                                              Style="width: 320px;" />
+                                            </ToolBarContent>
+
+                                            <HeaderContent>
+                                                @foreach (var p in FunctionalProps)
+                                                {
+                                                    <MudTh Style="@MinColWidthStyle">@p.Name</MudTh>
+                                                }
+                                            </HeaderContent>
+
+                                            <RowTemplate>
+                                                @foreach (var p in FunctionalProps)
+                                                {
+                                                    <MudTd Style="@MinColWidthStyle" DataLabel="@p.Name">
+                                                        @FormatCell(p.GetValue(context))
+                                                    </MudTd>
+                                                }
+                                            </RowTemplate>
+
+                                            <PagerContent>
+                                                <MudTablePager RowsPerPageString="显示数量"
+                                                               PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    </div>
+                                </div>)
+                </MudStep>
+            </ChildContent>
+
+            <ActionContent Context="stepper">
+            </ActionContent>
+        </MudStepper>
+    </MudPaper>
+}
+
+<style>
+    .table-scroll-container { width: 100%; }
+    .horiz-scroll { overflow-x: auto; }
+</style>
+
+@code
+{
+    private string TableBodyMaxHeight => "600px";
+    private const int MinColWidthPx = 140;
+    private string MinColWidthStyle => $"min-width:{MinColWidthPx}px;";
+
+    [Parameter] public string taskId { get; set; }
+    [Parameter] public int? stepIndex { get; set; }
+
+    private ProductTaskDto task;
+
+    private bool isLoading = true;
+    private bool isStepLoading = false;
+
+    private int currentStepIndex = 0;
+
+    private List<ServoDto> Servos = new();
+    private List<FingerDto> Fingers = new();
+    private List<PalmDto> Palms = new();
+    private List<DX023CalibrateDetectsDto> DX023CalibrateDetects = new();
+    private List<DX023FunctionalDetectsDto> DX023FunctionalDetects = new();
+
+    private string currentSearchString = "";
+
+    private List<PropertyInfo> FunctionalProps { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        FunctionalProps = typeof(DX023FunctionalDetectsDto)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .OrderBy(p => p.Name)
+            .ToList();
+
+        if (!string.IsNullOrEmpty(taskId))
+        {
+            if (stepIndex.HasValue && stepIndex.Value >= 0 && stepIndex.Value <= 4)
+                currentStepIndex = stepIndex.Value;
+
+            await LoadTaskDetail();
+            await LoadStepData(currentStepIndex);
+        }
+        else
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (stepIndex.HasValue && stepIndex.Value >= 0 && stepIndex.Value <= 4)
+        {
+            if (currentStepIndex != stepIndex.Value)
+            {
+                currentStepIndex = stepIndex.Value;
+                await LoadStepData(currentStepIndex);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task OnPreviewInteraction(StepperInteractionEventArgs arg)
+    {
+        if (arg.Action == StepAction.Activate)
+        {
+            int targetIndex = arg.StepIndex;
+            currentStepIndex = targetIndex;
+            currentSearchString = "";
+
+            var newUri = $"/DX023TaskDetail/{taskId}/{targetIndex}";
+            NavigationManager.NavigateTo(newUri, replace: true, forceLoad: false);
+
+            await LoadStepData(targetIndex);
+        }
+    }
+
+    private async Task LoadStepData(int stepIdx)
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+            return;
+
+        try
+        {
+            isStepLoading = true;
+
+            await LoadStepDataInternal(stepIdx);
+            await TriggerProcessCheck(stepIdx);
+            await LoadTaskDetail();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载步骤数据失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isStepLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadStepDataInternal(int stepIdx)
+    {
+        currentSearchString = "";
+
+        switch (stepIdx)
+        {
+            case 0:
+            {
+                var res = await PartService.GetServoByTaskIdAsync(taskId);
+                if (res.ResultCode == 1)
+                    Servos = res.ResultData ?? new List<ServoDto>();
+                else
+                {
+                    Servos = new List<ServoDto>();
+                    Snackbar.Add($"加载 Servo 失败：{res.Msg}", Severity.Warning);
+                }
+                break;
+            }
+            case 1:
+            {
+                var res = await PartService.GetFingerByTaskId(taskId);
+                if (res.ResultCode == 1)
+                    Fingers = res.ResultData ?? new List<FingerDto>();
+                else
+                {
+                    Fingers = new List<FingerDto>();
+                    Snackbar.Add($"加载 Finger 失败：{res.Msg}", Severity.Warning);
+                }
+                break;
+            }
+            case 2:
+            {
+                var res = await PartService.GetPalmByTaskId(taskId);
+                if (res.ResultCode == 1)
+                    Palms = res.ResultData ?? new List<PalmDto>();
+                else
+                {
+                    Palms = new List<PalmDto>();
+                    Snackbar.Add($"加载 Palm 失败：{res.Msg}", Severity.Warning);
+                }
+                break;
+            }
+            case 3:
+            {
+                var res = await DX023Service.GetDX023CalibrateDetectByTaskId(taskId);
+                if (res.ResultCode == 1)
+                    DX023CalibrateDetects = res.ResultData ?? new List<DX023CalibrateDetectsDto>();
+                else
+                {
+                    DX023CalibrateDetects = new List<DX023CalibrateDetectsDto>();
+                    Snackbar.Add($"加载 标定检测 失败：{res.Msg}", Severity.Warning);
+                }
+                break;
+            }
+            case 4:
+            {
+                var res = await DX023Service.GetDX023FunctionalDetectByTaskId(taskId);
+                if (res.ResultCode == 1)
+                    DX023FunctionalDetects = res.ResultData ?? new List<DX023FunctionalDetectsDto>();
+                else
+                {
+                    DX023FunctionalDetects = new List<DX023FunctionalDetectsDto>();
+                    Snackbar.Add($"加载 功能检测 失败：{res.Msg}", Severity.Warning);
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    private async Task TriggerProcessCheck(int stepIdx)
+    {
+        ApiResponse<bool> res;
+
+        switch (stepIdx)
+        {
+            case 0: res = await DX023Service.GetProcess1Status(taskId); break;
+            case 1: res = await DX023Service.GetProcess2Status(taskId); break;
+            case 2: res = await DX023Service.GetProcess3Status(taskId); break;
+            case 3: res = await DX023Service.GetProcess4Status(taskId); break;
+            case 4: res = await DX023Service.GetProcess5Status(taskId); break;
+            default: return;
+        }
+    }
+
+    private async Task LoadTaskDetail()
+    {
+        try
+        {
+            isLoading = true;
+
+            var res = await TasksService.GetTaskById(taskId);
+
+            if (res.ResultCode == 1 && res.ResultData != null)
+                task = res.ResultData;
+            else
+            {
+                task = null;
+                Snackbar.Add($"加载任务失败：{res.Msg}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"加载任务失败: {ex.Message}");
+            await DialogService.ShowMessageBox("错误", $"加载任务失败: {ex.Message}", yesText: "确定");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private RenderFragment StepLoadingOrTable(RenderFragment table, bool isEmpty, string emptyText) => @<div>
+        @if (isStepLoading)
+        {
+            <div class="d-flex justify-content-center align-items-center py-10">
+                <MudText Typo="Typo.body1" Color="Color.Secondary">加载中...</MudText>
+            </div>
+        }
+        else if (isEmpty)
+        {
+            <div class="d-flex justify-content-center align-items-center py-10">
+                <MudText Typo="Typo.body1" Color="Color.Secondary">@emptyText</MudText>
+            </div>
+        }
+        else
+        {
+            @table
+        }
+    </div>;
+
+    private bool FilterServos(ServoDto x)
+    {
+        if (string.IsNullOrWhiteSpace(currentSearchString)) return true;
+        var s = currentSearchString.Trim().ToLowerInvariant();
+        return (x.servo_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.task_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.operator_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.superior_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.remarks ?? "").ToLowerInvariant().Contains(s)
+               || x.id.ToString().Contains(s);
+    }
+
+    private bool FilterFingers(FingerDto x)
+    {
+        if (string.IsNullOrWhiteSpace(currentSearchString)) return true;
+        var s = currentSearchString.Trim().ToLowerInvariant();
+        return (x.finger_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.task_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.operator_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.palm_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.remarks ?? "").ToLowerInvariant().Contains(s)
+               || x.id.ToString().Contains(s);
+    }
+
+    private bool FilterPalms(PalmDto x)
+    {
+        if (string.IsNullOrWhiteSpace(currentSearchString)) return true;
+        var s = currentSearchString.Trim().ToLowerInvariant();
+        return (x.palm_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.task_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.operator_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.remarks ?? "").ToLowerInvariant().Contains(s)
+               || x.id.ToString().Contains(s);
+    }
+
+    private bool FilterCalibrates(DX023CalibrateDetectsDto x)
+    {
+        if (string.IsNullOrWhiteSpace(currentSearchString)) return true;
+        var s = currentSearchString.Trim().ToLowerInvariant();
+        return (x.palm_id ?? "").ToLowerInvariant().Contains(s)
+               || (x.inspector ?? "").ToLowerInvariant().Contains(s)
+               || (x.remarks ?? "").ToLowerInvariant().Contains(s)
+               || x.id.ToString().Contains(s);
+    }
+
+    private bool FilterFunctionalByReflection(DX023FunctionalDetectsDto x)
+    {
+        if (string.IsNullOrWhiteSpace(currentSearchString)) return true;
+        var s = currentSearchString.Trim().ToLowerInvariant();
+
+        foreach (var p in FunctionalProps)
+        {
+            var v = p.GetValue(x);
+            if (v == null) continue;
+            var text = FormatCell(v).ToLowerInvariant();
+            if (text.Contains(s)) return true;
+        }
+        return false;
+    }
+
+    private string FormatCell(object? val)
+    {
+        if (val == null) return "";
+        if (val is DateTime dt) return dt.ToString("yyyy-MM-dd HH:mm:ss");
+        if (val is bool b) return b ? "是" : "否";
+        return val.ToString() ?? "";
+    }
+}

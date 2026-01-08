@@ -40,4 +40,9 @@ public class DX023Detect2Controller : ControllerBase
     [HttpGet]
     public Task<ApiResponse<bool>> GetProcess4Status(string task_id, CancellationToken ct = default) =>
         _idx023Service.GetProcess4Status(task_id, ct);
+    
+    [HttpGet]
+    public Task<ApiResponse<bool>> GetProcess5Status(string task_id, CancellationToken ct = default) =>
+        _idx023Service.GetProcess5Status(task_id, ct);
+    
 }

@@ -539,7 +539,7 @@
         if (!string.IsNullOrWhiteSpace(taskId))
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, taskId);
 
-        NavManager.NavigateTo($"/TaskDetail/{taskId}/{3}");
+        NavManager.NavigateTo($"/DX023TaskDetail/{taskId}/{1}");
     }
 
     private async Task HandleAnyInputBlur(string inputId)
