@@ -1,0 +1,700 @@
+﻿@page "/PartSearching"
+@implements IDisposable
+
+@using DexRobotPDA.DTOs
+@using DexRobotPDA.Services
+@using Microsoft.AspNetCore.Components.Web
+@using System.Text.Json
+@using DexRobotPDA.DataModel
+
+@inject ITasksService TaskService
+@inject IJSRuntime JS
+@inject DailyDbContext Db
+
+<MudPaper Elevation="3" Class="pa-4 ma-2 mx-md-8">
+
+    <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3">
+        绑定关系图（Mermaid，可点击折叠/展开）
+    </MudText>
+
+    <!-- ✅ 两路查询：taskId + partId -->
+    <MudStack Row="true" Spacing="2" Class="d-flex align-center mb-3">
+        <MudTextField T="string"
+                      @bind-Value="taskId"
+                      Label="生产单号 taskId"
+                      Variant="Variant.Outlined"
+                      Clearable="true"
+                      Class="flex-1" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Search"
+                   OnClick="@LoadByTaskId"
+                   Disabled="isLoading">
+            @(isLoading ? "查询中..." : "按任务查询")
+        </MudButton>
+
+        <MudTextField T="string"
+                      @bind-Value="partId"
+                      Label="部件号 partId（Motor/Servo/Finger/Palm/Task 任意）"
+                      Variant="Variant.Outlined"
+                      Clearable="true"
+                      Class="flex-1" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.AccountTree"
+                   OnClick="@LoadByPartId"
+                   Disabled="isLoading">
+            @(isLoading ? "查询中..." : "按部件查询")
+        </MudButton>
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Clear"
+                   OnClick="@ClearAll"
+                   Disabled="isLoading">
+            清除
+        </MudButton>
+    </MudStack>
+
+    @if (!hasSearched)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            可按 taskId 查询，也可按 partId 查询后自动定位高亮。
+        </MudText>
+    }
+    else if (isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-4" />
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMsg))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@errorMsg</MudAlert>
+    }
+    else if (fullTaskData == null || fullTaskData.Count == 0)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+            无法加载任务数据，请检查输入是否正确。
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3">
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">任务信息</MudText>
+
+            <div style="display:flex; flex-wrap:wrap; gap:14px;">
+                <div><b>任务号：</b>@(Task?.task_id ?? "—")</div>
+                <div><b>产品类型：</b>@(ProductionType ?? "—")</div>
+                <div><b>产品数量：</b>@(Task?.product_num ?? 0)</div>
+                <div><b>创建时间：</b>@(Task?.created_at.ToString("yyyy-MM-dd HH:mm") ?? "—")</div>
+            </div>
+
+            <MudDivider Class="my-3" />
+
+            <MudStack Row="true" Spacing="2" Class="align-center">
+                <MudTextField T="string"
+                              @bind-Value="graphQuery"
+                              Label="输入任意节点ID（Task/Palm/Finger/Motor/Servo/RotateServo）"
+                              Variant="Variant.Outlined"
+                              Clearable="true"
+                              Immediate="true"
+                              Class="flex-1" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Highlight"
+                           OnClick="@ApplyQueryExpand"
+                           Disabled="@(!HasGraph)">
+                    定位/展开
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.HighlightOff"
+                           OnClick="@ClearQuery"
+                           Disabled="@(!HasGraph)">
+                    清除
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Info"
+                           StartIcon="@Icons.Material.Filled.UnfoldMore"
+                           OnClick="@ExpandAll"
+                           Disabled="@(!HasGraph)">
+                    全部展开
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.UnfoldLess"
+                           OnClick="@CollapseToRoot"
+                           Disabled="@(!HasGraph)">
+                    折叠到根
+                </MudButton>
+            </MudStack>
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                当前结构：@(IsDX021 ? "DX021：Task → Palm → Finger → Motor"
+                           : IsDX023 ? "DX023：Task → Palm → Finger → Servo + Palm → RotateServo"
+                           : "未知（按 DX021）")
+                ｜提示：点击图上的节点即可折叠/展开
+            </MudText>
+
+            <MudDivider Class="my-2" />
+
+            <MudStack Row="true" Spacing="2" Class="align-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">缩放：</MudText>
+                <button class="mini-btn" @onclick="ZoomOut">-</button>
+                <button class="mini-btn" @onclick="ZoomIn">+</button>
+                <button class="mini-btn" @onclick="ZoomReset">重置</button>
+                <div style="min-width:70px; color:#666;">@(zoom.ToString("0.0"))x</div>
+            </MudStack>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">关系图（可拖拽平移 + 点击折叠）</MudText>
+
+            <div class="graph-viewport"
+                 @onmousedown="OnMouseDown"
+                 @onmousemove="OnMouseMove"
+                 @onmouseup="OnMouseUp"
+                 @onmouseleave="OnMouseUp">
+
+                <div class="graph-canvas" style="@GraphCanvasStyle">
+                    <div id="@graphElementId"></div>
+                </div>
+            </div>
+        </MudPaper>
+    }
+
+</MudPaper>
+
+<style>
+    .graph-viewport {
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 8px;
+        height: 560px;
+        overflow: auto;
+        position: relative;
+        cursor: grab;
+        background: #fff;
+    }
+    .graph-viewport:active { cursor: grabbing; }
+
+    .graph-canvas {
+        transform-origin: 0 0;
+        padding: 20px;
+        min-width: 1200px;
+        min-height: 560px;
+    }
+
+    #bindingGraph2 svg {
+        max-width: none !important;
+        height: auto !important;
+    }
+
+    .mini-btn{
+        border:1px solid rgba(0,0,0,.2);
+        background:#fff;
+        border-radius:6px;
+        padding:4px 10px;
+        cursor:pointer;
+    }
+    .mini-btn:hover{ background:#f6f6f6; }
+</style>
+
+@code {
+    private string taskId = "";
+    private string partId = "";
+    private string errorMsg = "";
+    private bool isLoading = false;
+    private bool hasSearched = false;
+
+    private List<FullTaskDataDto> fullTaskData = new();
+
+    private ProductTaskDto? Task => fullTaskData.FirstOrDefault()?.task;
+    private string? ProductionType => Task?.production_type;
+    private bool IsDX021 => string.Equals(ProductionType, "DX021", StringComparison.OrdinalIgnoreCase);
+    private bool IsDX023 => string.Equals(ProductionType, "DX023", StringComparison.OrdinalIgnoreCase);
+
+    // Mermaid
+    private readonly string graphElementId = "bindingGraph2";
+    private string graphQuery = "";
+    private string? hitKey = null;
+
+    private bool HasGraph => nodes.Count > 0 && !string.IsNullOrWhiteSpace(rootKey);
+
+    // Zoom + Pan
+    private double zoom = 1.0;
+    private double panX = 0;
+    private double panY = 0;
+    private bool isPanning = false;
+    private double lastX = 0;
+    private double lastY = 0;
+    private string GraphCanvasStyle => $"transform: translate({panX}px, {panY}px) scale({zoom});";
+
+    private record Node(string Key, string Kind, string Id, string Display);
+    private record Edge(string FromKey, string ToKey, string Label);
+
+    private Dictionary<string, Node> nodes = new();
+    private List<Edge> edges = new();
+    private Dictionary<string, List<string>> children = new();
+    private Dictionary<string, string> parent = new();
+
+    private HashSet<string> expanded = new();
+    private string? rootKey = null;
+    private Dictionary<string, string> mermaidIdToKey = new();
+
+    private DotNetObjectReference<DataSummary2>? _dotnetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotnetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("mermaidFold.bind", _dotnetRef);
+        }
+    }
+
+    // -------------------------
+    // ✅ 路 1：按 taskId 查询
+    // -------------------------
+    private async Task LoadByTaskId()
+    {
+        errorMsg = "";
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            errorMsg = "请输入 taskId";
+            hasSearched = true;
+            return;
+        }
+
+        await LoadTaskAndRender(taskId.Trim(), autoFocusId: null);
+    }
+
+    // -------------------------
+    // ✅ 路 2：按 partId 查询（先溯源拿 taskId，再按 taskId 加载，然后自动定位）
+    // -------------------------
+    private async Task LoadByPartId()
+    {
+        errorMsg = "";
+        hasSearched = true;
+
+        if (string.IsNullOrWhiteSpace(partId))
+        {
+            errorMsg = "请输入 partId";
+            return;
+        }
+
+        isLoading = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var tid = await GetTaskIdAsync(partId.Trim());
+            if (string.IsNullOrWhiteSpace(tid))
+            {
+                errorMsg = "通过 partId 未找到对应 taskId";
+                return;
+            }
+
+            taskId = tid; // ✅ 自动回填 taskId 输入框
+        }
+        catch (Exception ex)
+        {
+            errorMsg = "获取 taskId 失败：" + ex.Message;
+            return;
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // ✅ 拿到 taskId 后，走同一条加载逻辑，并自动定位 partId
+        await LoadTaskAndRender(taskId.Trim(), autoFocusId: partId.Trim());
+    }
+
+    // -------------------------
+    // ✅ 统一：加载 fullTaskData + 建图 + 折叠到根 + 渲染
+    // 如果 autoFocusId != null：自动定位/高亮
+    // -------------------------
+    private async Task LoadTaskAndRender(string tid, string? autoFocusId)
+    {
+        isLoading = true;
+        hasSearched = true;
+        errorMsg = "";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var resp = await TaskService.GetFullTaskDataAsync(tid);
+            fullTaskData = resp?.ResultData ?? new List<FullTaskDataDto>();
+
+            BuildFullGraph();
+            CollapseToRootInternal();
+
+            await RenderGraph();
+
+            // ✅ 自动定位：把 partId 写入 graphQuery 并展开
+            if (!string.IsNullOrWhiteSpace(autoFocusId))
+            {
+                graphQuery = autoFocusId;
+                await ApplyQueryExpand();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMsg = "加载任务失败：" + ex.Message;
+
+            fullTaskData = new List<FullTaskDataDto>();
+            nodes.Clear();
+            edges.Clear();
+            children.Clear();
+            parent.Clear();
+            expanded.Clear();
+            rootKey = null;
+            mermaidIdToKey.Clear();
+
+            await JS.InvokeVoidAsync("mermaidFold.clear", graphElementId);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ClearAll()
+    {
+        taskId = "";
+        partId = "";
+        graphQuery = "";
+        hitKey = null;
+        errorMsg = "";
+        isLoading = false;
+        hasSearched = false;
+
+        fullTaskData.Clear();
+        nodes.Clear();
+        edges.Clear();
+        children.Clear();
+        parent.Clear();
+        expanded.Clear();
+        rootKey = null;
+        mermaidIdToKey.Clear();
+
+        zoom = 1.0;
+        panX = 0;
+        panY = 0;
+
+        _ = JS.InvokeVoidAsync("mermaidFold.clear", graphElementId);
+    }
+
+    // -------------------------
+    // Graph build
+    // -------------------------
+    private void BuildFullGraph()
+    {
+        nodes.Clear();
+        edges.Clear();
+        children.Clear();
+        parent.Clear();
+        mermaidIdToKey.Clear();
+        hitKey = null;
+        expanded.Clear();
+        rootKey = null;
+
+        if (fullTaskData == null || fullTaskData.Count == 0) return;
+
+        var task = fullTaskData.FirstOrDefault()?.task;
+        if (task == null || string.IsNullOrWhiteSpace(task.task_id)) return;
+
+        rootKey = KeyOf("Task", task.task_id);
+        AddNode(rootKey, "Task", task.task_id, $"Task {task.task_id}");
+
+        foreach (var palmData in fullTaskData)
+        {
+            var palm = palmData.palm;
+            if (palm == null || string.IsNullOrWhiteSpace(palm.palm_id)) continue;
+
+            var palmKey = KeyOf("Palm", palm.palm_id);
+            AddNode(palmKey, "Palm", palm.palm_id, $"Palm {palm.palm_id}");
+            AddEdge(rootKey, palmKey, "task_id");
+
+            // DX023：Palm -> RotateServo
+            if (IsDX023 && palmData.rotateServo != null && !string.IsNullOrWhiteSpace(palmData.rotateServo.servo_id))
+            {
+                var rsId = palmData.rotateServo.servo_id!;
+                var rsKey = KeyOf("RotateServo", rsId);
+                AddNode(rsKey, "RotateServo", rsId, $"RotateServo {rsId}");
+                AddEdge(palmKey, rsKey, "rotate_servo");
+            }
+
+            foreach (var fingerData in palmData.fingers ?? new List<FingerDataDto>())
+            {
+                var finger = fingerData.finger;
+                if (finger == null || string.IsNullOrWhiteSpace(finger.finger_id)) continue;
+
+                var fingerKey = KeyOf("Finger", finger.finger_id);
+                AddNode(fingerKey, "Finger", finger.finger_id, $"Finger {finger.finger_id}");
+                AddEdge(palmKey, fingerKey, "palm_id");
+
+                if (IsDX023)
+                {
+                    foreach (var s in fingerData.servos ?? new List<ServoDataDto>())
+                    {
+                        var servo = s.servo;
+                        if (servo == null || string.IsNullOrWhiteSpace(servo.servo_id)) continue;
+
+                        var servoKey = KeyOf("Servo", servo.servo_id);
+                        AddNode(servoKey, "Servo", servo.servo_id, $"Servo {servo.servo_id}");
+                        AddEdge(fingerKey, servoKey, "superior_id");
+                    }
+                }
+                else
+                {
+                    foreach (var m in fingerData.motors ?? new List<MotorDataDto>())
+                    {
+                        var motor = m.motor;
+                        if (motor == null || string.IsNullOrWhiteSpace(motor.motor_id)) continue;
+
+                        var motorKey = KeyOf("Motor", motor.motor_id);
+                        AddNode(motorKey, "Motor", motor.motor_id, $"Motor {motor.motor_id}");
+                        AddEdge(fingerKey, motorKey, "motor_id");
+                    }
+                }
+            }
+        }
+
+        foreach (var e in edges)
+        {
+            if (!children.TryGetValue(e.FromKey, out var list))
+            {
+                list = new List<string>();
+                children[e.FromKey] = list;
+            }
+
+            list.Add(e.ToKey);
+            parent[e.ToKey] = e.FromKey;
+        }
+    }
+
+    private void AddNode(string key, string kind, string id, string display) => nodes[key] = new Node(key, kind, id, display);
+    private void AddEdge(string fromKey, string toKey, string label) => edges.Add(new Edge(fromKey, toKey, label));
+    private static string KeyOf(string kind, string id) => $"{kind}:{id}";
+
+    private void CollapseToRootInternal()
+    {
+        expanded.Clear();
+        hitKey = null;
+        if (!string.IsNullOrWhiteSpace(rootKey))
+            expanded.Add(rootKey!);
+    }
+
+    private async Task CollapseToRoot()
+    {
+        if (!HasGraph) return;
+        CollapseToRootInternal();
+        await RenderGraph();
+    }
+
+    private async Task ExpandAll()
+    {
+        if (!HasGraph) return;
+        expanded = nodes.Keys.ToHashSet();
+        await RenderGraph();
+    }
+
+    private async Task ApplyQueryExpand()
+    {
+        if (!HasGraph) return;
+        if (string.IsNullOrWhiteSpace(graphQuery)) return;
+
+        var hit = FindNodeKeyByAnyId(graphQuery.Trim());
+        if (hit == null)
+        {
+            // 如果 partId 输入的是“显示文本的一部分”或扫描码有前后空格，这里就提示一下
+            errorMsg = "未在当前任务关系图中找到该节点ID";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        errorMsg = "";
+        hitKey = hit;
+
+        // 展开到根路径
+        var cur = hit;
+        while (true)
+        {
+            expanded.Add(cur);
+            if (!parent.TryGetValue(cur, out var p)) break;
+            cur = p;
+        }
+
+        expanded.Add(hit);
+
+        await RenderGraph();
+    }
+
+    private async Task ClearQuery()
+    {
+        if (!HasGraph) return;
+        graphQuery = "";
+        hitKey = null;
+        errorMsg = "";
+        await RenderGraph();
+    }
+
+    private string? FindNodeKeyByAnyId(string anyId)
+    {
+        var hit = nodes.Values.FirstOrDefault(n => string.Equals(n.Id, anyId, StringComparison.OrdinalIgnoreCase));
+        return hit?.Key;
+    }
+
+    private async Task RenderGraph()
+    {
+        if (!HasGraph)
+        {
+            await JS.InvokeVoidAsync("mermaidFold.clear", graphElementId);
+            return;
+        }
+
+        var visible = new HashSet<string>();
+        var visibleEdges = new List<Edge>();
+
+        var q = new Queue<string>();
+        q.Enqueue(rootKey!);
+        visible.Add(rootKey!);
+
+        while (q.Count > 0)
+        {
+            var cur = q.Dequeue();
+            if (!expanded.Contains(cur)) continue;
+
+            if (children.TryGetValue(cur, out var ch))
+            {
+                foreach (var c in ch)
+                {
+                    visible.Add(c);
+
+                    // 用 FirstOrDefault 会 O(n^2)，但规模不大无所谓；要优化再改 lookup
+                    var e = edges.FirstOrDefault(x => x.FromKey == cur && x.ToKey == c);
+                    if (e != null) visibleEdges.Add(e);
+
+                    q.Enqueue(c);
+                }
+            }
+        }
+
+        var visibleNodes = nodes.Values.Where(n => visible.Contains(n.Key)).ToList();
+        var mermaid = BuildMermaid(visibleNodes, visibleEdges, hitKey);
+
+        mermaidIdToKey.Clear();
+        foreach (var n in visibleNodes)
+        {
+            mermaidIdToKey[MermaidId(n.Key)] = n.Key;
+        }
+
+        var mapJson = JsonSerializer.Serialize(mermaidIdToKey);
+
+        await JS.InvokeVoidAsync("mermaidFold.render", graphElementId, mermaid, mapJson);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string BuildMermaid(List<Node> vNodes, List<Edge> vEdges, string? hit)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("graph TD");
+
+        sb.AppendLine("classDef normal fill:#ffffff,stroke:#cbd5e1,stroke-width:1px;");
+        sb.AppendLine("classDef hit fill:#fff3bf,stroke:#f59f00,stroke-width:4px;");
+        sb.AppendLine("classDef expanded fill:#e7f5ff,stroke:#339af0,stroke-width:2px;");
+
+        foreach (var n in vNodes)
+            sb.AppendLine($"    {MermaidId(n.Key)}[\"{Escape(n.Display)}\"]");
+
+        sb.AppendLine();
+
+        foreach (var e in vEdges)
+            sb.AppendLine($"    {MermaidId(e.FromKey)} -->|{Escape(e.Label)}| {MermaidId(e.ToKey)}");
+
+        sb.AppendLine();
+
+        foreach (var n in vNodes)
+        {
+            var mid = MermaidId(n.Key);
+
+            var cls = "normal";
+            if (!string.IsNullOrWhiteSpace(hit) && n.Key == hit) cls = "hit";
+            else if (expanded.Contains(n.Key)) cls = "expanded";
+
+            sb.AppendLine($"    class {mid} {cls}");
+
+            // ✅ Mermaid click：必须是 call + function(args)
+            sb.AppendLine($"    click {mid} call mermaidNodeClick(\"{mid}\")");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string MermaidId(string key)
+        => key.Replace(":", "_").Replace("-", "_").Replace(".", "_").Replace(" ", "_").Replace("/", "_");
+
+    private static string Escape(string s)
+        => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    [JSInvokable]
+    public async Task ToggleNodeByMermaidId(string mermaidNodeId)
+    {
+        if (string.IsNullOrWhiteSpace(mermaidNodeId)) return;
+        if (!mermaidIdToKey.TryGetValue(mermaidNodeId, out var key)) return;
+
+        // toggle expand
+        var hasChild = children.TryGetValue(key, out var ch) && ch.Count > 0;
+        if (hasChild)
+        {
+            if (expanded.Contains(key)) expanded.Remove(key);
+            else expanded.Add(key);
+        }
+
+        hitKey = key;
+
+        if (nodes.TryGetValue(key, out var node))
+        {
+            graphQuery = node.Id; // ✅ 直接绑定变量即可，避免 MudTextField 版本差异
+        }
+
+        await RenderGraph();
+    }
+
+    // Zoom & Pan
+    private void ZoomIn() => zoom = Math.Min(2.5, zoom + 0.1);
+    private void ZoomOut() => zoom = Math.Max(0.3, zoom - 0.1);
+    private void ZoomReset() { zoom = 1.0; panX = 0; panY = 0; }
+
+    private void OnMouseDown(MouseEventArgs e) { isPanning = true; lastX = e.ClientX; lastY = e.ClientY; }
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        if (!isPanning) return;
+        panX += (e.ClientX - lastX);
+        panY += (e.ClientY - lastY);
+        lastX = e.ClientX;
+        lastY = e.ClientY;
+    }
+    private void OnMouseUp(MouseEventArgs e) => isPanning = false;
+
+    // ✅ 你写好的溯源：根据 partId 找 taskId
+    private async Task<string?> GetTaskIdAsync(string part_id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(part_id)) return null;
+        var info = await PartCodeHelper.TraceAsync(Db, part_id.Trim(), ct);
+        return info?.TaskId;
+    }
+
+    public void Dispose()
+    {
+        _dotnetRef?.Dispose();
+    }
+}

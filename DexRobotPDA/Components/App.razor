@@ -15,10 +15,12 @@
 
 <script src="_framework/blazor.web.js"></script>
 <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="js/barcode-scanner.js"></script>
 <script src="js/enterKeyHandler.js"></script>
 <script src="js/input-utils.js"></script>
 <script src="JS/title.js"></script>
+<script src="JS/mermaidFold.js"></script>
 
 <script src="/xlsx/dist/xlsx.full.min.js"></script>
 <script>
@@ -64,6 +66,19 @@
     if (el) el.remove();
   };
 </script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+@* <script> *@
+@*   mermaid.initialize({ *@
+@*     startOnLoad: false, *@
+@*     flowchart: { useMaxWidth: false }   // ✅ 关键：不要自动压缩 *@
+@*   }); *@
+@* *@
+@*   window.mermaidRender = async (elementId) => { *@
+@*     const el = document.getElementById(elementId); *@
+@*     if (!el) return; *@
+@*     await mermaid.run({ querySelector: `#${elementId}` }); *@
+@*   }; *@
+@* </script> *@
 
 </body>
 </html>

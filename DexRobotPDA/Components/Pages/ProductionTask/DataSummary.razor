@@ -122,63 +122,127 @@
                                     </MudPaper>
                                 }
 
-                                @* ====================== DX021：Palm 检测（DX023 暂无检测 -> 不显示） ====================== *@
+                                @* ====================== Palm 检测区块 ====================== *@
                                 @if (IsDX021)
                                 {
+                                    @* ===== DX021：显示原 Detect5 -> palmData.detects ===== *@
                                     <MudExpansionPanels Elevation="1" Class="my-3">
-                                        <MudExpansionPanel Text="整手标定检测"
+                                        <MudExpansionPanel Text="整手标定检测（DX021）"
                                                            ExpandIcon="@Icons.Material.Filled.KeyboardArrowDown"
                                                            CollapseIcon="@Icons.Material.Filled.KeyboardArrowUp">
-                                            <MudTable Items="palmData.detects" Dense="true" Hover="true" Bordered="true">
-                                                <HeaderContent>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.id">检测ID</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.palm_id">手掌外壳ID</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.proximity_sensing">接近觉</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.normal_force">法向力</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.fan_function">风扇功能</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.software_version">软件版本号</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.electricity">电流</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.inspector">检测人员</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.remarks">备注</MudTableSortLabel>
-                                                    </MudTh>
-                                                    <MudTh Style="@MinColWidthStyle">
-                                                        <MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.if_qualified">是否合格</MudTableSortLabel>
-                                                    </MudTh>
-                                                </HeaderContent>
-                                                <RowTemplate>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="检测ID">@context.id</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="手掌外壳ID">@context.palm_id</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="接近觉">@context.proximity_sensing</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="法向力">@context.normal_force</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="风扇功能">@context.fan_function</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="软件版本号">@context.software_version</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="电流">@context.electricity</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="操作员ID">@context.inspector</MudTd>
-                                                    <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
-                                                    <MudTd>
-                                                        @if (context.if_qualified == true) { <span>✅ 合格</span> }
-                                                        else if (context.if_qualified == false) { <span>❌ 不合格</span> }
-                                                        else { <span>未知</span> }
-                                                    </MudTd>
-                                                </RowTemplate>
-                                            </MudTable>
+                                            @if (palmData.detects == null || !palmData.detects.Any())
+                                            {
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">暂无整手标定检测数据</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudTable Items="palmData.detects" Dense="true" Hover="true" Bordered="true">
+                                                    <HeaderContent>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.id">检测ID</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.palm_id">手掌外壳ID</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.proximity_sensing">接近觉</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.normal_force">法向力</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.fan_function">风扇功能</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.software_version">软件版本号</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.electricity">电流</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.inspector">检测人员</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.remarks">备注</MudTableSortLabel></MudTh>
+                                                        <MudTh Style="@MinColWidthStyle"><MudTableSortLabel SortBy="(PalmCalibrateDetectDto x) => x.if_qualified">是否合格</MudTableSortLabel></MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="检测ID">@context.id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="手掌外壳ID">@context.palm_id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="接近觉">@context.proximity_sensing</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="法向力">@context.normal_force</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="风扇功能">@context.fan_function</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="软件版本号">@context.software_version</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="电流">@context.electricity</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="操作员ID">@context.inspector</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle" DataLabel="备注">@context.remarks</MudTd>
+                                                        <MudTd>
+                                                            @if (context.if_qualified == true) { <span>✅ 合格</span> }
+                                                            else if (context.if_qualified == false) { <span>❌ 不合格</span> }
+                                                            else { <span>未知</span> }
+                                                        </MudTd>
+                                                    </RowTemplate>
+                                                </MudTable>
+                                            }
+                                        </MudExpansionPanel>
+                                    </MudExpansionPanels>
+                                }
+                                else if (IsDX023)
+                                {
+                                    @* ===== DX023：显示 dx023CalibrateDetects + dx023FunctionalDetects ===== *@
+
+                                    <MudExpansionPanels Elevation="1" Class="my-3">
+                                        <MudExpansionPanel Text="DX023 校准检测"
+                                                           ExpandIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                                                           CollapseIcon="@Icons.Material.Filled.KeyboardArrowUp">
+                                            @if (palmData.dx023CalibrateDetects == null || !palmData.dx023CalibrateDetects.Any())
+                                            {
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">暂无 DX023 校准检测数据</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudTable Items="palmData.dx023CalibrateDetects" Dense="true" Hover="true" Bordered="true">
+                                                    <HeaderContent>
+                                                        <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">PalmId</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">检测时间</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">检测员</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd Style="@MinColWidthStyle">@context.id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.palm_id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.calibrate_time</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.inspector</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.remarks</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">
+                                                            @if (context.if_qualified == true) { <span>✅ 合格</span> }
+                                                            else if (context.if_qualified == false) { <span>❌ 不合格</span> }
+                                                            else { <span>未知</span> }
+                                                        </MudTd>
+                                                    </RowTemplate>
+                                                </MudTable>
+                                            }
+                                        </MudExpansionPanel>
+                                    </MudExpansionPanels>
+
+                                    <MudExpansionPanels Elevation="1" Class="my-3">
+                                        <MudExpansionPanel Text="DX023 功能检测"
+                                                           ExpandIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                                                           CollapseIcon="@Icons.Material.Filled.KeyboardArrowUp">
+                                            @if (palmData.dx023FunctionalDetects == null || !palmData.dx023FunctionalDetects.Any())
+                                            {
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">暂无 DX023 功能检测数据</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudTable Items="palmData.dx023FunctionalDetects" Dense="true" Hover="true" Bordered="true">
+                                                    <HeaderContent>
+                                                        <MudTh Style="@MinColWidthStyle">ID</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">PalmId</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">检测时间</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">检测员</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">备注</MudTh>
+                                                        <MudTh Style="@MinColWidthStyle">是否合格</MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd Style="@MinColWidthStyle">@context.id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.palm_id</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.calibrate_time</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.inspector</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">@context.remarks</MudTd>
+                                                        <MudTd Style="@MinColWidthStyle">
+                                                            @if (context.if_qualified == true) { <span>✅ 合格</span> }
+                                                            else if (context.if_qualified == false) { <span>❌ 不合格</span> }
+                                                            else { <span>未知</span> }
+                                                        </MudTd>
+                                                    </RowTemplate>
+                                                </MudTable>
+                                            }
                                         </MudExpansionPanel>
                                     </MudExpansionPanels>
                                 }
@@ -495,7 +559,6 @@
 
         try
         {
-            // ✅ 改成 Service 版（你现在的接口是 GetFullTaskDataAsync）
             var resp = await TaskService.GetFullTaskDataAsync(taskId.Trim());
             fullTaskData = resp?.ResultData ?? new List<FullTaskDataDto>();
         }
@@ -571,13 +634,15 @@
         if (IsDX023)
         {
             BuildPalmFingerServoRelations(rows, merges, styles);
-            // DX023 暂时没有检测内容 -> 不导出检测区块
+
+            // ✅ DX023：导出两类检测（不导出 detects）
+            BuildDx023DetectionResults(rows, styles);
         }
         else
         {
             // 默认 DX021
             BuildPalmFingerMotorRelations(rows, merges, styles);
-            BuildDetectionResults(rows, styles);
+            BuildDetectionResultsDx021(rows, styles);
         }
 
         return (rows, merges, styles);
@@ -763,17 +828,17 @@
                 int fingerRowEnd = rows.Count - 1;
                 if (fingerRowEnd > fingerRowStart)
                 {
-                    AddMerge(merges, fingerRowStart, fingerRowEnd, 3); // 手指编号
-                    AddMerge(merges, fingerRowStart, fingerRowEnd, 4); // 手指类型
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 3);
+                    AddMerge(merges, fingerRowStart, fingerRowEnd, 4);
                 }
             }
 
             int palmRowEnd = rows.Count - 1;
             if (palmRowEnd > palmRowStart)
             {
-                AddMerge(merges, palmRowStart, palmRowEnd, 0); // 手掌编号
-                AddMerge(merges, palmRowStart, palmRowEnd, 1); // 手掌组装时间
-                AddMerge(merges, palmRowStart, palmRowEnd, 2); // 旋转舵机ID
+                AddMerge(merges, palmRowStart, palmRowEnd, 0);
+                AddMerge(merges, palmRowStart, palmRowEnd, 1);
+                AddMerge(merges, palmRowStart, palmRowEnd, 2);
             }
         }
 
@@ -781,10 +846,10 @@
         rows.Add(new());
     }
 
-    // ================== DX021：检测结果（你的原逻辑） ==================
-    private void BuildDetectionResults(List<List<object>> rows, List<object> styles)
+    // ================== DX021：检测导出（原逻辑） ==================
+    private void BuildDetectionResultsDx021(List<List<object>> rows, List<object> styles)
     {
-        var palmDetectRows = BuildPalmDetectionRows();
+        var palmDetectRows = BuildPalmDetectionRowsDx021();
         var fingerD4Rows = BuildFingerD4Rows();
         var fingerD3Rows = BuildFingerD3Rows();
         var fingerD2Rows = BuildFingerD2Rows();
@@ -806,6 +871,19 @@
             new[] { "电机编号", "检测编号", "粘接时间", "使用时间", "作用力", "检测前距离", "检测后距离", "距离差", "检测员", "备注", "是否合格" });
     }
 
+    // ================== DX023：检测导出（新增） ==================
+    private void BuildDx023DetectionResults(List<List<object>> rows, List<object> styles)
+    {
+        var calRows = BuildDx023CalibrateRows();
+        var funRows = BuildDx023FunctionalRows();
+
+        AddDetectionSection(rows, styles, "DX023校准检测", calRows,
+            new[] { "手掌编号", "检测ID", "检测时间", "检测员", "备注", "是否合格" });
+
+        AddDetectionSection(rows, styles, "DX023功能检测", funRows,
+            new[] { "手掌编号", "检测ID", "检测时间", "检测员", "备注", "是否合格" });
+    }
+
     private void AddDetectionSection(List<List<object>> rows, List<object> styles,
         string sectionTitle, List<List<object>> dataRows, string[] headers)
     {
@@ -823,12 +901,12 @@
         }
     }
 
-    // ================== 数据明细（保持你的原实现） ==================
-    private List<List<object>> BuildPalmDetectionRows()
+    // ================== DX021：整手标定检测 rows（原 detects） ==================
+    private List<List<object>> BuildPalmDetectionRowsDx021()
     {
         var rows = new List<List<object>>();
 
-        foreach (var palm in fullTaskData.Where(p => p?.detects != null))
+        foreach (var palm in fullTaskData.Where(p => p != null && p.detects != null))
         {
             foreach (var d in palm.detects)
             {
@@ -853,6 +931,55 @@
         return rows;
     }
 
+    // ================== DX023：校准检测 rows（⚠ 字段名按你 DTO 调整） ==================
+    private List<List<object>> BuildDx023CalibrateRows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p != null && p.dx023CalibrateDetects != null))
+        {
+            foreach (var d in palm.dx023CalibrateDetects)
+            {
+                rows.Add(new()
+                {
+                    palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                    d.id,
+                    d.calibrate_time,
+                    d.inspector ?? ExportConstants.EmptyValue,
+                    d.remarks ?? ExportConstants.EmptyValue,
+                    d.if_qualified switch { true => ExportConstants.Qualified, false => ExportConstants.Unqualified, null => "未知" }
+                });
+            }
+        }
+
+        return rows;
+    }
+
+    // ================== DX023：功能检测 rows（⚠ 字段名按你 DTO 调整） ==================
+    private List<List<object>> BuildDx023FunctionalRows()
+    {
+        var rows = new List<List<object>>();
+
+        foreach (var palm in fullTaskData.Where(p => p != null && p.dx023FunctionalDetects != null))
+        {
+            foreach (var d in palm.dx023FunctionalDetects)
+            {
+                rows.Add(new()
+                {
+                    palm.palm?.palm_id ?? ExportConstants.EmptyValue,
+                    d.id,
+                    d.calibrate_time,
+                    d.inspector ?? ExportConstants.EmptyValue,
+                    d.remarks ?? ExportConstants.EmptyValue,
+                    d.if_qualified switch { true => ExportConstants.Qualified, false => ExportConstants.Unqualified, null => "未知" }
+                });
+            }
+        }
+
+        return rows;
+    }
+
+    // ================== DX021 其他检测（保持你的原实现） ==================
     private List<List<object>> BuildFingerD4Rows()
     {
         var rows = new List<List<object>>();
@@ -995,7 +1122,6 @@
             };
         }
 
-        // 默认 DX021
         return type switch
         {
             0 => "单指",
@@ -1061,7 +1187,9 @@
             "分指标定检测",
             "分指蜗杆粘接检测",
             "单指标定检测",
-            "电机蜗杆粘接检测"
+            "电机蜗杆粘接检测",
+            "DX023校准检测",
+            "DX023功能检测"
         };
         for (int r = 0; r < rows.Count; r++)
         {
@@ -1072,7 +1200,6 @@
             }
         }
 
-        // styles（保留你的接口，实际你当前 styles 填得不多，先不强依赖）
         if (styles != null)
         {
             foreach (dynamic st in styles)

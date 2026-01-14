@@ -811,3 +811,4 @@ D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Serilog.Filters.Expressions.d
 D:\C# Projects\NewPda\DexRobotPDA\bin\Debug\net9.0\Superpower.dll
 D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\compressed\1geivr5qz9-d4ypubpf4b.gz
 D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\compressed\ykdtvvz57f-uja9764j2z.gz
+D:\C# Projects\NewPda\DexRobotPDA\obj\Debug\net9.0\compressed\3l9gqf7ymz-hfgwqk4iz2.gz

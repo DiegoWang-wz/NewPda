@@ -69,6 +69,21 @@ namespace DexRobotPDA.Services
 
                 var taskDto = _mapper.Map<ProductTaskDto>(task);
 
+                // ✅ 判定是否 DX023（按你项目实际字段调整：production_type / product_type / line 等）
+                // 这里做得更“宽松”：只要包含 "DX023" 就认为是 DX023
+                var isDx023 = false;
+                try
+                {
+                    // 你若是 int 型，比如 23/21，请改成：task.production_type == 23
+                    // 这里先按 string 处理，避免你贴的结构不一致
+                    var pt = task.production_type?.ToString() ?? string.Empty;
+                    isDx023 = pt.Contains("DX023", StringComparison.OrdinalIgnoreCase) || pt == "23";
+                }
+                catch
+                {
+                    isDx023 = false;
+                }
+
                 // 2) palms
                 var palms = await _db.Palms
                     .AsNoTracking()
@@ -89,18 +104,55 @@ namespace DexRobotPDA.Services
                     .Distinct()
                     .ToList();
 
-                // 3) palm detects (Detect5)
-                var palmDetects = await _db.Detect5
-                    .AsNoTracking()
-                    .Where(d => palmIds.Contains(d.palm_id))
-                    .ToListAsync(ct);
+                // 3) palm detects
+                // 3.1) 旧 palm 检测：Detect5（给非 DX023 用 / 或给老页面兼容）
+                var palmDetectDtosByPalm = new Dictionary<string, List<PalmCalibrateDetectDto>>();
+                if (!isDx023)
+                {
+                    var palmDetects = await _db.Detect5
+                        .AsNoTracking()
+                        .Where(d => palmIds.Contains(d.palm_id))
+                        .ToListAsync(ct);
 
-                var palmDetectDtosByPalm = palmDetects
-                    .GroupBy(x => x.palm_id)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => _mapper.Map<List<PalmCalibrateDetectDto>>(g.ToList())
-                    );
+                    palmDetectDtosByPalm = palmDetects
+                        .GroupBy(x => x.palm_id)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => _mapper.Map<List<PalmCalibrateDetectDto>>(g.ToList())
+                        );
+                }
+
+                // 3.2) ✅ DX023 新增两类检测：都按 palm_id
+                // 说明：这里不影响非 DX023；即便你希望 DX023 也能返回 Detect5，可把 if (isDx023) 去掉
+                var dx023CalibrateDetectDtosByPalm = new Dictionary<string, List<DX023CalibrateDetectsDto>>();
+                var dx023FunctionalDetectDtosByPalm = new Dictionary<string, List<DX023FunctionalDetectsDto>>();
+
+                if (isDx023)
+                {
+                    var dx023CalibrateDetects = await _db.DX023CalibrateDetects
+                        .AsNoTracking()
+                        .Where(d => palmIds.Contains(d.palm_id))
+                        .ToListAsync(ct);
+
+                    dx023CalibrateDetectDtosByPalm = dx023CalibrateDetects
+                        .GroupBy(x => x.palm_id)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => _mapper.Map<List<DX023CalibrateDetectsDto>>(g.ToList())
+                        );
+
+                    var dx023FunctionalDetects = await _db.DX023FunctionalDetects
+                        .AsNoTracking()
+                        .Where(d => palmIds.Contains(d.palm_id))
+                        .ToListAsync(ct);
+
+                    dx023FunctionalDetectDtosByPalm = dx023FunctionalDetects
+                        .GroupBy(x => x.palm_id)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => _mapper.Map<List<DX023FunctionalDetectsDto>>(g.ToList())
+                        );
+                }
 
                 // 4) fingers
                 var fingers = await _db.Fingers
@@ -203,13 +255,22 @@ namespace DexRobotPDA.Services
 
                 foreach (var palm in palms)
                 {
-                    var pid = palm.palm_id ?? "";
-
+                    var pid = palm.palm_id ?? string.Empty;
                     var palmDto = _mapper.Map<PalmDto>(palm);
 
+                    // 旧 Detect5（非 DX023 才会有）
                     var palmDetectDtos = palmDetectDtosByPalm.TryGetValue(pid, out var pd)
                         ? pd
                         : new List<PalmCalibrateDetectDto>();
+
+                    // ✅ DX023 两类检测
+                    var dx023CalibrateDetectDtos = dx023CalibrateDetectDtosByPalm.TryGetValue(pid, out var cals)
+                        ? cals
+                        : new List<DX023CalibrateDetectsDto>();
+
+                    var dx023FunctionalDetectDtos = dx023FunctionalDetectDtosByPalm.TryGetValue(pid, out var funcs)
+                        ? funcs
+                        : new List<DX023FunctionalDetectsDto>();
 
                     var rotateServo = rotateServoByPalm.TryGetValue(pid, out var rs)
                         ? rs
@@ -221,14 +282,16 @@ namespace DexRobotPDA.Services
                     {
                         foreach (var finger in palmFingers)
                         {
-                            var fid = finger.finger_id ?? "";
+                            var fid = finger.finger_id ?? string.Empty;
 
                             var fDetect4 = detect4ByFinger.TryGetValue(fid, out var d4)
                                 ? d4
                                 : new List<FingerCalibrateDetectDto>();
+
                             var fDetect3 = detect3ByFinger.TryGetValue(fid, out var d3)
                                 ? d3
                                 : new List<SplitCalibrateDetectDto>();
+
                             var fDetect2 = detect2ByFinger.TryGetValue(fid, out var d2)
                                 ? d2
                                 : new List<SplitWormDetectDto>();
@@ -239,7 +302,7 @@ namespace DexRobotPDA.Services
                             {
                                 foreach (var m in fMotors)
                                 {
-                                    var mid = m.motor_id ?? "";
+                                    var mid = m.motor_id ?? string.Empty;
                                     var mDetect1 = detect1ByMotor.TryGetValue(mid, out var d1)
                                         ? d1
                                         : new List<MotorWormDetectDto>();
@@ -269,14 +332,24 @@ namespace DexRobotPDA.Services
                         }
                     }
 
-                    result.Add(new FullTaskDataDto
+                    // ✅ 输出：保留 detects（老字段）+ 新增 DX023 两类
+                    var dto = new FullTaskDataDto
                     {
                         task = taskDto,
                         palm = palmDto,
                         rotateServo = rotateServo, // ✅ 单个（可能为 null）
                         fingers = fingerDataList,
-                        detects = palmDetectDtos
-                    });
+
+                        // 老逻辑兼容：DX023 默认空；非 DX023 则有 Detect5
+                        detects = palmDetectDtos,
+                    };
+
+                    // ✅ 如果你的 FullTaskDataDto 已经加了这两个字段，就能直接挂上
+                    // 如果还没加字段导致编译报错：删掉下面两行即可
+                    dto.dx023CalibrateDetects = dx023CalibrateDetectDtos;
+                    dto.dx023FunctionalDetects = dx023FunctionalDetectDtos;
+
+                    result.Add(dto);
                 }
 
                 response.ResultCode = 1;
